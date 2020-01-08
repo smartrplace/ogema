@@ -38,6 +38,7 @@ import org.ogema.model.sensors.TemperatureSensor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
+import org.ogema.drivers.homematic.xmlrpc.hl.types.HmMaintenance;
 import org.ogema.tools.resource.util.ResourceUtils;
 
 /**
@@ -173,6 +174,7 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
         
         TemperatureResource setpoint = thermos.temperatureSensor().settings().setpoint();
         setpoint.create();
+        linkMaintenanceWhenAvailable(parent, thermos);
         thermos.activate(true);
         
         setpoint.addValueListener(new ResourceValueListener<TemperatureResource>() {
@@ -187,6 +189,36 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
         setupHmParameterValues(thermos, parent.address().getValue());
         setupTempSensLinking(thermos);
+    }
+    
+    void linkMaintenanceWhenAvailable(final HmDevice device, final Thermostat thermos) {
+        List<HmMaintenance> l = device.getSubResources(HmMaintenance.class, false);
+        if (l.isEmpty()) {
+            device.addStructureListener(new ResourceStructureListener() {
+                @Override
+                public void resourceStructureChanged(ResourceStructureEvent event) {
+                    if (event.getType() != ResourceStructureEvent.EventType.SUBRESOURCE_ADDED) {
+                        return;
+                    }
+                    if (HmMaintenance.class.isAssignableFrom(event.getChangedResource().getResourceType())) {
+                        linkMaintencance((HmMaintenance) event.getChangedResource(), thermos);
+                        device.removeStructureListener(this);
+                    }
+                }
+            });
+            // race condition during creation not resolveable here
+            l = device.getSubResources(HmMaintenance.class, false);
+            if (!l.isEmpty()) {
+                linkMaintencance(l.get(0), thermos);
+            }
+        } else {
+            linkMaintencance(l.get(0), thermos);
+        }
+    }
+    
+    void linkMaintencance(HmMaintenance mntn, Thermostat thermos) {
+        thermos.battery().create();
+        mntn.battery().setAsReference(thermos.battery());
     }
     
     class ParameterListener implements ResourceValueListener<SingleValueResource> {
