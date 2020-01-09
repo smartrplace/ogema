@@ -17,6 +17,7 @@ package org.ogema.impl.security;
 
 import java.io.IOException;
 import java.security.AccessControlContext;
+import java.security.AccessControlException;
 import java.security.AccessController;
 import java.security.Permission;
 import java.security.PrivilegedAction;
@@ -629,7 +630,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 	}
 
 	private boolean isPermitted(String username, AppID app) {
-		if (!permMan.isSecure())
+		if (!permMan.isSecure() && (!Boolean.getBoolean("org.ogema.impl.security.nosecactivated.restrictuserpageaccess")))
 			return true;
 		Bundle b = app.getBundle();
 		WebAccessPermission wap = new WebAccessPermission(b.getSymbolicName(), username, null, b.getVersion());
@@ -639,7 +640,13 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 			return false;
 		}
 		AccessControlContext acc = permMan.getBundleAccessControlContext(urp.getClass());
-		return permMan.handleSecurity(wap, acc);
+		//return permMan.handleSecurity(wap, acc);
+		try {
+			acc.checkPermission(wap);
+			return true;
+		} catch(AccessControlException e) {
+			return false;
+		}
 	}
 
 	@Override
