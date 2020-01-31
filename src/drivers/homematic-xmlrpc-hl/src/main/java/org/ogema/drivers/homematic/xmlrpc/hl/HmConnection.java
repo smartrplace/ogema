@@ -190,7 +190,9 @@ public class HmConnection implements HomeMaticConnection {
 		if (installModePoller == null) {
 			installModePoller = t.scheduleWithFixedDelay(installModePolling, 0, 60, TimeUnit.SECONDS);
 		}
-		if (pingCheck == null) {
+                baseResource.disablePingCheck().create();
+                baseResource.disablePingCheck().activate(false);
+		if ((!baseResource.disablePingCheck().getValue()) && pingCheck == null) {
 			pingCheck = t.scheduleWithFixedDelay(new Runnable() {
 				@Override
 				public void run() {
@@ -257,6 +259,7 @@ public class HmConnection implements HomeMaticConnection {
 				if (events.size() == 1) {
 					HmEvent e = events.get(0);
 					if ("PONG".equals(e.getValueKey())) {
+                                                logger.debug("received PONG from {} / {}", e.getAddress(), e.getInterfaceId());
 						// BidCos vs IP
 						if ("CENTRAL".equals(e.getAddress()) || "CENTRAL:0".equals(e.getAddress())) {
 							if (callerId.equals(e.getValueString())) {
@@ -275,10 +278,10 @@ public class HmConnection implements HomeMaticConnection {
 				try {
 					client.ping(callerId);
 					if (pongReceived.await(pingTimeoutSec, TimeUnit.SECONDS)) {
-						logger.debug("ping OK");
+						logger.debug("ping OK for {}", baseResource.getName());
 						return true;
 					} else {
-						logger.warn("Homematic service does not respond, registering again...");
+						logger.warn("Homematic service for {} does not respond, registering again...", baseResource.getName());
 						performConnect();
 						return false;
 					}
