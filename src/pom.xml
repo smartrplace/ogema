@@ -27,7 +27,7 @@
 		<url>scm:ssh:git@github.com:smartrplace/ogema.git</url>
   </scm>
 
-	<repositories>
+	 <!-- <repositories>
 		<repository>
 			<snapshots />
 			<releases>
@@ -67,7 +67,7 @@
 			<name>Internal Snapshots</name>
 			<url>https://www.ogema-source.net/artifactory/libs-snapshot-local</url>
 		</snapshotRepository>
-	</distributionManagement>
+	</distributionManagement> -->
 
 	<pluginRepositories>
 		<!-- Repository for the Header Tool -->

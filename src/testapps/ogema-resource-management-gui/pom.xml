@@ -4,7 +4,7 @@
     <parent>
         <artifactId>ogema-tests</artifactId>
         <groupId>org.ogema.tests</groupId>
-        <version>2.2.1</version>
+        <version>2.2.2-SNAPSHOT</version>
     </parent>
 
     <artifactId>ogema-resource-management-gui</artifactId>
@@ -97,7 +97,7 @@
 
     </dependencies>
     	<!-- Closed Source -->
-	<distributionManagement>
+	<!-- <distributionManagement>
 		<repository>
 			<id>ogema-releases-closed-source</id>
 			<name>Internal Releases - Closed Source</name>
@@ -108,5 +108,5 @@
 			<name>Internal Snapshots - Closed Source</name>
 			<url>https://www.ogema-source.net/artifactory/libs-snapshot-local-closed</url>
 		</snapshotRepository>
-	</distributionManagement>
+	</distributionManagement>-->
 </project>

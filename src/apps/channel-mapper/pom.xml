@@ -16,7 +16,7 @@
         Generic high-level driver        
     </description>
 
-    <url>http://www.ogema-source.net</url>
+    <!-- <url>http://www.ogema-source.net</url>-->
 
     <packaging>bundle</packaging>
 

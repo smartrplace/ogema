@@ -15,7 +15,7 @@
 
 	<description>This application provides a shell interface to add and configure MODBUS electricity meter of the model drs485de.</description>
 
-	<url>https://www.ogema-source.net/wiki</url>
+	<!-- <url>https://www.ogema-source.net/wiki</url> -->
 
 	<packaging>bundle</packaging>
 
