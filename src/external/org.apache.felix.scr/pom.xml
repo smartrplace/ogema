@@ -41,13 +41,13 @@
     </scm>
     -->
     
-   <distributionManagement>
+    <!-- <distributionManagement>
 		<repository>
 			<id>external-opensource</id>
 			<name>external-opensource</name>
 			<url>https://www.ogema-source.net/artifactory/external-opensource</url>
 		</repository>
-	</distributionManagement>
+	</distributionManagement> -->
     
     <!--
         A Note on Testing

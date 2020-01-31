@@ -13,7 +13,7 @@
     <description>
         Imports resources at framework start-up from configuration files
     </description>
-    <url>http://www.ogema-source.net</url>
+    <!-- <url>http://www.ogema-source.net</url> -->
     
     <packaging>bundle</packaging>
     

@@ -16,7 +16,7 @@
       OGEMA Data Models
     </description>
 
-    <url>http://www.ogema-source.net</url>
+    <!-- <url>http://www.ogema-source.net</url> -->
     
     <packaging>bundle</packaging>
   

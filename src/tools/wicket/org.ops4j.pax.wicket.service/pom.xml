@@ -37,13 +37,13 @@
     </description>
     
     <!-- FIXME not working -->
-    <distributionManagement>
+    <!--  <distributionManagement>
         <repository>
             <id>ogema-releases</id>
             <name>Internal Releases</name>
             <url>https://www.ogema-source.net/artifactory/external-opensource</url>
         </repository>
-    </distributionManagement>
+    </distributionManagement> -->
 
     <build>
         <resources>

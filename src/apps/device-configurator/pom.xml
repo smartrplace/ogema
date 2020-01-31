@@ -16,7 +16,7 @@
         Application that visualizes the installed drivers and devices. Additionally it provides a look at the resource tree.
     </description>
 
-	<url>https://www.ogema-source.net/wiki</url>
+	<!-- <url>https://www.ogema-source.net/wiki</url>-->
 
 	<packaging>bundle</packaging>
 
