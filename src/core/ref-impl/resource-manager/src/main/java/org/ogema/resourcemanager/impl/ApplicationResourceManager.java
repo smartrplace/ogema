@@ -442,10 +442,14 @@ public class ApplicationResourceManager implements ResourceManagement, ResourceA
 		Objects.requireNonNull(listener);
 		final ResourceDemandListenerRegistration demandHandler = new ResourceDemandListenerRegistration(listener,
 				resourceType, this);
-		dbMan.addResourceDemandListener(resourceType, demandHandler);
 		synchronized (resourceDemands) {
+                        if (resourceDemands.contains(demandHandler)) {
+                            return;
+                        }
 			resourceDemands.add(demandHandler);
 		}
+		dbMan.addResourceDemandListener(resourceType, demandHandler);
+
 		// queue callbacks for all already-existing resources.
 		for (Resource resource : getResources(resourceType)) {
 			if (resource.isActive()) {

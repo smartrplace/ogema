@@ -32,7 +32,7 @@
                 <configuration>
                 	<instructions>
                 		<Provide-Capability>
-                			ogema.core; version:Version="2.2.2-SNAPSHOT"
+                			ogema.core; version:Version="2.2.2"
                 		</Provide-Capability>
                 	</instructions>
                 </configuration>
