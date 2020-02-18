@@ -31,7 +31,9 @@
 		<module>iec62056-21-driver</module>
 		<module>knx-driver</module>
 		<module>knx-js-gui</module>
+		<!--
 		<module>modbus-combined</module>
+		 -->
 		<module>modbus-tcp-resource</module>
 		<module>openweathermap-connector</module>
 		<module>remote-rest-connector</module>
