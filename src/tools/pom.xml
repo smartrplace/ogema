@@ -30,6 +30,8 @@
 		<module>schedule-import</module>
 		<module>slotsdb-reader</module>
 		<module>timeseries-import</module>
+		<!--  Java 8 dependency -->
+		<!-- <module>timeseries-utils</module> -->
 	</modules>
 
 	<build>

@@ -77,6 +77,10 @@ public class Connection {
 
 	public Connection(InetSocketAddress host) {
 
+		if(Boolean.getBoolean("org.ogema.drivers.modbus.testwithoutconnection")) {
+			con = null;
+			return;
+		}
 		con = new TCPMasterConnection(host.getAddress());
 		con.setPort(host.getPort());
 		try {
@@ -90,7 +94,10 @@ public class Connection {
 	}
 
 	public void connect() throws Exception {
-
+		
+		if(Boolean.getBoolean("org.ogema.drivers.modbus.testwithoutconnection")) {
+			return;
+		}
 		if (!con.isConnected()) {
 
 			con.connect();
@@ -100,6 +107,8 @@ public class Connection {
 	}
 
 	public boolean isConnected() {
+		if(Boolean.getBoolean("org.ogema.drivers.modbus.testwithoutconnection"))
+			return false;
 		return con.isConnected();
 	}
 
