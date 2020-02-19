@@ -27,47 +27,23 @@
 		<url>scm:ssh:git@github.com:smartrplace/ogema.git</url>
   </scm>
 
-	 <!-- <repositories>
-		<repository>
-			<snapshots />
-			<releases>
-				<enabled>false</enabled>
-			</releases>
-			<id>ogema-snapshots</id>
-			<name>ogema-snapshots</name>
-			<url>https://www.ogema-source.net/artifactory/libs-snapshot</url>
-		</repository>
-		<repository>
-			<releases />
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-			<id>ogema-releases</id>
-			<name>ogema-releases</name>
-			<url>https://www.ogema-source.net/artifactory/libs-release</url>
-		</repository>
-		<repository>
-			<releases />
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-			<id>external-opensource</id>
-			<name>external-opensource</name>
-			<url>https://www.ogema-source.net/artifactory/external-opensource</url>
-		</repository>
-	</repositories>
-	<distributionManagement>
-		<repository>
-			<id>ogema-releases</id>
-			<name>Internal Releases</name>
-			<url>https://www.ogema-source.net/artifactory/libs-release-local</url>
-		</repository>
-		<snapshotRepository>
-			<id>ogema-snapshots</id>
-			<name>Internal Snapshots</name>
-			<url>https://www.ogema-source.net/artifactory/libs-snapshot-local</url>
-		</snapshotRepository>
-	</distributionManagement> -->
+    <distributionManagement>
+        <repository>
+            <uniqueVersion>false</uniqueVersion>
+            <id>sp-central</id>
+            <name>Smartrplace Repository</name>
+            <url>https://repository.smartrplace.de/artifactory/libs-release</url>
+            <layout>default</layout>
+        </repository>
+        <snapshotRepository>
+            <uniqueVersion>true</uniqueVersion>
+            <id>sp-snapshots</id>
+            <name>Smartrplace Snapshots</name>
+            <url>https://repository.smartrplace.de/artifactory/libs-snapshot</url>
+            <layout>default</layout>
+        </snapshotRepository>
+    </distributionManagement>
+	
 
 	<pluginRepositories>
 		<!-- Repository for the Header Tool -->
