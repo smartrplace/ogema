@@ -23,9 +23,9 @@ import org.ogema.persistence.PersistencePolicy;
 
 public class TimedPersistence implements PersistencePolicy {
 
-	static final int DEFAULT_STOREPERIOD = 10 * 1000; // milliseconds
+	public static final int DEFAULT_STOREPERIOD = 10 * 1000; // milliseconds
 	final Timer timer;
-	int storePeriod;
+	private int storePeriod;
 
 	private ResourceDBImpl db;
 
