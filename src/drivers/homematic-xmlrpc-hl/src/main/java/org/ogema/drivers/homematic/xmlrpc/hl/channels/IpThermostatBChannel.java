@@ -84,7 +84,9 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
                         return v + 273.15f;
                     }
 
-        };
+        },
+        
+        LEVEL;
 
         public float convertInput(float v) {
             return v;
@@ -161,6 +163,16 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
                 }
                 case "ACTUAL_TEMPERATURE": {
                     TemperatureResource reading = thermos.temperatureSensor().reading();
+                    if (!reading.exists()) {
+                        reading.create();
+                        thermos.activate(true);
+                    }
+                    logger.debug("found supported thermostat parameter {} on {}", e.getKey(), desc.getAddress());
+                    resources.put(e.getKey(), reading);
+                    break;
+                }
+                case "LEVEL": {
+                    FloatResource reading = thermos.valve().setting().stateFeedback();
                     if (!reading.exists()) {
                         reading.create();
                         thermos.activate(true);
