@@ -48,6 +48,12 @@ class RestPatternServlet extends HttpServlet  {
 		this.permMan = Objects.requireNonNull(permMan);
 		this.restAcc = Objects.requireNonNull(restAcc);
 	}
+    
+    @Override
+    protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        resp.setStatus(200);
+        resp.setHeader("Allow", "OPTIONS, POST");
+    }
 	
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
