@@ -39,6 +39,7 @@ import org.ogema.model.sensors.TemperatureSensor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
+import static org.ogema.drivers.homematic.xmlrpc.hl.channels.IpThermostatBChannel.CONTROL_MODE_DECORATOR;
 import org.ogema.tools.resource.util.ResourceUtils;
 
 /**
@@ -216,6 +217,25 @@ public class ThermostatChannel extends AbstractDeviceHandler {
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
         setupHmParameterValues(thermos, parent.address().getValue());
         setupTempSensLinking(thermos);
+        setupControlModeResource(thermos, deviceAddress);
+    }
+    
+    final static String[] CONTROL_MODES = {"AUTO-MODE", "MANU-MODE"};
+    
+    private void setupControlModeResource(Thermostat thermos, final String deviceAddress) {
+        IntegerResource controlMode = thermos.addDecorator(CONTROL_MODE_DECORATOR, IntegerResource.class);
+        controlMode.create().activate(false);
+        controlMode.addValueListener(new ResourceValueListener<IntegerResource>() {
+            @Override
+            public void resourceChanged(IntegerResource resource) {
+                int mode = resource.getValue();
+                if (mode != 0 && mode != 1) {
+                    logger.warn("invalid value ({}) set for HomeMatic CONTROL_MODE on {}", mode, resource.getLocation());
+                    return;
+                }
+                conn.performSetValue(deviceAddress, "CONTROL_MODE", CONTROL_MODES[mode]);
+            }
+        }, true);
     }
     
     class ParameterListener implements ResourceValueListener<SingleValueResource> {

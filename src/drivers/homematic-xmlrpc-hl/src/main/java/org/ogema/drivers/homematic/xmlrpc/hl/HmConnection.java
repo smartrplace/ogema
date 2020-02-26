@@ -400,9 +400,6 @@ public class HmConnection implements HomeMaticConnection {
 		channel.controlledResources().add(ogemaDevice);
 	}
 
-	/*
-	 * TODO: error handling. If this fails (e.g. CCU not available) then we should retry later.
-	 */
 	public void init() {
 		try {
 			final HmLogicInterface config = baseResource;
