@@ -69,6 +69,15 @@ public class ModbusReadTask extends ModbusTask {
 			useLittleEndian = pattern.useLittleEndian.getValue();
 		else
 			useLittleEndian = false; // defualt
+		//if(Boolean.getBoolean("org.ogema.drivers.modbus.testwithoutconnection")) {
+		//	util = new ModbusDriverUtil();
+		//	taskResult = null;
+		//	task = null;
+		//	executor = null;
+		//	connection = null;
+		//	return;
+		//}
+
 		ScheduledExecutorService exec;
 
 		synchronized (executors) {
@@ -121,6 +130,9 @@ public class ModbusReadTask extends ModbusTask {
 				try {
 
 					connection.connect();
+					if(Boolean.getBoolean("org.ogema.drivers.modbus.testwithoutconnection")) {
+						return;
+					}
 					Value response = readChannel();
 					writeToResource(response);
 					

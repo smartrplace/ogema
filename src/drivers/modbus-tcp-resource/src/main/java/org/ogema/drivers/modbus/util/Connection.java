@@ -83,7 +83,7 @@ public class Connection {
 		}
 		con = new TCPMasterConnection(host.getAddress());
 		con.setPort(host.getPort());
-		try {
+		try {			
 			con.connect();
 //			con.setTimeout(10000);
 		} catch (Exception e) {
