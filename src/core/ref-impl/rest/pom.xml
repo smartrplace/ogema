@@ -69,7 +69,8 @@
         </dependency>
         <dependency>
             <groupId>org.osgi</groupId>
-            <artifactId>org.osgi.compendium</artifactId>
+            <artifactId>osgi.cmpn</artifactId>
+            <version>7.0.0</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>

@@ -80,7 +80,12 @@ class RecordedDataServlet extends HttpServlet {
 		this.rda = Objects.requireNonNull(rda);
 	}
 	
-
+    @Override
+    protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        resp.setStatus(200);
+        resp.setHeader("Allow", "DELETE, GET, OPTIONS, POST");
+    }
+    
     // two alternative ways to restrict the time interval: either append "/" + timestamp; OR use request
     // parameters: ?start=<START_TIME>&end=<END_TIME>
     @Override

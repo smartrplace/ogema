@@ -29,6 +29,7 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HomeMatic;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ServiceMessage;
+import org.ogema.drivers.homematic.xmlrpc.ll.xmlrpc.MapXmlRpcStruct;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
 
@@ -48,7 +49,7 @@ public class HomeMaticClientCli {
         Dictionary<String, Object> props = new Hashtable<>();
         props.put("osgi.command.scope", commandScope);
         props.put("osgi.command.function", new String[]{
-            "list", "params", "tim", "read", "readValue", "valueUsage", "set",
+            "list", "params", "tim", "read", "readValue", "readParams", "putParams", "valueUsage", "set",
         "addLink", "removeLink", "getLinkInfo", "getLinks",
         "deleteDevice", "abortDeleteDevice", "getServiceMessages", "client", "ping"});
         return ctx.registerService(HomeMaticClientCli.class, this, props);
@@ -176,6 +177,16 @@ public class HomeMaticClientCli {
     public Object readValue(@Descriptor("Device/channel address, such as 'LEQ0568335' or 'LEQ0568335:1'") String address, 
     		@Descriptor("Value key") String valueKey) throws Exception {
         return client.<Object>getValue(address, valueKey);
+    }
+    
+    public Map<String, Object> readParams(@Descriptor("Device/channel address, such as 'LEQ0568335' or 'LEQ0568335:1'") String address, 
+    		@Descriptor("Parameter set") String paramSet) throws Exception {
+        return client.getParamset(address, paramSet).toMap();
+    }
+    
+    public void putParams(@Descriptor("Device/channel address, such as 'LEQ0568335' or 'LEQ0568335:1'") String address, 
+    		@Descriptor("Parameter set key") String paramSet, @Descriptor("Parameters") Map<String, Object> map) throws Exception {
+        client.putParamset(address, paramSet, new MapXmlRpcStruct(map));
     }
     
     @Descriptor("Create a link between two devices")

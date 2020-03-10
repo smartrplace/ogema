@@ -77,6 +77,11 @@ class RestServlet extends HttpServlet  {
 		this.restAcc = Objects.requireNonNull(restAcc);
 	}
 	
+    @Override
+    protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        resp.setStatus(200);
+        resp.setHeader("Allow", "DELETE, GET, OPTIONS, POST, PUT");
+    }
 
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
