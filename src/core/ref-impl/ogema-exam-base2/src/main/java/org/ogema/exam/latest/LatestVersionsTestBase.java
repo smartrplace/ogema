@@ -49,7 +49,13 @@ import org.osgi.framework.ServiceRegistration;
  */
 @RunWith(PaxExam.class)
 public abstract class LatestVersionsTestBase {
-	@Inject
+
+	protected static final String JACKSON_VERSION = "2.9.9";
+	protected static final String JACKSON_DATABIND_VERSION = "2.9.10.3";
+    protected static final String MOXY_VERSION = "2.7.4";
+	protected static int HTTP_PORT = 4712;
+    
+    @Inject
 	protected BundleContext ctx;
 	@Inject
 	protected AdministrationManager adminManager;
@@ -60,9 +66,7 @@ public abstract class LatestVersionsTestBase {
 	private static final Path osgiStorage = Paths.get("data/osgi-storage");
 
 	protected final static String ogemaVersion = MavenUtils.asInProject().getVersion("org.ogema.core", "api");
-	protected static final String MOXY_VERSION = "2.7.4";
 
-	protected static int HTTP_PORT = 4712;
 	protected final boolean includeTestBundle;
 
 	static final AtomicInteger resourceCounter = new AtomicInteger(0);
@@ -141,10 +145,10 @@ public abstract class LatestVersionsTestBase {
 //				CoreOptions.mavenBundle("joda-time", "joda-time", "2.9.3"), // not required any more
 
 				// jackson (for serialization manager) -->
-				CoreOptions.mavenBundle("com.fasterxml.jackson.core", "jackson-core", "2.9.0"),
-				CoreOptions.mavenBundle("com.fasterxml.jackson.core", "jackson-annotations", "2.9.0"),
-				CoreOptions.mavenBundle("com.fasterxml.jackson.core", "jackson-databind", "2.9.0"),
-				CoreOptions.mavenBundle("com.fasterxml.jackson.module", "jackson-module-jaxb-annotations", "2.9.0"),
+				CoreOptions.mavenBundle("com.fasterxml.jackson.core", "jackson-core", JACKSON_VERSION),
+				CoreOptions.mavenBundle("com.fasterxml.jackson.core", "jackson-annotations", JACKSON_VERSION),
+				CoreOptions.mavenBundle("com.fasterxml.jackson.core", "jackson-databind", JACKSON_DATABIND_VERSION),
+				CoreOptions.mavenBundle("com.fasterxml.jackson.module", "jackson-module-jaxb-annotations", JACKSON_VERSION),
 				// <-- jackson
 
 				// apache commons (for recordeddata-storage and framework-administration)-->
