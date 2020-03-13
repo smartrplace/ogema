@@ -147,8 +147,8 @@ public abstract class OsgiAppTestBase {
 				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.eventadmin", "1.4.6").start(),
                 
 				CoreOptions.mavenBundle("org.osgi", "org.osgi.service.useradmin", "1.1.0").start(),
-                CoreOptions.mavenBundle("org.ogema.external", "org.apache.felix.useradmin.filestore", "1.0.3-SNAPSHOT").start(),
-				CoreOptions.mavenBundle("org.ogema.external", "org.apache.felix.useradmin", "1.0.4-SNAPSHOT").start(),
+                CoreOptions.mavenBundle("org.ogema.external", "org.apache.felix.useradmin.filestore", "1.0.2").start(),
+				CoreOptions.mavenBundle("org.ogema.external", "org.apache.felix.useradmin", "1.0.3").start(),
 				// alternatively to the 2 above:
 //				CoreOptions.mavenBundle("org.osgi", "org.knopflerfish.bundle.useradmin", "4.1.1").start(),
                 CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.metatype", "1.2.0"),
