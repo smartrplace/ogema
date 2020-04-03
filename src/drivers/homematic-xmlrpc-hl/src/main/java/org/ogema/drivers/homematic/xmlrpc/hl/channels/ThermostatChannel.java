@@ -208,9 +208,9 @@ public class ThermostatChannel extends AbstractDeviceHandler {
         setpoint.addValueListener(new ResourceValueListener<TemperatureResource>() {
             @Override
             public void resourceChanged(TemperatureResource resource) {
-                //XXX fails without the String conversion...
+                //XXX value type ??? does the homematic CCU really need string?
                 String value = String.format(Locale.ENGLISH, "%.1f", resource.getCelsius());
-                conn.performSetValue(deviceAddress, "SET_TEMPERATURE", value);
+                conn.performSetValue(deviceAddress, "SET_TEMPERATURE", Double.valueOf(resource.getCelsius()));
             }            
         }, true);
         
@@ -220,9 +220,8 @@ public class ThermostatChannel extends AbstractDeviceHandler {
         setupControlModeResource(thermos, deviceAddress);
     }
     
-    final static String[] CONTROL_MODES = {"AUTO-MODE", "MANU-MODE"};
-    
     private void setupControlModeResource(Thermostat thermos, final String deviceAddress) {
+        final String[] CONTROL_MODES = {"AUTO-MODE", "MANU-MODE"};
         IntegerResource controlMode = thermos.addDecorator(CONTROL_MODE_DECORATOR, IntegerResource.class);
         controlMode.create().activate(false);
         controlMode.addValueListener(new ResourceValueListener<IntegerResource>() {
