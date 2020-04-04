@@ -682,15 +682,9 @@
             </build>
         </profile>
         <profile>
-            <id>java9</id><!-- java versions 9 and greater -->
+            <id>java9</id><!-- java versions 9 & 10  -->
             <activation>
-                <!-- 
-                note: not using <jdk> due to a bug in our ancient ci server
-                    <jdk>[9,)</jdk>
-                -->
-                <file>
-                    <exists>${java.home}/jmods</exists>
-                </file>
+                <jdk>[9,10]</jdk>
             </activation>
             <properties>
                 <surefire-args>
@@ -698,6 +692,32 @@
                     --illegal-access=warn
                     --add-opens=java.base/jdk.internal.loader=ALL-UNNAMED
                     --add-modules java.xml.bind,java.xml.ws.annotation
+                </surefire-args>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <argLine>
+                                ${surefire-args}
+                            </argLine>
+                            <trimStackTrace>false</trimStackTrace>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>java11+</id>
+            <activation>
+                <jdk>[11,)</jdk>
+            </activation>
+            <properties>
+                <surefire-args>
+                    -ea
+                    --illegal-access=warn
+                    --add-opens=java.base/jdk.internal.loader=ALL-UNNAMED
                 </surefire-args>
             </properties>
             <build>

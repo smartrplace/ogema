@@ -36,9 +36,11 @@ import org.ogema.pattern.test.pattern.ChangeListenerPattern2;
 import org.ops4j.pax.exam.ProbeBuilder;
 import org.ops4j.pax.exam.TestProbeBuilder;
 import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
-import org.ops4j.pax.exam.spi.reactors.PerClass;
+import org.ops4j.pax.exam.spi.reactors.PerMethod;
 
-@ExamReactorStrategy(PerClass.class)
+//FIXME: rare failures with PerClass strategy: 
+// "Too many callbacks for pattern change listener" in structureCallbackWorksTwice
+@ExamReactorStrategy(PerMethod.class)
 public class ChangeListenerTest extends OsgiTestBase {
 	
 	private ResourcePatternAccess rpa;
