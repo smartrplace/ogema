@@ -396,6 +396,25 @@ public class ValueResourceUtils {
 			throw new IllegalArgumentException(); // cannot occur
 	}
 	
+	public static boolean containsGeneric(ArrayResource array, Object value) throws IndexOutOfBoundsException {
+		if (!array.exists())
+			return false;
+		if (array instanceof IntegerArrayResource)
+			return contains((IntegerArrayResource)array, (Integer)value);
+		else if (array instanceof FloatArrayResource)
+			return contains((FloatArrayResource)array, (Float)value, 0.0f);
+		//else if (array instanceof BooleanArrayResource)
+		//	return contains((BooleanArrayResource)array, (boolean)value);
+		else if (array instanceof TimeArrayResource)
+			return contains((TimeArrayResource)array, (long)value);
+		else if (array instanceof StringArrayResource)
+			return contains((StringArrayResource)array, (String)value);
+		//else if (array instanceof ByteArrayResource)
+		//	return contains((ByteArrayResource)array, value);
+		else 
+			throw new IllegalArgumentException(); // cannot occur
+	}
+	
 	/**
 	 * Check if the array resource contains a String. This returns false if the resource is inactive.
 	 * @param array
@@ -410,7 +429,13 @@ public class ValueResourceUtils {
 			return false;
 		return array.isActive() && Arrays.asList(array.getValues()).contains(string); 
 	}
-	
+	public static boolean containsIngoringActiveStatus(StringArrayResource array, String string) {
+		Objects.requireNonNull(array);
+		if (string == null)
+			return false;
+		return Arrays.asList(array.getValues()).contains(string); 
+	}
+
 	/**
 	 * Check if the array resource contains a float value. This returns false if the resource is inactive.
 	 * @param array
@@ -611,7 +636,27 @@ public class ValueResourceUtils {
 			return false;
 		return setValue(array, sz, object);
 	}
-	
+
+	/**
+	 * Append an element to the array if the element does not exist yet
+	 * @param array
+	 * @param object
+	 * @return
+	 */
+	public static boolean appendValueIfUnique(StringArrayResource array, String object, boolean createAndActivateIfNotExisting) {
+		if (object == null)
+			return false;
+		if(containsIngoringActiveStatus(array, object))
+			return false;
+		if(createAndActivateIfNotExisting && (!array.exists())) {
+			array.create();
+			boolean result = appendValue(array, object);
+			array.activate(false);
+			return result;
+		}
+		return appendValue(array, object);
+	}
+
 	/**
 	 * Remove an element from an ArrayResource, at the specified index.
 	 * @param array
