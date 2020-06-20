@@ -214,7 +214,7 @@ public class OgemaHttpContext implements HttpContext {
 			// Store the request, so that it could be responded after successful login.
 			if (!request.getRequestURL().toString().endsWith("favicon.ico")) {
 				if (request.getRequestURI().equals("/ogema") || request.getRequestURI().equals("/ogema/")) {
-					httpses.setAttribute(LoginServlet.OLDREQ_ATTR_NAME, "/ogema/index.html");
+					httpses.setAttribute(LoginServlet.OLDREQ_ATTR_NAME, System.getProperty("org.ogema.impl.security.starturl", "/ogema/index.html"));
 					logger.debug("Saved old request URI -> default page");
 				}
 				else {

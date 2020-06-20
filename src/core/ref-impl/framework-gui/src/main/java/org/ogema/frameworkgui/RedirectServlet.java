@@ -52,7 +52,7 @@ public class RedirectServlet extends HttpServlet {
     /**
      * Default value ({@value }) for the {@value #CONFIG_PROPERTY_REDIRECT} parameter.
      */
-    public static final String CONFIG_PROPERTY_REDIRECT_DEFAULT = "/ogema/index.html";
+    public static final String CONFIG_PROPERTY_REDIRECT_DEFAULT = System.getProperty("org.ogema.impl.security.starturl", "/ogema/index.html");
     String redirect = CONFIG_PROPERTY_REDIRECT_DEFAULT;
 
     @Override
