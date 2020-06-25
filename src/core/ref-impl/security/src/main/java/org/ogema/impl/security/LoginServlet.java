@@ -62,7 +62,7 @@ public class LoginServlet extends HttpServlet {
 		final boolean useCdn = Boolean.getBoolean(PROPERTY_USE_CDN);
 		LOGIN_PATH = useCdn ? LOGIN_PATH_REMOTE : LOGIN_PATH_LOCAL;
 		final String startProp = System.getProperty(PROPERTY_START_PAGE);
-		START_PAGE = startProp != null ? startProp : useCdn ? "/ogema/index2.html" : "/ogema/index.html";
+		START_PAGE = startProp != null ? startProp : useCdn ? "/ogema/index2.html" : System.getProperty("org.ogema.impl.security.starturl", "/ogema/index.html");
 	}
 	
 	private volatile String ICON;
