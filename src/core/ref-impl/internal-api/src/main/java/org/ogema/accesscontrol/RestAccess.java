@@ -52,6 +52,17 @@ public interface RestAccess {
 	 */
 	ApplicationManager authenticate(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException;
 	
+	/** Like {@link #authenticate(HttpServletRequest, HttpServletResponse)},  but returns the user name authenticated instead
+	 * 		of the ApplicationManager
+	 * 
+	 * @param req
+	 * @param resp
+	 * @return null if authentication fails
+	 * @throws ServletException
+	 * @throws IOException
+	 */
+	String authenticateToUser(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException;
+	
 	/**
 	 * Like {@link #authenticate(HttpServletRequest, HttpServletResponse)}, but returns the {@link AccessControlContext}
 	 * applicable to the app or user that initiated the request.

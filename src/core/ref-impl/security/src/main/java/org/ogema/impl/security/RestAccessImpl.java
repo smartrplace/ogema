@@ -74,9 +74,15 @@ public class RestAccessImpl implements RestAccess, Application {
 	 * @see javax.servlet.http.HttpServlet#doGet(javax.servlet.http.HttpServletRequest,
 	 * javax.servlet.http.HttpServletResponse)
 	 */
-	private ApplicationManager getAppManagerInternal(final HttpServletRequest req, final String resourcePath) {
-		final ApplicationManager appManInternal = this.appMan;
-		if (appManInternal == null) // framework not running or service not started yet
+	private static class AppManagerInternalResult {
+		ApplicationManager appManInternal;
+		String userName;
+	}
+	private AppManagerInternalResult getAppManagerInternal(final HttpServletRequest req, final String resourcePath) {
+		//final ApplicationManager appManInternal = this.appMan;
+		final AppManagerInternalResult result = new AppManagerInternalResult();
+		result.appManInternal = this.appMan;
+		if (result.appManInternal == null) // framework not running or service not started yet
 			return null;
 		/*
 		 * Check access permission trough the AccessControlContext of the App which is involved in this request.
@@ -91,7 +97,7 @@ public class RestAccessImpl implements RestAccess, Application {
 		final AccessManager accMan = permMan.getAccessManager();
 		if (usr != null && pwd != null && check1TimePW(ses, usr, pwd)) {
 			// Get the AccessControlContex of the involved app
-			AdminApplication aaa = appManInternal.getAdministrationManager().getAppById(usr);// ctx.wam.admin.getAppById(usr);
+			AdminApplication aaa = result.appManInternal.getAdministrationManager().getAppById(usr);// ctx.wam.admin.getAppById(usr);
 			if (aaa == null)
 				return null;
 			ProtectionDomain pda[] = new ProtectionDomain[1];
@@ -101,7 +107,8 @@ public class RestAccessImpl implements RestAccess, Application {
 					logger.debug("RestAccess permitted for 1Time-PW authenticated app {}", usr);
 				}
 				accMan.setCurrentUser(accMan.getLoggedInUser(req));
-				return aaa.getAppManager();
+				result.appManInternal = aaa.getAppManager();
+				return result;
 			}
 		}
 		final String user = accMan.authenticate(req, false);
@@ -112,7 +119,8 @@ public class RestAccessImpl implements RestAccess, Application {
 				return null;
 			}
 			accMan.setCurrentUser(user);
-			return appManInternal;
+			result.userName = user;
+			return result;
 		}
 		logger.debug("RestAccess denied for app man.");
 		return null;
@@ -148,10 +156,23 @@ public class RestAccessImpl implements RestAccess, Application {
 
 	@Override
 	public ApplicationManager authenticate(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		final ApplicationManager appMan = getAppManagerInternal(req, req.getPathInfo());
-		if (appMan == null)
+		final AppManagerInternalResult fullRes = getAppManagerInternal(req, req.getPathInfo());
+		if (fullRes == null || fullRes.appManInternal == null) {
 			resp.sendError(HttpServletResponse.SC_FORBIDDEN);
-		return appMan;
+			return null;
+		}
+		return fullRes.appManInternal;
+	}
+	
+	@Override
+	public String authenticateToUser(HttpServletRequest req, HttpServletResponse resp)
+			throws ServletException, IOException {
+		final AppManagerInternalResult fullRes = getAppManagerInternal(req, req.getPathInfo());
+		if (fullRes == null || fullRes.appManInternal == null) {
+			resp.sendError(HttpServletResponse.SC_FORBIDDEN);
+			return null;
+		}
+		return fullRes.userName;
 	}
 	
 	@Override
