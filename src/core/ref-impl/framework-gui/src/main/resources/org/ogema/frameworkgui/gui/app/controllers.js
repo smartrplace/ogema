@@ -61,8 +61,8 @@ ngOGFrGui.controller('NavigationCtrl', [ '$scope', '$location', '$rootScope',
 					ogemaGateway.getJSON("/apps/ogema/framework/gui", {
 						"action" : "logout"
 					}).then(function(result) {
-                        console.log('SHOW LOGOUT Modal success');
-						$window.location.href = "/ogema/index.html";
+						console.log('SHOW LOGOUT Modal success');
+						$window.location.href = result;
 					}, failCb);
 				}, function() {
 					// console.log('SHOW LOGOUT Modal dismissed at: ' + new

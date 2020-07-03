@@ -57,7 +57,8 @@ public class FrameworkGUIServlet extends HttpServlet {
 
 		if ("logout".equals(action)) {
 			req.getSession().invalidate();
-			//resp.sendRedirect("/ogema/login");
+			String redirect = System.getProperty("org.ogema.widgets.logout.redirect", "/ogema/index.html");
+			resp.getWriter().append(redirect);
 			resp.setStatus(HttpServletResponse.SC_OK);
 			return;
 		}
