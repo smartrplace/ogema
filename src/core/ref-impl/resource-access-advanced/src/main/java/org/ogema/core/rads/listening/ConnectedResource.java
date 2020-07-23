@@ -15,6 +15,7 @@
  */
 package org.ogema.core.rads.listening;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.ogema.core.administration.PatternCondition;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.schedule.Schedule;
@@ -53,9 +54,36 @@ class ConnectedResource implements PatternCondition {
 	private boolean valueListenerActive = false;
 
 	private boolean m_complete = false;
+    private AtomicBoolean m_reportedCompletion = new AtomicBoolean(false);
 
 	private boolean structureListenerActive = false;
 	private boolean accessModeListenerActive = false;
+    
+    // this listener is used to check both @Equals and @ValueChangedListener annotations    
+    class InitListener implements ResourceValueListener<Resource> {
+        
+        final CompletionListener listener;
+
+        public InitListener(CompletionListener listener) {
+            this.listener = listener;
+        }
+
+        @Override
+        public void resourceChanged(Resource resource) {
+            if (!valueListenerActive) {
+                logger.debug("Value changed callback although listener has been deregistered");
+                return;
+            }
+            boolean complete_bak = m_complete;
+            if (equalsAnnotation) {
+                ConnectedResource.this.recheckCompletion();
+                reportCompletion(m_complete);
+            }
+            if (listenValue && complete_bak == m_complete) {
+                listener.valueChanged(ConnectedResource.this);
+            }
+        }
+    };
 
 	public ConnectedResource(Resource resource, ResourceFieldInfo info, final CompletionListener listener,
 			final Logger logger, String name, boolean isOptional) {
@@ -65,31 +93,20 @@ class ConnectedResource implements PatternCondition {
 		this.name = name;
 		this.isOptional = isOptional;
 		this.logger = logger;
-		// this listener is used to check both @Equals and @ValueChangedListener annotations
-		initValueListener = new ResourceValueListener<Resource>() {
-
-			@Override
-			public void resourceChanged(Resource resource) {
-				if (!valueListenerActive) {
-					logger.debug("Value changed callback although listener has been deregistered");
-					return;
-				}
-				boolean complete_bak = m_complete;
-				if (equalsAnnotation) {
-					ConnectedResource.this.recheckCompletion();
-					if (m_complete != complete_bak) {
-						if (m_complete)
-							m_listener.resourceAvailable(ConnectedResource.this);
-						else
-							m_listener.resourceUnavailable(ConnectedResource.this, !m_resource.exists());
-					}
-				}
-				if (listenValue && complete_bak == m_complete) {
-					listener.valueChanged(ConnectedResource.this);
-				}
-			}
-		};
+		initValueListener = new InitListener(listener);
 	}
+    
+    private void reportCompletion(boolean isComplete) {
+        if (m_reportedCompletion.compareAndSet(!isComplete, isComplete)) {
+            if (isComplete) {
+                m_listener.resourceAvailable(this);
+            } else {
+                m_listener.resourceUnavailable(this, !m_resource.exists());
+            }
+        } else {
+            //System.out.printf("reportCompletion (NO CHANGE) %s = %b%n", name, isComplete);
+        }
+    }
 
 	public void start() {
 		structureListenerActive = true;
@@ -106,7 +123,8 @@ class ConnectedResource implements PatternCondition {
 		m_resource.requestAccessMode(m_info.getMode(), m_info.getPrio());
 		if (this.meetsRequirements()) {
 			m_complete = true;
-			m_listener.resourceAvailable(this);
+            reportCompletion(true);
+			//reportAvailable();
 		}
 		else {
 			m_complete = false;
@@ -182,14 +200,8 @@ class ConnectedResource implements PatternCondition {
 							+ resource.getLocation() + ". Expected resource at " + m_resource.getLocation());
 				}
 			}
-			boolean complete_bak = m_complete;
 			ConnectedResource.this.recheckCompletion();
-			if (complete_bak == m_complete)
-				return;
-			else if (m_complete)
-				m_listener.resourceAvailable(ConnectedResource.this);
-			else
-				m_listener.resourceUnavailable(ConnectedResource.this, !m_resource.exists());
+            reportCompletion(m_complete);
 		}
 	};
 
@@ -212,15 +224,14 @@ class ConnectedResource implements PatternCondition {
 			if (eventType == EventType.SUBRESOURCE_ADDED || eventType == EventType.SUBRESOURCE_REMOVED) {
 				return;
 			}
-
 			ConnectedResource.this.recheckCompletion();
 			if (eventType == EventType.RESOURCE_DELETED || eventType == EventType.RESOURCE_DEACTIVATED) {
-				m_listener.resourceUnavailable(ConnectedResource.this, !m_resource.exists());
+                reportCompletion(false);
 			}
 			// FIXME: the latter condition can occur if a resource is added as a reference... 
 			else if (eventType == EventType.RESOURCE_ACTIVATED
 					|| (m_resource.isActive() && (eventType == EventType.REFERENCE_ADDED || eventType == EventType.RESOURCE_CREATED))) {
-				m_listener.resourceAvailable(ConnectedResource.this);
+                reportCompletion(m_complete);
 			}
 		}
 	};
