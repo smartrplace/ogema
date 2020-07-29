@@ -354,6 +354,10 @@ class ShellCommands {
 
     @Descriptor("list all system permissions applying to a bundle")
     public List<ConditionalPermissionInfo> bundlePermissions(Bundle b) {
+        return bundlePermissionsList(cpa, b);
+    }
+    
+    static List<ConditionalPermissionInfo> bundlePermissionsList(ConditionalPermissionAdmin cpa, Bundle b) {
         final ConditionalPermissionUpdate cpu = cpa.newConditionalPermissionUpdate();
         List<ConditionalPermissionInfo> l = new ArrayList<>();
         for (ConditionalPermissionInfo cpi : cpu.getConditionalPermissionInfos()) {
@@ -369,7 +373,6 @@ class ShellCommands {
             if (cis.length == 0) {
                 l.add(cpi);
             }
-
         }
         return l;
     }

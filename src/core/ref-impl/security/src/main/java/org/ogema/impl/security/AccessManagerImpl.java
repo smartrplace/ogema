@@ -16,6 +16,7 @@
 package org.ogema.impl.security;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.security.AccessControlContext;
 import java.security.AccessControlException;
 import java.security.AccessController;
@@ -491,6 +492,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 		if (urp == null)
 			throw new IllegalStateException(
 					String.format("User rights proxy installation for the user %s not yet completed.", user));
+        logger.debug("adding permissions for user '{}': {}", user, permissions);
 		Bundle b = urp.getBundle();
 		final ConditionalPermissionAdmin cpa = (ConditionalPermissionAdmin) permMan.getSystemPermissionAdmin();
 		final ConditionalPermissionUpdate cpu = cpa.newConditionalPermissionUpdate();
@@ -566,12 +568,11 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 		args[1] = null;
 
 		AppPermission ap = permMan.getPolicies(appid);
-		{
-			ap.addPermission(WEB_ACCESS_PERMISSION_CLASS_NAME, args, null);
-		}
+    	ap.addPermission(WEB_ACCESS_PERMISSION_CLASS_NAME, args, null);
 		// To commit the made changes the following is needed.
-		permMan.installPerms(ap);
-
+		boolean success = permMan.installPerms(ap);
+        logger.debug("added web accesspermission for '{}': {} ({})",
+                appid.getBundle().getLocation(), args[0], success);
 	}
 
 	@Override
@@ -630,8 +631,10 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 	}
 
 	private boolean isPermitted(String username, AppID app) {
-		if (!permMan.isSecure() && (!Boolean.getBoolean("org.ogema.impl.security.nosecactivated.restrictuserpageaccess")))
+		if (!permMan.isSecure() && (!Boolean.getBoolean("org.ogema.impl.security.nosecactivated.restrictuserpageaccess"))) {
+            logger.trace("webaccess restrictions are disabled");
 			return true;
+        }
 		Bundle b = app.getBundle();
 		WebAccessPermission wap = new WebAccessPermission(b.getSymbolicName(), username, null, b.getVersion());
 		UserRightsProxy urp = urpMap.get(username);
@@ -639,15 +642,50 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 			logger.error("Unknown user " + username);
 			return false;
 		}
+        if (!permMan.isSecure()) {
+            return isPermittedManual(urp.getBundle(), wap);
+        }
 		AccessControlContext acc = permMan.getBundleAccessControlContext(urp.getClass());
-		//return permMan.handleSecurity(wap, acc);
 		try {
 			acc.checkPermission(wap);
+            logger.trace("webaccess permitted for {}@{}", username, app.getBundle().getSymbolicName());
 			return true;
 		} catch(AccessControlException e) {
+            logger.trace("webaccess denied for {}@{} ({})", username, app.getBundle().getSymbolicName(), wap);
 			return false;
 		}
 	}
+    
+    /*
+    test the given permission manually against the bundle's permission information
+    in the ConditionalPermissionAdmin.
+    */
+    private boolean isPermittedManual(Bundle bundle, Permission perm) {
+        List<ConditionalPermissionInfo> perms = ShellCommands.bundlePermissionsList(
+                (ConditionalPermissionAdmin) permMan.getSystemPermissionAdmin(), bundle);
+        for (ConditionalPermissionInfo cpi: perms) {
+            boolean isAllow = "ALLOW".equalsIgnoreCase(cpi.getAccessDecision());
+            for (PermissionInfo pi : cpi.getPermissionInfos()) {
+                try {
+                    Class<?> pc = getClass().getClassLoader().loadClass(pi.getType());
+                    Permission p = (Permission) pc.getConstructor(String.class, String.class).newInstance(pi.getName(), pi.getActions());
+                    if (isAllow) {
+                        if (p.implies(perm)) {
+                            return true;
+                        }
+                    } else {
+                        if (perm.implies(p)) {
+                            return false;
+                        }
+                    }
+                } catch (RuntimeException | ClassNotFoundException | IllegalAccessException 
+                        | InstantiationException | NoSuchMethodException | InvocationTargetException ex) {
+                    logger.warn("could not evaluate permission '{}' for bundle {}", pi, bundle, ex);
+                }
+            }
+        }
+        return false;
+    }
 
 	@Override
 	public boolean authenticate(String usrName, final String pwd, boolean isnatural) {
