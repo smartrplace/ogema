@@ -15,6 +15,8 @@
  */
 package org.ogema.core.administration;
 
+import java.util.Map;
+
 /**
  * Access to the data of a user registered on the system.
  */
@@ -45,4 +47,13 @@ public interface UserAccount {
 	 * @return the user name which is registered on the market place for the user of this account.
 	 */
 	public String getStoreUserName(String storeName);
+    
+    /**
+     * Gets the properties associated with this account. Property value types are
+     * restricted to {@code String} and {@code byte[]}.
+     * 
+     * @return property map.
+     */
+    Map<String, Object> getProperties();
+    
 }
