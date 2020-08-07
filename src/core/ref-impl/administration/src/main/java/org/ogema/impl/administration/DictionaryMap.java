@@ -61,30 +61,4 @@ public class DictionaryMap extends AbstractMap<String, Object>{
         return w;
     }
     
-    
-
-
-    public static void main(String ... args) {
-        Hashtable<String, Object> t = new Hashtable<>();
-        t.put("1", "2");
-        t.put("foo", "bar");
-        Map<String, Object> m = new DictionaryMap(t);
-        System.out.println(m);
-        System.out.println(m.get("1"));
-        System.out.println(m.put("1", "3"));
-        System.out.println(m);
-        m.remove("foo");
-        System.out.println(m.get("foo"));
-        System.out.println(m);
-        m.put("x", "y");
-        System.out.println(m);
-        System.out.println(t);
-        t.remove("x");
-        System.out.println(m);
-        System.out.println(t);
-        t.put("42", "6*9");
-        System.out.println(m);
-        System.out.println(t);
-    }
-    
 }
