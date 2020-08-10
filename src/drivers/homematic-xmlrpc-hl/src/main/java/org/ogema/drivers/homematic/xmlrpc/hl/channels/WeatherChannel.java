@@ -110,6 +110,15 @@ public class WeatherChannel extends AbstractDeviceHandler {
         return "WEATHER".equalsIgnoreCase(desc.getType()) // WDS40
                 || "WEATHER_TRANSMIT".equalsIgnoreCase(desc.getType()); // TC-IT-WM-W
     }
+    
+    private ResourceList<Sensor> getSensorList(HmDevice parent, String deviceName) {
+        SensorDevice sd = parent.addDecorator(deviceName, SensorDevice.class);
+        ResourceList<Sensor> sensors = sd.sensors();
+        sensors.create();
+        sd.activate(false);
+        sensors.activate(false);
+        return sensors;
+    }
 
     @Override
     public void setup(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
@@ -125,8 +134,7 @@ public class WeatherChannel extends AbstractDeviceHandler {
         for (Map.Entry<String, ParameterDescription<?>> e : values.entrySet()) {
             switch (e.getKey()) {
                 case "TEMPERATURE": {
-                    ResourceList<Sensor> sensors = parent.addDecorator(swName, SensorDevice.class).sensors();
-                    sensors.create();
+                    ResourceList<Sensor> sensors = getSensorList(parent, swName);
                     TemperatureResource reading = sensors.addDecorator(e.getKey(), TemperatureSensor.class).reading();
                     conn.registerControlledResource(weatherChannel, reading.getParent());
 
@@ -139,8 +147,7 @@ public class WeatherChannel extends AbstractDeviceHandler {
                     break;
                 }
                 case "HUMIDITY": {
-                    ResourceList<Sensor> sensors = parent.addDecorator(swName, SensorDevice.class).sensors();
-                    sensors.create();
+                    ResourceList<Sensor> sensors = getSensorList(parent, swName);
                     FloatResource reading = sensors.addDecorator(e.getKey(), HumiditySensor.class).reading();
                     conn.registerControlledResource(weatherChannel, reading.getParent());
 

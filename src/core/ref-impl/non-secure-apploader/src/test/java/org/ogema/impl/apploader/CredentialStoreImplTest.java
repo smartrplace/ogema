@@ -10,13 +10,15 @@ import static org.junit.Assert.*;
  */
 public class CredentialStoreImplTest {
     
+    static final int ITERATIONS = 100;
+    
     public CredentialStoreImplTest() {
     }
 
     @Test
     public void testEncodePassword() throws Exception {
         String password = UUID.randomUUID().toString();
-        String enc = CredentialStoreImpl.encodePassword(password, 50_000);
+        String enc = CredentialStoreImpl.encodePassword(password, ITERATIONS);
         assertNotNull(enc);
         assertNotSame(password, enc);
     }
@@ -24,7 +26,7 @@ public class CredentialStoreImplTest {
     @Test
     public void testCheckCorrectPassword() throws Exception {
         String password = UUID.randomUUID().toString();
-        String stored = CredentialStoreImpl.encodePassword(password, 50_000);
+        String stored = CredentialStoreImpl.encodePassword(password, ITERATIONS);
         System.out.println(stored);
         assertTrue(CredentialStoreImpl.checkPassword(null, password, stored));
     }
@@ -32,7 +34,7 @@ public class CredentialStoreImplTest {
     @Test
     public void testCheckIncorrectPassword() throws Exception {
         String password = UUID.randomUUID().toString();
-        String stored = CredentialStoreImpl.encodePassword(password, 50_000);
+        String stored = CredentialStoreImpl.encodePassword(password, ITERATIONS);
         System.out.println(stored);
         assertFalse(CredentialStoreImpl.checkPassword(null, "nope!", stored));
     }
