@@ -41,11 +41,12 @@
 	        	*
 	        </Bundle-NativeCode>
 	        <Bundle-Activator>org.ogema.hardwaremanager.rpi.Activator</Bundle-Activator>
+            <!-- require only cpu type, the activator will skip on windows -->
             <Require-Capability><![CDATA[
                 osgi.native;filter:="(|
-                    (&(osgi.native.osname~=linux)(osgi.native.processor~=x86-64))
-                    (&(osgi.native.osname~=linux)(osgi.native.processor~=arm))
-                    (&(osgi.native.osname~=linux)(osgi.native.processor~=arm_le)))"
+                    (osgi.native.processor~=x86-64)
+                    (osgi.native.processor~=arm)
+                    (osgi.native.processor~=arm_le))"
             ]]></Require-Capability>
 	      </instructions>
 	    </configuration>
