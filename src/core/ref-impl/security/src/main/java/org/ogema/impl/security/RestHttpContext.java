@@ -32,7 +32,7 @@ public class RestHttpContext implements HttpContext {
 
 	public RestHttpContext() {
 		// For development purposes secure mode could be disabled
-		httpEnable = OgemaHttpContext.httpEnable;
+		httpEnable = OgemaHttpContext.HTTP_ENABLE;
 	}
 
 	/*
