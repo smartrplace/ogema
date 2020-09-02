@@ -856,7 +856,7 @@ public class DefaultPermissionManager implements PermissionManager {
 								PermissionInfo[] tmpPinfos = new PermissionInfo[1];
 								tmpPinfos[0] = new PermissionInfo(permissionName, filterString, actions);
 								ConditionalPermissionInfo tmpCpi = cpa.newConditionalPermissionInfo(
-										"deny_" + System.currentTimeMillis(), cia, tmpPinfos, cpInfo.DENY);
+										"deny_" + System.currentTimeMillis(), cia, tmpPinfos, ConditionalPermissionInfo.DENY);
 								if (changedPInfos == null)
 									changedPInfos = new ArrayList<>();
 								changedPInfos.add(tmpCpi);
@@ -1099,7 +1099,7 @@ public class DefaultPermissionManager implements PermissionManager {
 								PermissionInfo[] tmpPinfos = new PermissionInfo[1];
 								tmpPinfos[0] = new PermissionInfo(permissionName, filterString, actions);
 								ConditionalPermissionInfo tmpCpi = cpa.newConditionalPermissionInfo(
-										"deny_" + System.currentTimeMillis(), cia, tmpPinfos, cpInfo.DENY);
+										"deny_" + System.currentTimeMillis(), cia, tmpPinfos, ConditionalPermissionInfo.DENY);
 								if (changedPInfos == null)
 									changedPInfos = new ArrayList<>();
 								changedPInfos.add(tmpCpi);

@@ -890,7 +890,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 		if (isNatural == null || 
 				isAuthenticatorAdmitted(isNatural ? OGEMA_NATURAL_USER : OGEMA_MACHINE_USER, Authenticator.DEFAULT_USER_PW_ID)) {
 			// the default pw-based login uses different parameters for machine users and natural users...
-			final String user = (String) req.getParameter(Constants.OTUNAME);
+			final String user = req.getParameter(Constants.OTUNAME);
 			final String pw = req.getParameter(Constants.OTPNAME);
 			if (user != null && pw != null	&& isAuthenticatorAdmitted(user, Authenticator.DEFAULT_USER_PW_ID)) {
 				if (authenticate(user, pw, isNatural != null ? isNatural : isNatural(user)))
