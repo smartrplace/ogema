@@ -220,8 +220,11 @@ public class ThermostatChannel extends AbstractDeviceHandler {
         setupControlModeResource(thermos, deviceAddress);
     }
     
-    private void setupControlModeResource(Thermostat thermos, final String deviceAddress) {
-        final String[] CONTROL_MODES = {"AUTO-MODE", "MANU-MODE"};
+    /* the control_mode param is not writeable on the bidcos model
+      to set manual mode (1): write temperature (double) to MANU_MODE (use setpoint value)
+      to set auto mode (0): write true to AUTO_MODE
+    */
+    private void setupControlModeResource(final Thermostat thermos, final String deviceAddress) {
         IntegerResource controlMode = thermos.addDecorator(CONTROL_MODE_DECORATOR, IntegerResource.class);
         controlMode.create().activate(false);
         controlMode.addValueListener(new ResourceValueListener<IntegerResource>() {
@@ -232,9 +235,19 @@ public class ThermostatChannel extends AbstractDeviceHandler {
                     logger.warn("invalid value ({}) set for HomeMatic CONTROL_MODE on {}", mode, resource.getLocation());
                     return;
                 }
-                conn.performSetValue(deviceAddress, "CONTROL_MODE", CONTROL_MODES[mode]);
+                //conn.performSetValue(deviceAddress, "CONTROL_MODE", CONTROL_MODES[mode]);
+                setManualModeState(thermos, deviceAddress, mode == 1);
             }
         }, true);
+    }
+    
+    void setManualModeState(Thermostat thermos, final String deviceAddress, boolean on) {
+        if (on) {
+            double val = thermos.temperatureSensor().settings().setpoint().getCelsius();
+            conn.performSetValue(deviceAddress, "MANU_MODE", val);
+        } else {
+            conn.performSetValue(deviceAddress, "AUTO_MODE", true);
+        }
     }
     
     class ParameterListener implements ResourceValueListener<SingleValueResource> {
