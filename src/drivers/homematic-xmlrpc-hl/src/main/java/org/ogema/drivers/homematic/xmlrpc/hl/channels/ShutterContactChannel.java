@@ -15,9 +15,12 @@
  */
 package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
+import java.io.IOException;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.logging.Level;
 
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
@@ -99,4 +102,21 @@ public class ShutterContactChannel extends AbstractDeviceHandler {
         conn.addEventListener(new ShutterContactListener(sens, desc.getAddress()));
     }
 
+    @Override
+    public boolean update(HmDevice device) {
+        HmDevice top = conn.getToplevelDevice(device);
+        List<DoorWindowSensor> sens = top.getSubResources(DoorWindowSensor.class, false);
+        if (!sens.isEmpty()) {
+            logger.debug("trying to update {}", sens.get(0));
+            DoorWindowSensor s = sens.get(0);
+            try {
+                boolean state = conn.getValue(device.address().getValue(), "STATE");
+                s.reading().setValue(state);
+            } catch (IOException ex) {
+                logger.warn("update failed for {}", s, ex);
+            }
+        }
+        return false;
+    }
+    
 }

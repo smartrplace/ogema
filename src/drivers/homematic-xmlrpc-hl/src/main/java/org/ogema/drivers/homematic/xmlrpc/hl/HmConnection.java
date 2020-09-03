@@ -72,6 +72,7 @@ import org.ogema.drivers.homematic.xmlrpc.ll.HomeMaticService;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEventListener;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HomeMatic;
+import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.event.EventAdmin;
@@ -315,6 +316,24 @@ public class HmConnection implements HomeMaticConnection {
 		writer.addWriteAction(WriteAction.createPutParamset(client, address, set, values));
 	}
 
+    @Override
+    public Map<String, Object> getParamset(String address, String set) throws IOException {
+        try {
+            return client.getParamset(address, set).toMap();
+        } catch (XmlRpcException e) {
+            throw new IOException(e.getMessage());
+        }
+    }
+
+    @Override
+    public Map<String, ParameterDescription<?>> getParamsetDescription(String address, String set) throws IOException {
+        try {
+            return client.getParamsetDescription(address, set);
+        } catch (XmlRpcException e) {
+            throw new IOException(e.getMessage());
+        }
+    }
+    
 	@Override
 	public void performAddLink(String sender, String receiver, String name, String description) {
 		WriteAction writeAction = WriteAction.createAddLink(client, sender, receiver, name, description);
