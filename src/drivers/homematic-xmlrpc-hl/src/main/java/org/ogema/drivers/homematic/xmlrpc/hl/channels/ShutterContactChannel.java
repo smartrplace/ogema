@@ -19,8 +19,7 @@ import java.io.IOException;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.logging.Level;
+import java.util.stream.Stream;
 
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
@@ -82,7 +81,11 @@ public class ShutterContactChannel extends AbstractDeviceHandler {
 
     @Override
     public boolean accept(DeviceDescription desc) {
-        return "SHUTTER_CONTACT".equalsIgnoreCase(desc.getType());
+        return accept(desc.getType());
+    }
+    
+    private boolean accept(String channelType) {
+        return "SHUTTER_CONTACT".equalsIgnoreCase(channelType);
     }
 
     @Override
@@ -105,18 +108,29 @@ public class ShutterContactChannel extends AbstractDeviceHandler {
     @Override
     public boolean update(HmDevice device) {
         HmDevice top = conn.getToplevelDevice(device);
-        List<DoorWindowSensor> sens = top.getSubResources(DoorWindowSensor.class, false);
+        return findChannels(top, "SHUTTER_CONTACT").findAny()
+                .map(d -> update(top, d.address().getValue())).orElse(Boolean.FALSE);
+    }
+    
+    private boolean update(HmDevice toplevel, String channeAddress) {
+        List<DoorWindowSensor> sens = toplevel.getSubResources(DoorWindowSensor.class, false);
         if (!sens.isEmpty()) {
             logger.debug("trying to update {}", sens.get(0));
             DoorWindowSensor s = sens.get(0);
             try {
-                boolean state = conn.getValue(device.address().getValue(), "STATE");
+                boolean state = conn.getValue(channeAddress, "STATE");
                 s.reading().setValue(state);
+                return true;
             } catch (IOException ex) {
                 logger.warn("update failed for {}", s, ex);
             }
         }
         return false;
+    }
+    
+    static Stream<HmDevice> findChannels(HmDevice toplevelDevice, String type) {
+        return toplevelDevice.channels().getAllElements().stream()
+                .filter(d -> type.equalsIgnoreCase(d.type().getValue()));
     }
     
 }
