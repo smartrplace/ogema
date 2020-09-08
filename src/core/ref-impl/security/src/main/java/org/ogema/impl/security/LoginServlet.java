@@ -210,16 +210,17 @@ public class LoginServlet extends HttpServlet {
 
 			// invalidate old session to prevent session hijacking:
 			HttpSession oldSession = req.getSession(false);
+   			String newLocation = START_PAGE;
             if (oldSession != null) {
+                // check if we had an old req to redirect to the originally requested URL before invalidating
+       			if (oldSession.getAttribute(OLDREQ_ATTR_NAME) != null) {
+    				newLocation = oldSession.getAttribute(OLDREQ_ATTR_NAME).toString();
+                    logger.debug("page requested originally: {}", newLocation);
+                }
                 oldSession.invalidate();
             }
 			final HttpSession session = req.getSession(true);
    			SessionAuth sauth = new SessionAuth(author,permissionManager.getAccessManager(), session);
-			// check if we had an old req to redirect to the originally requested URL before invalidating
-			String newLocation = START_PAGE;
-			if (session.getAttribute(OLDREQ_ATTR_NAME) != null) {
-				newLocation = session.getAttribute(OLDREQ_ATTR_NAME).toString();
-			}
 			session.setAttribute(Constants.AUTH_ATTRIBUTE_NAME, sauth);
 			// only applicable in case of pw-base access
 			final String pwd = req.getParameter(Constants.OTPNAME);
