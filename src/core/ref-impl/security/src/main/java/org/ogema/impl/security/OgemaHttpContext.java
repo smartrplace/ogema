@@ -389,11 +389,11 @@ public class OgemaHttpContext implements HttpContext {
     private boolean handleUserNotAuthorized(HttpServletRequest request,
             HttpServletResponse response, String user, AppID app) throws IOException {
         String message = "User " + user + " is not permitted access to " + request.getPathInfo();
-        //response.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
-        System.out.printf("ContextPath: %s%n", request.getContextPath());
-        System.out.printf("PathTranslated: %s%n", request.getPathTranslated());
+        String oldReq = request.getPathInfo() == null
+                ? ""
+                : URLEncoder.encode(request.getPathInfo(), "UTF-8");
         String redir = "/login/noaccess.html?userName=" + user 
-                + "&oldReq=" + URLEncoder.encode(request.getPathInfo(), "UTF-8")
+                + "&oldReq=" + oldReq
                 + "&appBsn=" + app.getBundle().getSymbolicName()
                 + "&cookie=" + cookie;
         response.sendRedirect(redir);
