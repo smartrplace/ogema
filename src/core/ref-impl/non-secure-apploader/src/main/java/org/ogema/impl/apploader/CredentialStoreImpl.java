@@ -39,6 +39,7 @@ import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.Service;
 import org.ogema.core.administration.CredentialStore;
 import org.osgi.framework.FrameworkUtil;
+import org.osgi.framework.InvalidSyntaxException;
 import org.osgi.service.useradmin.Group;
 import org.osgi.service.useradmin.Role;
 import org.osgi.service.useradmin.User;
@@ -117,7 +118,7 @@ public class CredentialStoreImpl implements CredentialStore {
 	public void setGWPassword(String usrName, String oldPwd, final String newPwd) {
 		if (!login(usrName, oldPwd))
 			throw new SecurityException("Wrong old passowrd!");
-		Role role = userAdmin.getRole(usrName);
+		Role role = findRole(usrName);
 		final User usr = (User) role;
 
 		if (role == null) {
@@ -179,10 +180,33 @@ public class CredentialStoreImpl implements CredentialStore {
 			addStoreCredentials(accountGW, accountStore, passwordStore);
 		return true;
 	}
+    
+    /* non case sensitive get role operation */
+    private Role findRole(String username) {
+        Role role = userAdmin.getRole(username);
+        if (role != null) {
+            return role;
+        }
+        role = userAdmin.getRole(username.toLowerCase());
+        if (role != null) {
+            return role;
+        }
+        try {
+            Role[] allRoles = userAdmin.getRoles(null);
+            for (Role r: allRoles) {
+                if (r.getName().equalsIgnoreCase(username)) {
+                    return r;
+                }
+            }
+        } catch (InvalidSyntaxException ex) {
+            // not likely with filter=null
+        }
+        return null;
+    }
 
 	@Override
 	public boolean login(String usrName, final String pwd) {
-		Role role = userAdmin.getRole(usrName);
+		Role role = findRole(usrName);
 		if (role == null)
 			return false;
 		final User admin = (User) role;
@@ -218,7 +242,7 @@ public class CredentialStoreImpl implements CredentialStore {
 
 	private void setCredential(String user, String credential, String value) {
 		User usr;
-		Role role = userAdmin.getRole(user);
+		Role role = findRole(user);
 		if (role == null) {
 			throw new IllegalArgumentException();
 		}
@@ -232,21 +256,21 @@ public class CredentialStoreImpl implements CredentialStore {
 	}
 
 	Boolean hasAccess(String user) {
-		User thisUser = (User) userAdmin.getRole(user);
+		User thisUser = (User) findRole(user);
 
 		return thisUser.hasCredential(APPSTORE_USER_NAME, user);
 	}
 
 	private Group getAppstoreGroup(String groupName) {
 		// Get or create group for the appstore
-		if (userAdmin.getRole(groupName) == null) {
+		if (findRole(groupName) == null) {
 			return (Group) userAdmin.createRole(groupName, Role.GROUP);
 		}
-		return (Group) userAdmin.getRole(groupName);
+		return (Group) findRole(groupName);
 	}
 
 	private String addStoreCredentials(String gwUser, String storeUser, String storePwd) {
-		User thisUser = (User) userAdmin.getRole(gwUser);
+		User thisUser = (User) findRole(gwUser);
 		Group appstoreAccessRole;
 
 		if (!hasAccess(gwUser)) {

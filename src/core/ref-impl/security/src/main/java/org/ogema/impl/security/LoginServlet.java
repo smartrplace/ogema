@@ -205,7 +205,7 @@ public class LoginServlet extends HttpServlet {
 		// Check if the user authentication is valid
 		final String usr = permissionManager.getAccessManager().authenticate(req, true);
 		if (usr != null) {
-			User user = (User) ua.getRole(usr);
+			User user = (User) AccessManagerImpl.findRole(ua, usr);
 			Authorization author = ua.getAuthorization(user);
 
 			// invalidate old session to prevent session hijacking:
