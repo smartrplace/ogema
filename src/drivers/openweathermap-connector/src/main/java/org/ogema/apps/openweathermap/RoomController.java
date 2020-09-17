@@ -17,6 +17,9 @@ package org.ogema.apps.openweathermap;
 
 import java.util.Timer;
 import java.util.TimerTask;
+import org.ogema.apps.openweathermap.dao.CurrentData;
+import org.ogema.apps.openweathermap.dao.ForecastData;
+import org.ogema.apps.openweathermap.dao.OpenWeatherMapREST;
 
 import org.ogema.core.application.ApplicationManager;
 
@@ -56,7 +59,20 @@ public class RoomController {
 							"update weather info for location " + device.model.getName() + " next update in "
 									+ scheduleUpdateTime + "ms");
 
-					util.update(device.city.getValue(), device.country.getValue());
+                    OpenWeatherMapREST owmremote = OpenWeatherMapREST.getInstance();
+                    ForecastData data;
+                    CurrentData current;
+                    if (device.latitude.isActive()) {
+                        data = owmremote.getWeatherForcastCoord(device.latitude.getValue(), device.longitude.getValue());
+                        current = owmremote.getWeatherCurrentCoord(device.latitude.getValue(), device.longitude.getValue());
+                    } else if (device.postalCode.isActive()) {
+                        data = owmremote.getWeatherForcastZip(device.postalCode.getValue(), device.country.getValue());
+                        current = owmremote.getWeatherCurrentZip(device.postalCode.getValue(), device.country.getValue());
+                    } else {
+                        data = owmremote.getWeatherForcast(device.city.getValue(), device.country.getValue());
+                        current = owmremote.getWeatherCurrent(device.city.getValue(), device.country.getValue());
+                    }
+                    util.store(data, current);
 				}
 			};
 

@@ -48,7 +48,7 @@ public class EnvironmentCreater {
 		this.appMan = appMan;
 	}
 
-	public Resource createResource(String name, final String city, final String country) {
+	public RoomRad createResource(String name, final String city, final String country) {
 
 		logger.info("create new resource with name: " + name);
 
@@ -72,7 +72,7 @@ public class EnvironmentCreater {
 		appMan.getResourcePatternAccess().activatePattern(pattern);
 		pattern.tempSens.reading().forecast().activate(false);
 		
-		return environment;
+		return pattern;
 	}
 
 	public Map<String, Object> getParameters(String name) {
