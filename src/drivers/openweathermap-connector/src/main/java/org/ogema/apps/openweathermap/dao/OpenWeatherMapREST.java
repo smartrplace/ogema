@@ -37,7 +37,7 @@ public class OpenWeatherMapREST {
     private final static Logger LOGGER = LoggerFactory.getLogger(OpenWeatherMapREST.class);
 
 	public static void main(String[] args) {
-        System.setProperty("org.ogema.drivers.openweathermap.key", "ad2e7fb00e663dd30784afdd94f86035");
+        //System.setProperty("org.ogema.drivers.openweathermap.key", "");
 		OpenWeatherMapREST rest = OpenWeatherMapREST.getInstance();
 		//ForecastData data = rest.getWeatherForcast("München", "de");
         ForecastData data = rest.getWeatherForcastZip("10200", "th");
