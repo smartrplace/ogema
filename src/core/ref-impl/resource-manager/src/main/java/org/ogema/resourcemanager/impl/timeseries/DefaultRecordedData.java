@@ -442,6 +442,8 @@ public class DefaultRecordedData implements RecordedData {
 
 	@Override
 	public boolean isEmpty() {
+		if(data == null)
+			return true;
 		return data.isEmpty();
 	}
 
