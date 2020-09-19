@@ -18,19 +18,25 @@ package org.ogema.apps.openweathermap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.ogema.apps.openweathermap.dao.OpenWeatherMapREST;
 
-import org.apache.felix.scr.annotations.Component;
-//import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.Service;
 import org.ogema.apps.openweathermap.resources.EnvironmentCreater;
 import org.ogema.core.application.Application;
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.core.logging.OgemaLogger;
 import org.ogema.core.model.Resource;
+import org.ogema.core.model.simple.FloatResource;
+import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.resourcemanager.AccessPriority;
 import org.ogema.core.resourcemanager.ResourceManagement;
 import org.ogema.core.resourcemanager.pattern.PatternListener;
 import org.ogema.core.resourcemanager.pattern.ResourcePatternAccess;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.ConfigurationPolicy;
+import org.osgi.service.metatype.annotations.AttributeDefinition;
+import org.osgi.service.metatype.annotations.Designate;
+import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
 //import org.osgi.service.cm.ConfigurationAdmin;
 
@@ -41,9 +47,38 @@ import org.ogema.core.resourcemanager.pattern.ResourcePatternAccess;
  * 
  * @author brequardt
  */
-@Component(specVersion = "1.2")
-@Service({ Application.class, OpenWeatherMapApplicationI.class })
+
+@Designate(ocd = OpenWeatherMapApplication.Config.class)
+@Component(service = { Application.class, OpenWeatherMapApplicationI.class },
+        configurationPolicy = ConfigurationPolicy.OPTIONAL)
 public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
+    
+    public static final String PID = "org.ogema.apps.OpenWeatherMap";
+    
+    @ObjectClassDefinition(
+            localization = "OSGI-INF/l10n/OpenWeatherMapConfig",
+            name = "%name", description = "%description")
+    public static @interface Config {
+        
+        @AttributeDefinition(name = "%apikey", description = "%apikey_desc")
+        String apikey();
+        
+        @AttributeDefinition(name = "%city", description = "%city_desc")
+        String city();
+        
+        @AttributeDefinition(name = "%country", description = "%country_desc")
+        String country();
+        
+        @AttributeDefinition(name = "%postal", description = "%postal_desc")
+        String postalCode();
+        
+        @AttributeDefinition(name = "%lat", description = "%lat_desc")
+        double latitude() default Double.NaN;
+        
+        @AttributeDefinition(name = "%lon", description = "%lon_desc")
+        double longitude() default Double.NaN;
+        
+    }
 
 	/**
 	 * System property ({@value} ) holding the interval in ms at which weather data will be retrieved.
@@ -64,6 +99,14 @@ public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
 	EnvironmentCreater envCreater;
 	private List<RoomController> roomControllers = new ArrayList<>();
 	private ResourcePatternAccess advAcc;
+    private Config config;
+    
+    @Activate
+    protected void activate(Config cfg) {
+        if (cfg != null && cfg.apikey() != null) {
+            this.config = cfg;
+        }
+    }
 
 	@Override
 	public void start(ApplicationManager appManager) {
@@ -84,19 +127,52 @@ public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
 		if ((stdCity != null) && (stdCountry != null)) {
 			envCreater.createResource("OpenWeatherMapData", stdCity, stdCountry);
 		}
+        if (config != null) {
+            logger.debug("using configuration from OSGi ConfigAdmin");
+            RoomRad r = envCreater.createResource("OpenWeatherMapData", "", "");
+            storeConfig(config, r);
+            if (config.apikey() != null) {
+                OpenWeatherMapREST.getInstance().setAPI_KEY(config.apikey());
+            }
+        }
 		advAcc = appManager.getResourcePatternAccess();
 		advAcc.addPatternDemand(RoomRad.class, roomListener, AccessPriority.PRIO_DEVICEGROUPMAN);
 	}
 
 	@Override
 	public void stop(AppStopReason reason) {
-
 		for (RoomController controller : roomControllers) {
 			controller.stop();
 		}
 		roomControllers.clear();
 		advAcc.removePatternDemand(RoomRad.class, roomListener);
 	}
+    
+    void storeConfig(Config cfg, RoomRad room) {
+        if (Double.isNaN(cfg.latitude())) {
+            room.latitude.delete();
+            room.longitude.delete();
+        } else {
+            room.latitude.<FloatResource>create().setValue((float)cfg.latitude());
+            room.longitude.<FloatResource>create().setValue((float)cfg.longitude());
+        }
+        if (cfg.city() != null && !cfg.city().isEmpty()) {
+            room.city.<StringResource>create().setValue(cfg.city());
+        } else {
+            room.city.delete();
+        }
+        if (cfg.country()!= null && !cfg.country().isEmpty()) {
+            room.country.<StringResource>create().setValue(cfg.country());
+        } else {
+            room.country.delete();
+        }
+        if (cfg.postalCode()!= null && !cfg.postalCode().isEmpty()) {
+            room.postalCode.<StringResource>create().setValue(cfg.postalCode());
+        } else {
+            room.postalCode.delete();
+        }
+        room.model.activate(true);
+    }
 
 	/**
 	 * Create an environment OGEMA resource for saving weather information.
@@ -111,8 +187,7 @@ public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
 	 */
 	@Override
 	public Resource createEnvironment(String name, String city, String country) {
-		// TODO Auto-generated method stub
-		return envCreater.createResource(name, city, country);
+		return envCreater.createResource(name, city, country).model;
 	}
 
 	final PatternListener<RoomRad> roomListener = new PatternListener<RoomRad>() {

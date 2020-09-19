@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.Dictionary;
 import java.util.Hashtable;
 import java.util.Map;
+import java.util.UUID;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -108,11 +109,15 @@ public class RestTest extends SecurityTestBase {
 		get.setHeader("Accept", "application/xml");
 		return get.execute().returnResponse();
 	}
+    
+    String newUserName() {
+        return UUID.randomUUID().toString().toLowerCase();
+    }
 	
 	@Test
 	public void restAccessWithoutResourcePermissionFails() throws InterruptedException, ClientProtocolException, IOException, URISyntaxException {
 		final String res = newResourceName();
-		String userName = newResourceName();
+		String userName = newUserName();
 		final Resource r = getUnrestrictedAppManager().getResourceManagement().createResource(res, Room.class);
 		// unprivileged natural user
 		final UserAccount user = SecurityTestUtils.createUser(userName, getUnrestrictedAppManager(), false, false);
@@ -127,7 +132,7 @@ public class RestTest extends SecurityTestBase {
 	public void restAccessRequiresResourcePermission() throws InterruptedException, ClientProtocolException, IOException, URISyntaxException {
 		final String res0 = newResourceName();
 		final String res1 = newResourceName();
-		String userName = newResourceName();
+		String userName = newUserName();
 		final Resource r0 = getUnrestrictedAppManager().getResourceManagement().createResource(res0, Room.class);
 		final Resource r1 = getUnrestrictedAppManager().getResourceManagement().createResource(res1, Room.class);
 		// unprivileged natural user
@@ -145,7 +150,7 @@ public class RestTest extends SecurityTestBase {
 	@Test
 	public void restAccessForSubresourceWorks() throws InterruptedException, ClientProtocolException, IOException, URISyntaxException {
 		final String res = newResourceName();
-		String userName = newResourceName();
+		String userName = newUserName();
 		final Resource r = getUnrestrictedAppManager().getResourceManagement().<Room> createResource(res, Room.class).name().create();
 		// unprivileged natural user
 		final UserAccount user = SecurityTestUtils.createUser(userName, getUnrestrictedAppManager(), false, false);
@@ -159,7 +164,7 @@ public class RestTest extends SecurityTestBase {
 	@Test
 	public void restAccessForSubresourceWorks2() throws InterruptedException, ClientProtocolException, IOException, URISyntaxException {
 		final String res = newResourceName();
-		String userName = newResourceName();
+		String userName = newUserName();
 		final Resource r = getUnrestrictedAppManager().getResourceManagement().<Room> createResource(res, Room.class).name().create();
 		// unprivileged natural user
 		final UserAccount user = SecurityTestUtils.createUser(userName, getUnrestrictedAppManager(), false, false);
@@ -175,7 +180,7 @@ public class RestTest extends SecurityTestBase {
 	@Test
 	public void restCreateForSubresourceWorks() throws InterruptedException, ClientProtocolException, IOException, URISyntaxException {
 		final String res = newResourceName();
-		String userName = newResourceName();
+		String userName = newUserName();
 		final Resource r = getUnrestrictedAppManager().getResourceManagement().<Room> createResource(res, Room.class).create();
 		// unprivileged natural user
 		final UserAccount user = SecurityTestUtils.createUser(userName, getUnrestrictedAppManager(), false, false);
@@ -196,8 +201,8 @@ public class RestTest extends SecurityTestBase {
 	@Test
 	public void usersDontInterfere0() throws InterruptedException, ClientProtocolException, IOException, URISyntaxException {
 		final String res = newResourceName();
-		String userName0 = newResourceName();
-		String userName1 = newResourceName();
+		String userName0 = newUserName();
+		String userName1 = newUserName();
 		final Resource r = getUnrestrictedAppManager().getResourceManagement().createResource(res, Room.class);
 		// unprivileged natural user
 		final UserAccount userPriv = SecurityTestUtils.createUser(userName0, getUnrestrictedAppManager(), false, true);
@@ -217,8 +222,8 @@ public class RestTest extends SecurityTestBase {
 	@Test
 	public void usersDontInterfere1() throws InterruptedException, ClientProtocolException, IOException, URISyntaxException {
 		final String res = newResourceName();
-		String userName0 = newResourceName();
-		String userName1 = newResourceName();
+		String userName0 = newUserName();
+		String userName1 = newUserName();
 		final Resource r = getUnrestrictedAppManager().getResourceManagement().createResource(res, Room.class);
 		// unprivileged natural user
 		final UserAccount userPriv = SecurityTestUtils.createUser(userName0, getUnrestrictedAppManager(), false, true);
@@ -243,8 +248,8 @@ public class RestTest extends SecurityTestBase {
 	public void customAuthenticatorWorks() throws InterruptedException, ClientProtocolException, IOException, URISyntaxException {
 		final String paramKey = "customAuthKey";
 		final String res = newResourceName();
-		String userName0 = newResourceName();
-		String userName1 = newResourceName();
+		String userName0 = newUserName();
+		String userName1 = newUserName();
 		final Resource r = getUnrestrictedAppManager().getResourceManagement().createResource(res, Room.class);
 		final UserAccount user0 = SecurityTestUtils.createUser(userName0, getUnrestrictedAppManager(), false, false);
 		final UserAccount user1 = SecurityTestUtils.createUser(userName1, getUnrestrictedAppManager(), false, false);
@@ -284,7 +289,7 @@ public class RestTest extends SecurityTestBase {
 	@Test
 	public void authenticatorDisablingWorks() throws ClientProtocolException, IOException, URISyntaxException, InterruptedException {
 		final String res = newResourceName();
-		String userName1 = newResourceName();
+		String userName1 = newUserName();
 		final Resource r = getUnrestrictedAppManager().getResourceManagement().createResource(res, Room.class);
 		final UserAccount user1 = SecurityTestUtils.createUser(userName1, getUnrestrictedAppManager(), false, false);
 		SecurityTestUtils.addResourcePermissions(userName1, ctx, res, null, "*");

@@ -23,8 +23,10 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
@@ -37,6 +39,8 @@ import javax.net.ssl.SSLSocketFactory;
 import org.ogema.apps.openweathermap.dao.CurrentData;
 import org.ogema.apps.openweathermap.dao.ForecastData;
 import org.ogema.apps.openweathermap.dao.OpenWeatherMapREST;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 
@@ -47,31 +51,31 @@ import org.ogema.apps.openweathermap.dao.OpenWeatherMapREST;
 public class WeatherUtil {
 
 	private static WeatherUtil instance;
+    
+    private final static Logger LOGGER = LoggerFactory.getLogger(WeatherUtil.class);
 
 	private WeatherUtil() {
 	}
 
-	public String call(String querry) {
+	public String call(String query) {
 
-		if (querry.toLowerCase().startsWith("https")) {
-			return callSSL(querry);
+		if (query.toLowerCase().startsWith("https")) {
+			return callSSL(query);
 		}
 
 		String result = "{}";
 		try {
-			final URLConnection urlCon = new URL(querry).openConnection();
+			final URLConnection urlCon = new URL(query).openConnection();
 			urlCon.setRequestProperty("accept", "text/json");
 			final InputStream input = urlCon.getInputStream();
-			BufferedReader reader = new BufferedReader(new InputStreamReader(urlCon.getInputStream()));
+			BufferedReader reader = new BufferedReader(new InputStreamReader(urlCon.getInputStream(), StandardCharsets.UTF_8));
 			String line;
 			while ((line = reader.readLine()) != null) {
 				result = line;
 			}
 			input.close();
-
 		} catch (IOException e) {
-			OpenWeatherMapApplication.instance.appMan.getLogger().error(
-					"Exception by http-Request to OpenWeathermap: " + e.getMessage());
+            LOGGER.error("OpenWeatherMap query {} failed.", query, e);
 			return null;
 		}
 		return result;
@@ -87,28 +91,26 @@ public class WeatherUtil {
 			final URLConnection urlCon = new URL(querry).openConnection();
 			urlCon.setRequestProperty("accept", "text/json");
 			((HttpsURLConnection) urlCon).setSSLSocketFactory(sslSocketFactory);
-			final InputStream input = urlCon.getInputStream();
-			BufferedReader reader = new BufferedReader(new InputStreamReader(urlCon.getInputStream()));
-			String line;
-			while ((line = reader.readLine()) != null) {
-				result = line;
-			}
-			input.close();
-
+            try (InputStream input = urlCon.getInputStream()) {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    result = line;
+                }
+            }
 		} catch (NoSuchAlgorithmException | IOException e) {
-			return "ERROR: " + e.getStackTrace();
+			return "ERROR: " + Arrays.toString(e.getStackTrace());
 		}
 		return result;
 	}
 
 	public boolean ping(String ip, Integer port, Integer timeout) {
-
 		try {
 			Socket so = new Socket();
 			so.connect(new InetSocketAddress(ip, port), timeout);
 			so.close();
 			return true;
-		} catch (Exception ex) {
+		} catch (IOException ex) {
 			ex.printStackTrace();
 			return false;
 		}
@@ -137,8 +139,8 @@ public class WeatherUtil {
 
 			Double temp = (Math.round((entry.getMain().getTemp() - 273.15) * 100) / 100.0);
 			sb.append(city).append(" (").append(date).append("): ").append(cloud).append(" % Wolken,\t")
-					.append(irradiance).append(" Watt/mÂ²\t").append(tab).append(humidity).append("% Feuchtigkeit,\t")
-					.append(temp).append(" Â°C\n");
+					.append(irradiance).append(" Watt/m²\t").append(tab).append(humidity).append("% Feuchtigkeit,\t")
+					.append(temp).append(" °C\n");
 		}
 
 		return sb.toString();
@@ -159,12 +161,17 @@ public class WeatherUtil {
 
 		return sb.toString();
 	}
-
-	public void calculateIrradiation(ForecastData data) {
-		final String city = data.getCity().getName();
+    
+    public void calculateIrradiation(ForecastData data) {
+        final String city = data.getCity().getName();
 		final String country = data.getCity().getCountry();
 
 		final CurrentData current = OpenWeatherMapREST.getInstance().getWeatherCurrent(city, country);
+        calculateIrradiation(data, current);
+    }
+
+	public void calculateIrradiation(ForecastData data, CurrentData current) {
+		
 		if (current != null) {
 			final long sunUp = getMillisOfDay(current.getSys().getSunrise());
 			final long sunDown = getMillisOfDay(current.getSys().getSunset());

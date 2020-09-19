@@ -16,6 +16,7 @@
 package org.ogema.apps.openweathermap;
 
 import org.ogema.core.model.Resource;
+import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.resourcemanager.pattern.ResourcePattern;
 import org.ogema.model.devices.sensoractordevices.WindSensor;
@@ -47,15 +48,24 @@ public class RoomRad extends ResourcePattern<Room> {
 	public final WindSensor windSens = model.getSubResource("windSensor", WindSensor.class);
 
 	@Existence(required = CreateMode.OPTIONAL)
-	public final StringResource city = model.location().geographicLocation().getSubResource("city");
+	public final StringResource city = model.location().geographicLocation().getSubResource("city", StringResource.class);
 
 	@Existence(required = CreateMode.OPTIONAL)
-	public final StringResource country = model.location().geographicLocation().getSubResource("country");
+	public final StringResource country = model.location().geographicLocation().getSubResource("country", StringResource.class);
 
 	@Existence(required = CreateMode.OPTIONAL)
 	public final SolarIrradiationSensor irradSensor = model.getSubResource("solarIrradiationSensor",
 			SolarIrradiationSensor.class);
 
+    @Existence(required = CreateMode.OPTIONAL)
+    public final StringResource postalCode = model.location().getSubResource("postalCode", StringResource.class);
+    
+    @Existence(required = CreateMode.OPTIONAL)
+    public final FloatResource longitude = model.location().getSubResource("longitude", FloatResource.class);
+    
+    @Existence(required = CreateMode.OPTIONAL)
+    public final FloatResource latitude = model.location().getSubResource("latitude", FloatResource.class);
+    
 	public RoomRad(Resource match) {
 		super(match);
 	}

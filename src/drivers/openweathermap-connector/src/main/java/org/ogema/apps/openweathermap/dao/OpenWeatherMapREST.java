@@ -19,6 +19,9 @@ import org.ogema.apps.openweathermap.OpenWeatherMapApplication;
 import org.ogema.apps.openweathermap.WeatherUtil;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 
@@ -30,16 +33,21 @@ public class OpenWeatherMapREST {
 	private final String BASE_URL = "http://api.openweathermap.org/";
 	private final WeatherUtil util = WeatherUtil.getInstance();
 	private static OpenWeatherMapREST instance;
+    
+    private final static Logger LOGGER = LoggerFactory.getLogger(OpenWeatherMapREST.class);
 
 	public static void main(String[] args) {
-		// System.setProperty("openweathermapKEY", "");
+        //System.setProperty("org.ogema.drivers.openweathermap.key", "");
 		OpenWeatherMapREST rest = OpenWeatherMapREST.getInstance();
-		ForecastData data = rest.getWeatherForcast("Kassel", "de");
+		//ForecastData data = rest.getWeatherForcast("München", "de");
+        ForecastData data = rest.getWeatherForcastZip("10200", "th");
+        //ForecastData data = rest.getWeatherForcastCoord(48.85, 2.35); //Paris
 		
 		rest.util.calculateIrradiation(data);
 		
 		System.out.println(rest.util.toString(data) + "--------------------\n");
-		CurrentData current = rest.getWeatherCurrent("Kassel", "de");
+		//CurrentData current = rest.getWeatherCurrent(city, country);
+        CurrentData current = rest.getWeatherCurrentCoord(50.97, 8.97);
 		System.out.println(rest.util.toString(current));
 	}
 
@@ -67,28 +75,65 @@ public class OpenWeatherMapREST {
 		if (API_KEY != null && API_KEY.isEmpty() == false) {
 			url += "&APPID=" + API_KEY;
 		}
-		String json = util.call(url);
+		return getWeatherForecast(url);
+	}
+    
+    public ForecastData getWeatherForcastZip(String postalCode, String countryCode) {
+		String url = BASE_URL + "data/2.5/forecast?zip=" + postalCode + "," + countryCode;
+		if (API_KEY != null && API_KEY.isEmpty() == false) {
+			url += "&APPID=" + API_KEY;
+		}
+		return getWeatherForecast(url);
+	}
+    
+    public ForecastData getWeatherForcastCoord(double lat, double lon) {
+        String url = BASE_URL + "data/2.5/forecast?lat=" + lat + "&lon=" + lon;
+		if (API_KEY != null && API_KEY.isEmpty() == false) {
+			url += "&APPID=" + API_KEY;
+		}
+		return getWeatherForecast(url);
+    }
+    
+    private ForecastData getWeatherForecast(String url) {
+        String json = util.call(url);
 		if (json == null)
 			return null;
 		ObjectMapper mapper = new ObjectMapper();
 		try {
 			ForecastData data = mapper.readValue(json, ForecastData.class);
 			return data;
-		} catch (Exception e) {
-			System.out.println("error by: " + e.getMessage() + " --> " + json + "\n\n");
-			e.printStackTrace();
+		} catch (IOException e) {
+            LOGGER.error("could not parse JSON: {}", json, e);
 			return null;
 		}
-	}
+    }
 
 	public CurrentData getWeatherCurrent(String city, String countryCode) {
-		// city = "Kassel";
-		// countryCode = "de";
 		String url = BASE_URL + "data/2.5/weather?q=" + city + "," + countryCode;
 		if (API_KEY != null && API_KEY.isEmpty() == false) {
 			url += "&APPID=" + API_KEY;
 		}
-		String json = util.call(url);
+		return getWeatherCurrent(url);
+	}
+    
+    public CurrentData getWeatherCurrentZip(String postalCode, String countryCode) {
+		String url = BASE_URL + "data/2.5/weather?zip=" + postalCode + "," + countryCode;
+		if (API_KEY != null && API_KEY.isEmpty() == false) {
+			url += "&APPID=" + API_KEY;
+		}
+		return getWeatherCurrent(url);
+	}
+    
+    public CurrentData getWeatherCurrentCoord(double lat, double lon) {
+		String url = BASE_URL + "data/2.5/weather?lat=" + lat + "&lon=" + lon;
+		if (API_KEY != null && API_KEY.isEmpty() == false) {
+			url += "&APPID=" + API_KEY;
+		}
+		return getWeatherCurrent(url);
+	}
+    
+    private CurrentData getWeatherCurrent(String url) {
+        String json = util.call(url);
 		if (json == null)
 			return null;
 		ObjectMapper mapper = new ObjectMapper();
@@ -98,10 +143,10 @@ public class OpenWeatherMapREST {
 			data.getSys().setSunset(data.getSys().getSunset() * 1000l);
 			data.setDt(data.getDt() * 1000l);
 			return data;
-		} catch (Exception e) {
-			OpenWeatherMapApplication.instance.logger.error("irradiation could not be calculated");
+		} catch (IOException e) {
+			LOGGER.error("irradiation could not be calculated", e);
 			return null;
 		}
-	}
+    }
 
 }
