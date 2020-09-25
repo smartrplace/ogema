@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 public class OpenWeatherMapREST {
 
 	private String API_KEY = "";
+    public static final String API_KEY_PROPERTY = "org.ogema.drivers.openweathermap.key";
 	private final String BASE_URL = "http://api.openweathermap.org/";
 	private final WeatherUtil util = WeatherUtil.getInstance();
 	private static OpenWeatherMapREST instance;
@@ -37,7 +38,7 @@ public class OpenWeatherMapREST {
     private final static Logger LOGGER = LoggerFactory.getLogger(OpenWeatherMapREST.class);
 
 	public static void main(String[] args) {
-        //System.setProperty("org.ogema.drivers.openweathermap.key", "");
+        //System.setProperty(API_KEY_PROPERTY, "");
 		OpenWeatherMapREST rest = OpenWeatherMapREST.getInstance();
 		//ForecastData data = rest.getWeatherForcast("München", "de");
         ForecastData data = rest.getWeatherForcastZip("10200", "th");
@@ -58,7 +59,7 @@ public class OpenWeatherMapREST {
 	public static OpenWeatherMapREST getInstance() {
 		if (OpenWeatherMapREST.instance == null) {
 			OpenWeatherMapREST.instance = new OpenWeatherMapREST();
-			String key = System.getProperty("org.ogema.drivers.openweathermap.key", null);
+			String key = System.getProperty(API_KEY_PROPERTY, null);
 			if (key == null) {
 				System.out.print("openweathermapKEY is required, Please register: http://openweathermap.org/register");
 			}

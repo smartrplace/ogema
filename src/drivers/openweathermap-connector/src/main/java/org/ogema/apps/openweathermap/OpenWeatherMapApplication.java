@@ -39,94 +39,102 @@ import org.osgi.service.metatype.annotations.Designate;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
 //import org.osgi.service.cm.ConfigurationAdmin;
-
 /**
- * 
- * Application main class. Application connect to the openweathermap services (www.openweathermap.com) and store weather
- * information (temperature,cloudiness, humidity, rain) into OGEMA resources. Also calculate solar irradiation.
- * 
+ *
+ * Application main class. Application connect to the openweathermap services
+ * (www.openweathermap.com) and store weather information
+ * (temperature,cloudiness, humidity, rain) into OGEMA resources. Also calculate
+ * solar irradiation.
+ *
  * @author brequardt
  */
-
 @Designate(ocd = OpenWeatherMapApplication.Config.class)
-@Component(service = { Application.class, OpenWeatherMapApplicationI.class },
+@Component(service = {Application.class, OpenWeatherMapApplicationI.class},
         configurationPolicy = ConfigurationPolicy.OPTIONAL)
 public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
-    
+
     public static final String PID = "org.ogema.apps.OpenWeatherMap";
-    
+
     @ObjectClassDefinition(
             localization = "OSGI-INF/l10n/OpenWeatherMapConfig",
             name = "%name", description = "%description")
     public static @interface Config {
-        
+
         @AttributeDefinition(name = "%apikey", description = "%apikey_desc")
         String apikey();
-        
+
         @AttributeDefinition(name = "%city", description = "%city_desc")
         String city();
-        
+
         @AttributeDefinition(name = "%country", description = "%country_desc")
         String country();
-        
+
         @AttributeDefinition(name = "%postal", description = "%postal_desc")
         String postalCode();
-        
+
         @AttributeDefinition(name = "%lat", description = "%lat_desc")
         double latitude() default Double.NaN;
-        
+
         @AttributeDefinition(name = "%lon", description = "%lon_desc")
         double longitude() default Double.NaN;
-        
+
     }
 
-	/**
-	 * System property ({@value} ) holding the interval in ms at which weather data will be retrieved.
-	 */
-	public static final String UPDATE_INTERVAL = "org.ogema.drivers.openweathermap.getWeatherInfoRepeatTime";
+    /**
+     * System property ({@value} ) holding the interval in ms at which weather
+     * data will be retrieved.
+     */
+    public static final String UPDATE_INTERVAL = "org.ogema.drivers.openweathermap.getWeatherInfoRepeatTime";
 
-	/**
-	 * Default value ({@value} ) for {@link #UPDATE_INTERVAL}.
-	 */
-	public static final long UPDATE_INTERVAL_DEFAULT = 3 * 60 * 60 * 1000L;
+    /**
+     * Default value ({@value} ) for {@link #UPDATE_INTERVAL}.
+     */
+    public static final long UPDATE_INTERVAL_DEFAULT = 3 * 60 * 60 * 1000L;
 
-	public OgemaLogger logger;
-	protected ApplicationManager appMan;
-	protected ResourceManagement resMan;
-	// @Reference
-	// private ConfigurationAdmin configurationAdmin;
-	public static OpenWeatherMapApplication instance;
-	EnvironmentCreater envCreater;
-	private List<RoomController> roomControllers = new ArrayList<>();
-	private ResourcePatternAccess advAcc;
+    public OgemaLogger logger;
+    protected ApplicationManager appMan;
+    protected ResourceManagement resMan;
+    // @Reference
+    // private ConfigurationAdmin configurationAdmin;
+    public static OpenWeatherMapApplication instance;
+    EnvironmentCreater envCreater;
+    private List<RoomController> roomControllers = new ArrayList<>();
+    private ResourcePatternAccess advAcc;
     private Config config;
-    
+
     @Activate
     protected void activate(Config cfg) {
-        if (cfg != null && cfg.apikey() != null) {
+        if (cfg != null && isUsableConfig(cfg)) {
             this.config = cfg;
         }
     }
 
-	@Override
-	public void start(ApplicationManager appManager) {
+    boolean isUsableConfig(Config cfg) {
+        return (cfg.apikey() != null || !System.getProperty(OpenWeatherMapREST.API_KEY_PROPERTY, "").isEmpty())
+                && ((cfg.city() != null && cfg.country() != null)
+                    || (cfg.postalCode() != null && cfg.country() != null)
+                    || (!Double.isNaN(cfg.latitude()) && !Double.isNaN(cfg.latitude())));
+    }
 
-		instance = this;
-		this.appMan = appManager;
-		this.logger = appManager.getLogger();
-		this.resMan = appManager.getResourceManagement();
-		envCreater = new EnvironmentCreater(appManager);
-		String stdCity = null;
-		String stdCountry = null;
-		try {
-			stdCity = System.getProperty("org.ogema.drivers.openweathermap.stdCity");
-			stdCountry = System.getProperty("org.ogema.drivers.openweathermap.stdCountry");
-		} catch (SecurityException e) {
-			logger.warn("Permission denied to access init properties",e);
-		}
-		if ((stdCity != null) && (stdCountry != null)) {
-			envCreater.createResource("OpenWeatherMapData", stdCity, stdCountry);
-		}
+    @Override
+    public void start(ApplicationManager appManager) {
+
+        instance = this;
+        this.appMan = appManager;
+        this.logger = appManager.getLogger();
+        this.resMan = appManager.getResourceManagement();
+        envCreater = new EnvironmentCreater(appManager);
+        String stdCity = null;
+        String stdCountry = null;
+        try {
+            stdCity = System.getProperty("org.ogema.drivers.openweathermap.stdCity");
+            stdCountry = System.getProperty("org.ogema.drivers.openweathermap.stdCountry");
+        } catch (SecurityException e) {
+            logger.warn("Permission denied to access init properties", e);
+        }
+        if ((stdCity != null) && (stdCountry != null)) {
+            envCreater.createResource("OpenWeatherMapData", stdCity, stdCountry);
+        }
         if (config != null) {
             logger.debug("using configuration from OSGi ConfigAdmin");
             RoomRad r = envCreater.createResource("OpenWeatherMapData", "", "");
@@ -135,38 +143,38 @@ public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
                 OpenWeatherMapREST.getInstance().setAPI_KEY(config.apikey());
             }
         }
-		advAcc = appManager.getResourcePatternAccess();
-		advAcc.addPatternDemand(RoomRad.class, roomListener, AccessPriority.PRIO_DEVICEGROUPMAN);
-	}
+        advAcc = appManager.getResourcePatternAccess();
+        advAcc.addPatternDemand(RoomRad.class, roomListener, AccessPriority.PRIO_DEVICEGROUPMAN);
+    }
 
-	@Override
-	public void stop(AppStopReason reason) {
-		for (RoomController controller : roomControllers) {
-			controller.stop();
-		}
-		roomControllers.clear();
-		advAcc.removePatternDemand(RoomRad.class, roomListener);
-	}
-    
+    @Override
+    public void stop(AppStopReason reason) {
+        for (RoomController controller : roomControllers) {
+            controller.stop();
+        }
+        roomControllers.clear();
+        advAcc.removePatternDemand(RoomRad.class, roomListener);
+    }
+
     void storeConfig(Config cfg, RoomRad room) {
         if (Double.isNaN(cfg.latitude())) {
             room.latitude.delete();
             room.longitude.delete();
         } else {
-            room.latitude.<FloatResource>create().setValue((float)cfg.latitude());
-            room.longitude.<FloatResource>create().setValue((float)cfg.longitude());
+            room.latitude.<FloatResource>create().setValue((float) cfg.latitude());
+            room.longitude.<FloatResource>create().setValue((float) cfg.longitude());
         }
         if (cfg.city() != null && !cfg.city().isEmpty()) {
             room.city.<StringResource>create().setValue(cfg.city());
         } else {
             room.city.delete();
         }
-        if (cfg.country()!= null && !cfg.country().isEmpty()) {
+        if (cfg.country() != null && !cfg.country().isEmpty()) {
             room.country.<StringResource>create().setValue(cfg.country());
         } else {
             room.country.delete();
         }
-        if (cfg.postalCode()!= null && !cfg.postalCode().isEmpty()) {
+        if (cfg.postalCode() != null && !cfg.postalCode().isEmpty()) {
             room.postalCode.<StringResource>create().setValue(cfg.postalCode());
         } else {
             room.postalCode.delete();
@@ -174,60 +182,56 @@ public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
         room.model.activate(true);
     }
 
-	/**
-	 * Create an environment OGEMA resource for saving weather information.
-	 * 
-	 * @param name
-	 *            name of the environment
-	 * @param city
-	 *            name of the city
-	 * @param country
-	 *            name of country (shortcuts) example: de for germany
-	 * @return OGEMA resource
-	 */
-	@Override
-	public Resource createEnvironment(String name, String city, String country) {
-		return envCreater.createResource(name, city, country).model;
-	}
+    /**
+     * Create an environment OGEMA resource for saving weather information.
+     *
+     * @param name name of the environment
+     * @param city name of the city
+     * @param country name of country (shortcuts) example: de for germany
+     * @return OGEMA resource
+     */
+    @Override
+    public Resource createEnvironment(String name, String city, String country) {
+        return envCreater.createResource(name, city, country).model;
+    }
 
-	final PatternListener<RoomRad> roomListener = new PatternListener<RoomRad>() {
+    final PatternListener<RoomRad> roomListener = new PatternListener<RoomRad>() {
 
-		@Override
-		public void patternAvailable(RoomRad rad) {
-			final RoomController newController = new RoomController(appMan, rad);
-			roomControllers.add(newController);
-			newController.start();
-		}
-		
-		@Override
-		public void patternUnavailable(RoomRad rad) {
-			RoomController controller = null;
-			for (RoomController existingController : roomControllers) {
-				if (existingController.isControllingDevice(rad)) {
-					controller = existingController;
-					break;
-				}
-			}
-			if (controller == null) {
-				logger.warn("Got a resource unavailable callback for a RAD that has no controller.");
-				return;
-			}
-			controller.stop();
-			roomControllers.remove(controller);
-		}
-	};
+        @Override
+        public void patternAvailable(RoomRad rad) {
+            final RoomController newController = new RoomController(appMan, rad);
+            roomControllers.add(newController);
+            newController.start();
+        }
 
-	/**
-	 * return environment parameters
-	 * 
-	 * @param name
-	 *            name of the environment information
-	 * @return return information inside a map
-	 */
-	@Override
-	public Map<String, Object> getEnviromentParameter(String name) {
-		// TODO Auto-generated method stub
-		return envCreater.getParameters(name);
-	}
+        @Override
+        public void patternUnavailable(RoomRad rad) {
+            RoomController controller = null;
+            for (RoomController existingController : roomControllers) {
+                if (existingController.isControllingDevice(rad)) {
+                    controller = existingController;
+                    break;
+                }
+            }
+            if (controller == null) {
+                logger.warn("Got a resource unavailable callback for a RAD that has no controller.");
+                return;
+            }
+            controller.stop();
+            roomControllers.remove(controller);
+        }
+    };
+
+    /**
+     * return environment parameters
+     *
+     * @param name name of the environment information
+     * @return return information inside a map
+     */
+    @Override
+    public Map<String, Object> getEnviromentParameter(String name) {
+        // TODO Auto-generated method stub
+        return envCreater.getParameters(name);
+    }
 
 }
