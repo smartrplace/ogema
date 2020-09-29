@@ -91,6 +91,11 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
             this.connection = connection;
             this.handler = handler;
         }
+
+        @Override
+        public String toString() {
+            return String.format("%s (%s): %s%n", device.getPath(), toplevelDevice.getPath(), handler.getClass().getSimpleName());
+        }
         
     }
 

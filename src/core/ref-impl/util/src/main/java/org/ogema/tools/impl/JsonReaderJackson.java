@@ -20,7 +20,6 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.google.common.io.BaseEncoding;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.security.AccessController;
@@ -233,7 +232,13 @@ public class JsonReaderJackson {
 
     }
     
-    Collection<Resource> readCollection(Reader reader) throws IOException {
+    /**
+     * Reads a JSON array of resources into a collection.
+     * @param reader Reader positioned at the start of a JSON array.
+     * @return collection containing array elements.
+     * @throws IOException
+     */
+    public Collection<Resource> readCollection(Reader reader) throws IOException {
         Collection<Resource> c = new ArrayList<>();
         try (JsonParser p = createParser(reader)) {
             acceptStartArray(p);
@@ -247,7 +252,7 @@ public class JsonReaderJackson {
         return c;
     }
 
-    Resource read(Reader reader) throws IOException, ClassNotFoundException {
+    public Resource read(Reader reader) throws IOException, ClassNotFoundException {
         try (JsonParser p = createParser(reader)) {
             p.nextToken(); //TODO: test startObject
             return (Resource) readResource(null, p);
@@ -544,13 +549,6 @@ public class JsonReaderJackson {
         }
     }
 
-    public static void main(String[] args) throws Exception {
-        FileReader r = new FileReader("/home/jlapp/temp/resource-test-3.json");
-        //URL u = new URL("http://localhost:8080/rest/resources/__testFloatRes__?user=rest&pw=rest&depth=10&schedules=true");
-        //Reader r = new InputStreamReader(u.openStream());
-        new JsonReaderJackson().read(r);
-    }
-    
     static final JsonParser createParser(final Reader reader) throws IOException {
 		try {
 			return AccessController.doPrivileged(new PrivilegedExceptionAction<JsonParser>() {
