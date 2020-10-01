@@ -392,14 +392,36 @@ public class OgemaHttpContext implements HttpContext {
         String oldReq = request.getPathInfo() == null
                 ? ""
                 : URLEncoder.encode(request.getPathInfo(), "UTF-8");
-        String redir = "/login/noaccess.html?userName=" + user 
-                + "&oldReq=" + oldReq
-                + "&appBsn=" + app.getBundle().getSymbolicName()
-                + "&cookie=" + cookie;
-        response.sendRedirect(redir);
-        if (Configuration.DEBUG) {
-            logger.debug(message);
+        HttpSession ses = request.getSession(false);
+
+        String otpwd = "???";
+        String otusr = app.getIDString();
+
+        if (ses != null) {
+            SessionAuth sa = (SessionAuth) ses.getAttribute("ogemaAuth");
+            otpwd = sa.registerAppOtp(app);
         }
+        
+        StringBuilder vars = new StringBuilder();
+        vars.append("var ").append("otusr='").append(otusr).append("';");
+        vars.append("var ").append("otpwd='").append(otpwd).append("';");
+        vars.append("var ").append("userName='").append(user).append("';");
+        vars.append("var ").append("oldReq='").append(oldReq).append("';");
+        vars.append("var ").append("appBsn='").append(app.getBundle().getSymbolicName()).append("';");
+        vars.append("var ").append("redirect='").append("/login/noaccess.html").append("';");
+        vars.append("var ").append("startPage='").append(LoginServlet.START_PAGE).append("';");
+
+        String resp = String.format("<HTML><HEAD><SCRIPT type='application/javascript'>"
+                + "%s"
+                + "var get = new XMLHttpRequest(); get.open('GET', redirect,true);"
+                + "get.onreadystatechange = process; get.send(); "
+                + "function process(){ "
+                + "if(get.readyState == 4) { var data = get.responseText; document.write(data); }"
+                + "}</SCRIPT></HEAD></HTML>", vars.toString());
+        response.setContentType("text/html");
+        response.getWriter().print(resp);
+        response.flushBuffer();
+        response.getWriter().close();
         return false;
     }
 	

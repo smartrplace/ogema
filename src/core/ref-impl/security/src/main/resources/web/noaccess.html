@@ -35,6 +35,7 @@
         <script src="/login/jquery-2.1.1.min.js" type="text/javascript"></script>
         <script src="/login/bootstrap.min.js" type="text/javascript"></script>
         <script type="text/javascript">
+            /*
             $.urlParam = function (name) {
                 var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
                 if (results === null) {
@@ -42,19 +43,26 @@
                 }
                 return decodeURI(results[1]) || 0;
             };
-            
             $(document).ready(function () {
-                $('#userName').html($.urlParam('userName'));
-                $('#oldReq').html(decodeURIComponent($.urlParam('oldReq')));
-                $('#appBsn').html(decodeURIComponent($.urlParam('appBsn')));
+                $('#userName').html(userName);
+                $('#oldReq').html(decodeURIComponent(oldReq));
+                $('#appBsn').html(decodeURIComponent(appBsn));
             });
-            
+            */
+
             function logout() {
-                var logoutUrl = "/apps/ogema/framework/gui?action=logout&otusr=" + otusr + "&otpwd=" + otpwd;
-                window.location.replace(logoutUrl);
-            }
+                var onLogoutSuccess = function (data) {
+                    window.location.assign(data);
+                };
+                $.ajax({
+                    url: "/apps/ogema/framework/gui?action=logout&user=" + otusr + "&pw=" + otpwd,
+                    data: "",
+                    success: onLogoutSuccess,
+                    dataType: "text",
+                    async: false
+                });
+            };
         </script>
-        <!--link rel="icon" href="/login/favicon.ico">
         <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
         <!--[if lt IE 9]>
               <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
@@ -74,9 +82,15 @@
                 not authorized to access pages belonging to<br/>
                 <span id="appBsn"></span>.
                 <br/>
-                <a href="/ogema/index.html">Return to start page</a><br/>
+                <a id="startPage" href="/ogema/index.html">Return to start page</a><br/>
                 <a onClick="logout()">Logout and login as different user</a>
             </div>
         </div>
+        <script type="text/javascript">
+            $('#userName').html(userName);
+            $('#oldReq').html(oldReq);
+            $('#appBsn').html(appBsn);
+            $('#startPage').attr("href", startPage);
+        </script>
     </body>
 </html>
