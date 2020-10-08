@@ -248,7 +248,7 @@ public class ShellCommands {
 
 	@Descriptor("List/configure loggers")
 	public void loggers(
-			@Descriptor("set log level for selected loggers") @Parameter(names = { "-l",
+			@Descriptor("set log level for selected loggers (null to clear override)") @Parameter(names = { "-l",
 					"--level" }, absentValue = "") String level,
 			@Descriptor("comma separated list of outputs (file, console or cache) for which to set the log level (default: all outputs)") @Parameter(names = {
 					"-o", "--output" }, absentValue = "") String output,
@@ -275,15 +275,16 @@ public class ShellCommands {
 		}
 		for (AdminLogger l : loggers) {
 			String loggerName = l.getName();
-			if (p != null && !p.matcher(loggerName).find()) {
-				continue;
-			}
-			if (!level.isEmpty()) {
-				LogLevel ll = LogLevel.valueOf(level.toUpperCase());
-				for (LogOutput o : outputs) {
-					l.setMaximumLogLevel(o, ll);
-				}
-			}
+            if (p != null && !p.matcher(loggerName).find()) {
+                continue;
+            }
+            LogLevel ll = null;
+            if (level != null && !level.isEmpty()) {
+                ll = LogLevel.valueOf(level.toUpperCase());
+            }
+            for (LogOutput o : outputs) {
+                l.overwriteMaximumLogLevel(o, ll);
+            }
 			System.out.printf("  %s {%s=%s, %s=%s, %s=%s}%n", loggerName, LogOutput.CONSOLE,
 					l.getMaximumLogLevel(LogOutput.CONSOLE), LogOutput.FILE, l.getMaximumLogLevel(LogOutput.FILE),
 					LogOutput.CACHE, l.getMaximumLogLevel(LogOutput.CACHE));
