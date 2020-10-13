@@ -243,13 +243,13 @@ public class ShellCommands {
 
 	@Descriptor("List loggers")
 	public void loggers() {
-		loggers("", "", "");
+		loggers("unused", "", "");
 	}
 
 	@Descriptor("List/configure loggers")
 	public void loggers(
 			@Descriptor("set log level for selected loggers (null to clear override)") @Parameter(names = { "-l",
-					"--level" }, absentValue = "") String level,
+					"--level" }, absentValue = "unused") String level,
 			@Descriptor("comma separated list of outputs (file, console or cache) for which to set the log level (default: all outputs)") @Parameter(names = {
 					"-o", "--output" }, absentValue = "") String output,
 			@Descriptor("select loggers by regex (case-insensitive subsequence match)") String match) {
@@ -278,12 +278,15 @@ public class ShellCommands {
             if (p != null && !p.matcher(loggerName).find()) {
                 continue;
             }
-            LogLevel ll = null;
-            if (level != null && !level.isEmpty()) {
-                ll = LogLevel.valueOf(level.toUpperCase());
-            }
-            for (LogOutput o : outputs) {
-                l.overwriteMaximumLogLevel(o, ll);
+            if (!"unused".equals(level)) {
+                LogLevel ll = null;
+                if (level != null && !level.isEmpty()) {
+                    ll = LogLevel.valueOf(level.toUpperCase());
+                }
+
+                for (LogOutput o : outputs) {
+                    l.overwriteMaximumLogLevel(o, ll);
+                }
             }
 			System.out.printf("  %s {%s=%s, %s=%s, %s=%s}%n", loggerName, LogOutput.CONSOLE,
 					l.getMaximumLogLevel(LogOutput.CONSOLE), LogOutput.FILE, l.getMaximumLogLevel(LogOutput.FILE),
