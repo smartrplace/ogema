@@ -65,6 +65,24 @@ public class TransportIP extends AbstractTransport {
                 sock.getBroadcast(), broadcast, sock.getReuseAddress());
         receiverThread = new Thread(receiver, getClass().getSimpleName() + " UDP receiver");
     }
+    
+    static String bytesToString(byte[] bytes, int l) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < l; i++) {
+            byte b = bytes[i];
+            int v = b < 0
+                    ? 256 + b
+                    : b;
+            if (i > 0) {
+                sb.append(" ");
+            }
+            if (v < 16) {
+                sb.append("0");
+            }
+            sb.append(Integer.toHexString(v));
+        }
+        return sb.toString();
+    }
 
     Runnable receiver = new Runnable() {
 
@@ -75,8 +93,14 @@ public class TransportIP extends AbstractTransport {
             while (!Thread.interrupted()) {
                 try {
                     sock.receive(p);
-
-                    logger.trace("received {} bytes from {}:{}", p.getLength(), p.getAddress(), p.getPort());
+                    if (logger.isTraceEnabled()) {
+                        if (p.getLength() <= 40) {
+                            logger.trace("received {} bytes from {}:{} [{}]",
+                                p.getLength(), p.getAddress(), p.getPort(), bytesToString(p.getData(), p.getLength()));
+                        } else {
+                            logger.trace("received {} bytes from {}:{}", p.getLength(), p.getAddress(), p.getPort());
+                        }
+                    }
 
                     byte[] msg = new byte[p.getLength()];
                     System.arraycopy(buf, 0, msg, 0, msg.length);
@@ -162,6 +186,8 @@ public class TransportIP extends AbstractTransport {
                 //TODO: hop count?
                 dest.npdu = dest.npdu.withDestination(
                         npdu.getSourceNet(), npdu.getSourceAddress(), 255);
+            } else {
+                dest.npdu = dest.npdu.withoutDestination();
             }
             return dest;
         }
@@ -195,19 +221,30 @@ public class TransportIP extends AbstractTransport {
     @Override
     protected void sendData(ByteBuffer data, Priority prio, boolean expectingReply, DeviceAddress destination) throws IOException {
         BACnetIpAddress addr = (BACnetIpAddress) destination;
-        byte[] npduOctets = addr.npdu.withExpectingReply(expectingReply).toArray();
+        Npdu npdu = addr.npdu.withExpectingReply(expectingReply);
+        
+        npdu = npdu.withoutDestination();
+        
+        byte[] npduOctets = npdu.toArray();
         int vlcSize = 4;
         int packetSize = vlcSize + npduOctets.length + data.limit();
         byte[] packetData = new byte[packetSize];
         //TODO need full VLC support(?) see spec J.2
         //write virtual link control
         packetData[0] = (byte) 0x81;
-        packetData[1] = (byte) (addr.npdu.isBroadcast() ? 0x0b : 0x0a);
+        packetData[1] = (byte) (npdu.isBroadcast() ? 0x0b : 0x0a);
         packetData[2] = (byte) ((packetSize & 0xFF00) >> 8);
         packetData[3] = (byte) (packetSize & 0xFF);
         System.arraycopy(npduOctets, 0, packetData, 4, npduOctets.length);
-        logger.trace("perform sending of {} bytes to {}:{}", packetData.length, addr.addr, addr.port);
         data.get(packetData, vlcSize + npduOctets.length, data.limit());
+        if (logger.isTraceEnabled()) {
+            if (packetData.length <= 40) {
+                logger.trace("sending {} bytes to {}:{} [{}]",
+                        packetData.length, addr.addr, addr.port, bytesToString(packetData, packetData.length));
+            } else {
+                logger.trace("sending {} bytes to {}:{}", packetData.length, addr.addr, addr.port);
+            }
+        }
         DatagramPacket p = new DatagramPacket(packetData, packetData.length, addr.addr, addr.port);
         sock.send(p);
     }

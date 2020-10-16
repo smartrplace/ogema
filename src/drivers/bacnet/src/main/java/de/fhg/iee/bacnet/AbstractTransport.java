@@ -200,7 +200,12 @@ public abstract class AbstractTransport implements Transport {
 
     protected final boolean hasLocalInvokeId(ProtocolControlInformation pci) {
         int pduType = pci.getPduType();
-        return pduType == ApduConstants.TYPE_COMPLEX_ACK || pduType == ApduConstants.TYPE_SIMPLE_ACK || pduType == ApduConstants.TYPE_SEGMENT_ACK || pduType == ApduConstants.TYPE_ERROR || pduType == ApduConstants.TYPE_REJECT || pduType == ApduConstants.TYPE_ABORT;
+        return pduType == ApduConstants.TYPE_COMPLEX_ACK
+                || pduType == ApduConstants.TYPE_SIMPLE_ACK
+                || pduType == ApduConstants.TYPE_SEGMENT_ACK
+                || pduType == ApduConstants.TYPE_ERROR
+                || pduType == ApduConstants.TYPE_REJECT
+                || pduType == ApduConstants.TYPE_ABORT;
     }
 
     private void executeListener(final PendingReply r, final Indication i) {
@@ -234,6 +239,7 @@ public abstract class AbstractTransport implements Transport {
                 while (it.hasNext()) {
                     PendingReply r = it.next();
                     if (r.getInvokeId() == invokeId) {
+                        logger.trace("executing callback for invoke ID {}", invokeId);
                         it.remove();
                         indicationHandled = true;
                         Indication i = new DefaultIndication(indication);
@@ -243,8 +249,12 @@ public abstract class AbstractTransport implements Transport {
                 }
                 pendingReplies.notifyAll();
             }
+        } else {
+            logger.trace("indication PDU type={}", Integer.toBinaryString(pci.getPduType()));
         }
         if (!indicationHandled) {
+            logger.trace("calling {} default handlers for unhandled indication from {}",
+                    listeners.size(), indication.getSource());
             for (IndicationListener l : listeners) {
                 //TODO: needs executor
                 Indication i = new DefaultIndication(indication);
