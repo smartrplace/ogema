@@ -1295,5 +1295,36 @@ public class ValueResourceUtils {
 		final String val = ((StringResource) r).getValue().trim();
 		return val.isEmpty() ? null: val;
     }
+
+	public static <T extends ValueResource> boolean isEqual(T res1, T res2) {
+		if (res1 instanceof FloatResource) 
+			return ((FloatResource) res1).getValue() == ((FloatResource) res2).getValue();
+		if (res1 instanceof StringResource)
+			return ((StringResource) res1).getValue().equals(((StringResource) res2).getValue());
+		if (res1 instanceof IntegerResource)
+			return ((IntegerResource) res1).getValue() == ((IntegerResource) res2).getValue();
+		if (res1 instanceof TimeResource)
+			return ((TimeResource) res1).getValue() == ((TimeResource) res2).getValue();
+		if (res1 instanceof BooleanResource)
+			return ((BooleanResource) res1).getValue() == ((BooleanResource) res2).getValue();
+		if (res1 instanceof Schedule)
+			return((Schedule) res1).getValues(0).equals(((Schedule) res2).getValues(0));
+		if (res1 instanceof ByteArrayResource)
+			return((ByteArrayResource) res1).getValues().equals(((ByteArrayResource) res2).getValues());
+		if (res1 instanceof IntegerArrayResource)
+			return((IntegerArrayResource) res1).getValues().equals(((IntegerArrayResource) res2).getValues());
+		if (res1 instanceof BooleanArrayResource)
+			return((BooleanArrayResource) res1).getValues().equals(((BooleanArrayResource) res2).getValues());
+		if (res1 instanceof FloatArrayResource)
+			return((FloatArrayResource) res1).getValues().equals(((FloatArrayResource) res2).getValues());
+		if (res1 instanceof TimeArrayResource)
+			return((TimeArrayResource) res1).getValues().equals(((TimeArrayResource) res2).getValues());
+		if (res1 instanceof StringArrayResource) {
+			return((StringArrayResource) res1).getValues().equals(((StringArrayResource) res2).getValues());
+		}
+		if (res1 instanceof org.ogema.core.model.simple.OpaqueResource)
+			return ((org.ogema.core.model.simple.OpaqueResource) res1).getValue().equals(((org.ogema.core.model.simple.OpaqueResource) res2).getValue());
+		throw new IllegalStateException("unknown resource type in "+res1.getLocation()); // should not happen
+	}
 	
 }

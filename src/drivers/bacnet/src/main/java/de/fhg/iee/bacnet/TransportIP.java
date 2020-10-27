@@ -195,7 +195,9 @@ public class TransportIP extends AbstractTransport {
         @Override
         public String toString() {
             //TODO: include bacnet network info
-            return addr.toString();
+            if(addr == null)
+            	return null;
+        	return addr.toString();
         }
 
     }
@@ -246,6 +248,8 @@ public class TransportIP extends AbstractTransport {
             }
         }
         DatagramPacket p = new DatagramPacket(packetData, packetData.length, addr.addr, addr.port);
+        if(Boolean.getBoolean("org.ogema.driver.bacnet.testwithoutconnection"))
+        	return;
         sock.send(p);
     }
 
