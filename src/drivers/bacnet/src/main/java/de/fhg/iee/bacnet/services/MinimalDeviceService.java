@@ -29,6 +29,7 @@ import de.fhg.iee.bacnet.tags.CompositeTag;
 import de.fhg.iee.bacnet.tags.EnumeratedValueTag;
 import de.fhg.iee.bacnet.tags.ObjectIdentifierTag;
 import de.fhg.iee.bacnet.tags.Tag;
+import de.fhg.iee.bacnet.tags.TagConstants;
 import de.fhg.iee.bacnet.tags.UnsignedIntTag;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -115,7 +116,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
         ObjectIdentifierTag requestOid = new ObjectIdentifierTag(i.getData());
         if (objects.containsKey(requestOid)) {
             UnsignedIntTag propId = new UnsignedIntTag(i.getData());
-            logger.debug("got readProperty request for property {}", propId.getValue());
+            logger.debug("got readProperty request for property {}/{}", requestOid.getInstanceNumber(), propId.getValue());
             if (i.getData().remaining() > 0) {
                 UnsignedIntTag index = new UnsignedIntTag(i.getData());
                 logger.warn("got unsupported readProperty request with index for {}[{}]", propId.getValue(), index);
@@ -126,6 +127,9 @@ public class MinimalDeviceService implements IndicationListener<Void> {
             } else {
                 sendProperty(i, requestOid, id);
             }
+        } else {
+            logger.debug("got readProperty request for unknown property {}/{}",
+                    requestOid.getObjectType(), requestOid.getInstanceNumber());
         }
     }
 
@@ -142,10 +146,17 @@ public class MinimalDeviceService implements IndicationListener<Void> {
                 sendError(i, BACnetErrorClass.property, BACnetErrorCode.write_access_denied);
             } else {
                 CompositeTag ct = new CompositeTag(i.getData());
-                UnsignedIntTag priority = new UnsignedIntTag(i.getData());
+                if (i.getData().remaining() > 0) {
+                    UnsignedIntTag priority = new UnsignedIntTag(i.getData());
+                    logger.trace("ignoring priority {} on write to {}/{}",
+                            priority.getValue(), requestOid.getInstanceNumber(), propId.getValue());
+                }
                 p.consumer.accept(ct);
                 sendAck(i);
             }
+        } else {
+            logger.debug("got writeProperty request for unknown property {}/{}",
+                    requestOid.getObjectType(), requestOid.getInstanceNumber());
         }
     }
 
@@ -212,11 +223,21 @@ public class MinimalDeviceService implements IndicationListener<Void> {
                 ((Tag) value).write(buf);
             } else if (value instanceof Collection) {
                 for (Object e : ((Collection) value)) {
-                    ((Tag) e).write(buf);
+                    if (e != null) {
+                        ((Tag) e).write(buf);
+                    } else {
+                        logger.trace("writing NULL tag for null value in collection");
+                        new Tag(0, Tag.TagClass.Application, TagConstants.TAG_NULL).write(buf);
+                    }
                 }
             } else if (value.getClass().isArray()) {
                 for (Tag e : ((Tag[]) value)) {
-                    e.write(buf);
+                    if (e != null) {
+                        e.write(buf);
+                    } else {
+                        logger.trace("writing NULL tag for null value in array");
+                        new Tag(0, Tag.TagClass.Application, TagConstants.TAG_NULL).write(buf);
+                    }
                 }
             }
         }

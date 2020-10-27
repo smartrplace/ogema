@@ -60,7 +60,7 @@
                 <configuration>
                     <instructions>
                     </instructions>
-                    <unpackBundle>false</unpackBundle>
+                    <unpackBundle>true</unpackBundle>
                 </configuration>
             </plugin>
             <plugin>
