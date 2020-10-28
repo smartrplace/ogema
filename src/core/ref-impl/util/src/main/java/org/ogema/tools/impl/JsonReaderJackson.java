@@ -58,6 +58,7 @@ import org.ogema.serialization.jaxb.IntegerSchedule;
 import org.ogema.serialization.jaxb.OpaqueSchedule;
 import org.ogema.serialization.jaxb.Resource;
 import org.ogema.serialization.jaxb.ResourceLink;
+import org.ogema.serialization.jaxb.ResourceList;
 import org.ogema.serialization.jaxb.SampledFloat;
 import org.ogema.serialization.jaxb.SampledValue;
 import org.ogema.serialization.jaxb.ScheduleResource;
@@ -76,7 +77,7 @@ public class JsonReaderJackson {
     private static final String SCHEDULE_ENTRY_QUALITY = "quality";
     private static final String SCHEDULE_ENTRY_TIME = "time";
 
-    static class CompositeResource extends Resource {
+    static class CompositeResource extends ResourceList {
 
         Object value;
         
@@ -219,6 +220,9 @@ public class JsonReaderJackson {
                 } else {
                     throw new RuntimeException("unsupported value resource type: " + c);
                 }
+            } else if (org.ogema.core.model.ResourceList.class.isAssignableFrom(c)){
+                r = new ResourceList();
+                ((ResourceList)r).setElementType(elementType);
             } else {
                 r = new Resource();
             }
@@ -279,6 +283,9 @@ public class JsonReaderJackson {
                     break;
                 case "type":
                     res.setType(p.nextTextValue());
+                    break;
+                case "elementType":
+                    res.setElementType(p.nextTextValue());
                     break;
                 case "path":
                     res.setPath(p.nextTextValue());
