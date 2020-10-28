@@ -23,6 +23,7 @@ import de.fhg.iee.bacnet.api.Transport;
 import de.fhg.iee.bacnet.enumerations.BACnetConfirmedServiceChoice;
 import de.fhg.iee.bacnet.enumerations.BACnetErrorClass;
 import de.fhg.iee.bacnet.enumerations.BACnetErrorCode;
+import de.fhg.iee.bacnet.enumerations.BACnetObjectType;
 import de.fhg.iee.bacnet.enumerations.BACnetPropertyIdentifier;
 import de.fhg.iee.bacnet.enumerations.BACnetRejectReason;
 import de.fhg.iee.bacnet.tags.CompositeTag;
@@ -37,6 +38,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -81,7 +83,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
             this.consumer = consumer;
         }
     }
-    Map<ObjectIdentifierTag, Map<Integer, PropertyConversion>> objects = new HashMap<>();
+    Map<ObjectIdentifierTag, Map<Integer, PropertyConversion>> objects = new ConcurrentHashMap<>();
 
     public void addProperty(ObjectIdentifierTag oid, BACnetPropertyIdentifier prop, Supplier<? extends Object> value) {
         addProperty(oid, prop, value, null);
@@ -91,6 +93,14 @@ public class MinimalDeviceService implements IndicationListener<Void> {
         objects.computeIfAbsent(oid, (de.fhg.iee.bacnet.tags.ObjectIdentifierTag __) -> {
             return new HashMap<>();
         }).put(prop.getBACnetEnumValue(), new PropertyConversion(value, writer));
+    }
+    
+    public boolean removeObject(ObjectIdentifierTag oid) {
+        if (oid.getObjectType() == BACnetObjectType.device.getBACnetEnumValue()) {
+            //ignore calls to remove the device object
+            return false;
+        }
+        return objects.remove(oid) != null;
     }
 
     @Override
