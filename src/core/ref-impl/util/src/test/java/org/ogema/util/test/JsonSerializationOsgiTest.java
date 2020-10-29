@@ -27,6 +27,7 @@ import java.util.UUID;
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.ogema.core.channelmanager.measurements.FloatValue;
 import org.ogema.core.channelmanager.measurements.Quality;
@@ -219,6 +220,7 @@ public class JsonSerializationOsgiTest extends OsgiAppTestBase {
         Assert.assertTrue(0 > f.getValue());
     }
     
+    @Ignore
     @Test
     public void listOrderIsPreserved() throws IOException {
         @SuppressWarnings("unchecked")
