@@ -338,7 +338,10 @@ public class ValueResourceUtils {
 		else
 			return String.format(Locale.ENGLISH,format, resource.getValue());
 	}
-	
+	public static String getValue(float value, int maxDecimals) {
+		final String format = maxDecimals >= 0 ? "%." + maxDecimals + "f" : "%f";
+		return String.format(Locale.ENGLISH,format, value);
+	}
 	
 	/**
 	 * Returns the size of a generic array resource, or -1 if the array is a virtual resource (does not exist)
