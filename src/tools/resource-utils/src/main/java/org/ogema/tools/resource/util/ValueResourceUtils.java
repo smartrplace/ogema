@@ -90,8 +90,20 @@ public class ValueResourceUtils {
 	 */
 	@SuppressWarnings("unchecked")
 	public static boolean setValue(ValueResource resource, Object value) throws ClassCastException, NumberFormatException {
-		if (resource instanceof SingleValueResource) 
+		if (resource instanceof SingleValueResource) {
+			if(value instanceof Float)
+				return setValue((SingleValueResource) resource, (float)(Float)value);
+			else if(value instanceof Double)
+				return setValue((SingleValueResource) resource, (float)(double)(Double)value);
+			else if(value instanceof Integer)
+				return setValue((SingleValueResource) resource, (float)(Integer)value);
+			else if(value instanceof Long)
+				return setValue((SingleValueResource) resource, (float)(Long)value);
+			else if(value instanceof Boolean)
+				return setValue((SingleValueResource) resource, (Boolean)value?1.0f:0.0f);
+
 			return setValue((SingleValueResource) resource, value.toString());
+		}
 		else if (resource instanceof Schedule) {
 			Collection<SampledValue> values;
 			if (value instanceof ReadOnlyTimeSeries)
@@ -188,23 +200,25 @@ public class ValueResourceUtils {
 	 * canonical conversion method to the primitive (or String) value type of <code>resource</code>. 
 	 * @param resource
 	 * @param value
+	 * @return 
 	 */
-	public static void setValue(SingleValueResource resource, float value) {
+	public static boolean setValue(SingleValueResource resource, float value) {
 		if (resource instanceof StringResource) {
-			((StringResource) resource).setValue(String.valueOf(value));
+			return ((StringResource) resource).setValue(String.valueOf(value));
 		}
 		else if (resource instanceof FloatResource) {
-			((FloatResource) resource).setValue(value);
+			return ((FloatResource) resource).setValue(value);
 		}
 		else if (resource instanceof IntegerResource) {
-			((IntegerResource) resource).setValue((int) value);
+			return ((IntegerResource) resource).setValue((int) value);
 		}
 		else if (resource instanceof BooleanResource) {
-			((BooleanResource) resource).setValue(value == 1 ? true : false);
+			return ((BooleanResource) resource).setValue(value == 1 ? true : false);
 		}
 		else if (resource instanceof TimeResource) {
-			((TimeResource) resource).setValue((long) value);
+			return ((TimeResource) resource).setValue((long) value);
 		}
+		return false;
 	}
 
 	/**
