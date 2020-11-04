@@ -78,9 +78,15 @@ import org.slf4j.Logger;
  */
 public class OgemaHttpContext implements HttpContext {
 
+    /** System property defining the additional attributes of the session cookie,
+     default <pre>'{@value #COOKIE_ATTRIBUTES_DEFAULT}'</pre> */
+    public static final String COOKIE_ATTRIBUTES_PROPERTY = "org.ogema.security.http.cookieoptions";
+    public static final String COOKIE_ATTRIBUTES_DEFAULT = "; HttpOnly; SameSite=Strict";
 	private static final String SESSION_COOKIE_PROP = "org.eclipse.jetty.servlet.SessionCookie";
 	static final Boolean HTTP_ENABLE;
-	// private static final boolean xservletEnable;
+    
+    private static final String COOKIE_ATTRIBUTES =
+            System.getProperty(COOKIE_ATTRIBUTES_PROPERTY, COOKIE_ATTRIBUTES_DEFAULT);
 	
 	private final String cookie;
 	
@@ -330,7 +336,7 @@ public class OgemaHttpContext implements HttpContext {
 		 * Set HttpOnly and secure flags which helps mitigate the client side XSS attacks accessing the session cookie.
 		 */
 		String sessionid = httpses.getId();
-		response.addHeader("SET-COOKIE", cookie + "=" + sessionid + ";HttpOnly");
+		response.addHeader("SET-COOKIE", cookie + "=" + sessionid + COOKIE_ATTRIBUTES);
 
 		// Look for access right of the user to the app sites according this http context.
 		String usrName = sesAuth.getName();
