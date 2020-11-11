@@ -55,10 +55,10 @@ public class WriteScheduler implements Closeable {
 
     final Logger logger = LoggerFactory.getLogger(getClass());
 
-    public WriteScheduler(ApplicationManager appman, EventAdmin eventAdmin) {
+    public WriteScheduler(String name, ApplicationManager appman, EventAdmin eventAdmin) {
         this.eventAdmin = eventAdmin;
         this.appman = appman;
-        writerThread.setName("OGEMA HomeMatic-XMLRPC writer thread");
+        writerThread.setName("OGEMA HomeMatic-XMLRPC writer thread " + name);
     }    
 
     public void start() {
