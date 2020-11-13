@@ -95,7 +95,7 @@ public class JsonReaderJackson {
         }
 
         @SuppressWarnings({"deprecation", "null"})
-        Object toSpecializedResource() throws ClassNotFoundException {
+        Object toSpecializedResource() {
             if (link != null) {
                 ResourceLink l = new ResourceLink();
                 l.setLink(link);
@@ -103,132 +103,142 @@ public class JsonReaderJackson {
                 l.setType(type);
                 return l;
             }
-            Class<?> c = Class.forName(getType());
             Resource r = null;
-            if (ValueResource.class.isAssignableFrom(c)) {
-                //XXX null values?
-                if (SingleValueResource.class.isAssignableFrom(c)) {
-                    if (BooleanResource.class.isAssignableFrom(c)) {
-                        org.ogema.serialization.jaxb.BooleanResource br = new org.ogema.serialization.jaxb.BooleanResource();
-                        if (value != null)
-                        	br.setValue(Boolean.parseBoolean(String.valueOf(value)));
-                        r = br;
-                    } else if (IntegerResource.class.isAssignableFrom(c)) {
-                        org.ogema.serialization.jaxb.IntegerResource ir = new org.ogema.serialization.jaxb.IntegerResource();
-                        if (value != null)
-                        	ir.setValue(Integer.parseInt(String.valueOf(value)));
-                        r = ir;
-                    } else if (FloatResource.class.isAssignableFrom(c)) {
-                        org.ogema.serialization.jaxb.FloatResource fr = new org.ogema.serialization.jaxb.FloatResource();
-                        if (value != null)
-                        	fr.setValue(Float.parseFloat(String.valueOf(value)));
-                        r = fr;
-                    } else if (StringResource.class.isAssignableFrom(c)) {
-                        org.ogema.serialization.jaxb.StringResource sr = new org.ogema.serialization.jaxb.StringResource();
-                        if (value != null)
-                        	sr.setValue(String.valueOf(value));
-                        r = sr;
-                    } else if (TimeResource.class.isAssignableFrom(c)) {
-                        org.ogema.serialization.jaxb.TimeResource tr = new org.ogema.serialization.jaxb.TimeResource();
-                        if (value != null)
-                        	tr.setValue(Long.parseLong(String.valueOf(value)));
-                        r = tr;
+            try {
+                Class<?> c = Class.forName(getType());
+                if (ValueResource.class.isAssignableFrom(c)) {
+                    //XXX null values?
+                    if (SingleValueResource.class.isAssignableFrom(c)) {
+                        if (BooleanResource.class.isAssignableFrom(c)) {
+                            org.ogema.serialization.jaxb.BooleanResource br = new org.ogema.serialization.jaxb.BooleanResource();
+                            if (value != null) {
+                                br.setValue(Boolean.parseBoolean(String.valueOf(value)));
+                            }
+                            r = br;
+                        } else if (IntegerResource.class.isAssignableFrom(c)) {
+                            org.ogema.serialization.jaxb.IntegerResource ir = new org.ogema.serialization.jaxb.IntegerResource();
+                            if (value != null) {
+                                ir.setValue(Integer.parseInt(String.valueOf(value)));
+                            }
+                            r = ir;
+                        } else if (FloatResource.class.isAssignableFrom(c)) {
+                            org.ogema.serialization.jaxb.FloatResource fr = new org.ogema.serialization.jaxb.FloatResource();
+                            if (value != null) {
+                                fr.setValue(Float.parseFloat(String.valueOf(value)));
+                            }
+                            r = fr;
+                        } else if (StringResource.class.isAssignableFrom(c)) {
+                            org.ogema.serialization.jaxb.StringResource sr = new org.ogema.serialization.jaxb.StringResource();
+                            if (value != null) {
+                                sr.setValue(String.valueOf(value));
+                            }
+                            r = sr;
+                        } else if (TimeResource.class.isAssignableFrom(c)) {
+                            org.ogema.serialization.jaxb.TimeResource tr = new org.ogema.serialization.jaxb.TimeResource();
+                            if (value != null) {
+                                tr.setValue(Long.parseLong(String.valueOf(value)));
+                            }
+                            r = tr;
+                        } else {
+                            throw new RuntimeException("unsupported type: " + c);
+                        }
+                    } else if (ArrayResource.class.isAssignableFrom(c)) {
+                        if (BooleanArrayResource.class.isAssignableFrom(c)) {
+                            org.ogema.serialization.jaxb.BooleanArrayResource ar = new org.ogema.serialization.jaxb.BooleanArrayResource();
+                            r = ar;
+                            if (value != null) {
+                                @SuppressWarnings("unchecked")
+                                List<String> l = (List<String>) value;
+                                for (String s : l) {
+                                    ar.getValues().add(Boolean.valueOf(s));
+                                }
+                            }
+                        } else if (StringArrayResource.class.isAssignableFrom(c)) {
+                            org.ogema.serialization.jaxb.StringArrayResource ar = new org.ogema.serialization.jaxb.StringArrayResource();
+                            if (value != null) {
+                                @SuppressWarnings("unchecked")
+                                List<String> l = (List<String>) value;
+                                ar.getValues().addAll(l);
+                                r = ar;
+                            }
+                        } else if (FloatArrayResource.class.isAssignableFrom(c)) {
+                            org.ogema.serialization.jaxb.FloatArrayResource ar = new org.ogema.serialization.jaxb.FloatArrayResource();
+                            r = ar;
+                            if (value != null) {
+                                @SuppressWarnings("unchecked")
+                                List<String> l = (List<String>) value;
+                                for (String s : l) {
+                                    ar.getValues().add(Float.valueOf(s));
+                                }
+                            }
+                        } else if (IntegerArrayResource.class.isAssignableFrom(c)) {
+                            org.ogema.serialization.jaxb.IntegerArrayResource ar = new org.ogema.serialization.jaxb.IntegerArrayResource();
+                            r = ar;
+                            if (value != null) {
+                                @SuppressWarnings("unchecked")
+                                List<String> l = (List<String>) value;
+                                for (String s : l) {
+                                    ar.getValues().add(Integer.valueOf(s));
+                                }
+                            }
+                        } else if (TimeArrayResource.class.isAssignableFrom(c)) {
+                            org.ogema.serialization.jaxb.TimeArrayResource ar = new org.ogema.serialization.jaxb.TimeArrayResource();
+                            r = ar;
+                            if (value != null) {
+                                @SuppressWarnings("unchecked")
+                                List<String> l = (List<String>) value;
+                                for (String s : l) {
+                                    ar.getValues().add(Long.valueOf(s));
+                                }
+                            }
+                        } else if (ByteArrayResource.class.isAssignableFrom(c) || org.ogema.core.model.simple.OpaqueResource.class.isAssignableFrom(c)) {
+                            org.ogema.serialization.jaxb.OpaqueResource tr = new org.ogema.serialization.jaxb.OpaqueResource();
+                            if (value != null) {
+                                tr.setValue(BaseEncoding.base64().decode(String.valueOf(value)));
+                            }
+                            r = tr;
+                        } else {
+                            throw new RuntimeException("unsupported array type: " + c);
+                        }
+                    } else if (Schedule.class.isAssignableFrom(c)) {
+                        assert scheduleType != null;
+                        ScheduleResource sched = null;
+                        if (BooleanResource.class.isAssignableFrom(scheduleType)) {
+                            sched = new BooleanSchedule();
+                        } else if (FloatResource.class.isAssignableFrom(scheduleType)) {
+                            sched = new FloatSchedule();
+                        } else if (IntegerResource.class.isAssignableFrom(scheduleType)) {
+                            sched = new IntegerSchedule();
+                        } else if (ByteArrayResource.class.isAssignableFrom(scheduleType) || org.ogema.core.model.simple.OpaqueResource.class.isAssignableFrom(scheduleType)) {
+                            sched = new OpaqueSchedule();
+                        } else if (StringResource.class.isAssignableFrom(scheduleType)) {
+                            sched = new StringSchedule();
+                        } else if (TimeResource.class.isAssignableFrom(scheduleType)) {
+                            sched = new TimeSchedule();
+                        } else {
+                            throw new RuntimeException("unsupported schedule resource type: " + c);
+                        }
+                        sched.getEntry().addAll(schedule);
+                        sched.setStart(start);
+                        sched.setEnd(end);
+                        sched.setLastUpdateTime(lastUpdateTime);
+                        sched.setLastCalculationTime(lastCalculationTime);
+                        r = sched;
                     } else {
-                        throw new RuntimeException("unsupported type: " + c);
+                        throw new RuntimeException("unsupported value resource type: " + c);
                     }
-                } else if (ArrayResource.class.isAssignableFrom(c)) {
-                    if (BooleanArrayResource.class.isAssignableFrom(c)) {
-                        org.ogema.serialization.jaxb.BooleanArrayResource ar = new org.ogema.serialization.jaxb.BooleanArrayResource();
-                        r = ar;
-                        if (value != null) {
-                        	@SuppressWarnings("unchecked")
-                        	List<String> l = (List<String>) value;
-	                        for (String s : l) {
-	                            ar.getValues().add(Boolean.valueOf(s));
-	                        }
-                        }
-                    } else if (StringArrayResource.class.isAssignableFrom(c)) {
-                        org.ogema.serialization.jaxb.StringArrayResource ar = new org.ogema.serialization.jaxb.StringArrayResource();
-                        if (value != null) {
-	                        @SuppressWarnings("unchecked")
-	                        List<String> l = (List<String>) value;
-	                        ar.getValues().addAll(l);
-	                        r = ar;
-                        }
-                    } else if (FloatArrayResource.class.isAssignableFrom(c)) {
-                        org.ogema.serialization.jaxb.FloatArrayResource ar = new org.ogema.serialization.jaxb.FloatArrayResource();
-                        r = ar;
-	                    if (value != null) {
-	                        @SuppressWarnings("unchecked")
-	                        List<String> l = (List<String>) value;
-	                        for (String s : l) {
-	                            ar.getValues().add(Float.valueOf(s));
-	                        }
-                        }
-                    } else if (IntegerArrayResource.class.isAssignableFrom(c)) {
-                        org.ogema.serialization.jaxb.IntegerArrayResource ar = new org.ogema.serialization.jaxb.IntegerArrayResource();
-                        r = ar;
-                        if (value != null) {
-	                        @SuppressWarnings("unchecked")
-	                        List<String> l = (List<String>) value;
-	                        for (String s : l) {
-	                            ar.getValues().add(Integer.valueOf(s));
-	                        }
-                        }
-                    } else if (TimeArrayResource.class.isAssignableFrom(c)) {
-                        org.ogema.serialization.jaxb.TimeArrayResource ar = new org.ogema.serialization.jaxb.TimeArrayResource();
-                        r = ar;
-	                        if (value != null) {
-	                        @SuppressWarnings("unchecked")
-	                        List<String> l = (List<String>) value;
-	                        for (String s : l) {
-	                            ar.getValues().add(Long.valueOf(s));
-	                        }
-                        }
-                    } else if (ByteArrayResource.class.isAssignableFrom(c) || org.ogema.core.model.simple.OpaqueResource.class.isAssignableFrom(c)) {
-                        org.ogema.serialization.jaxb.OpaqueResource tr = new org.ogema.serialization.jaxb.OpaqueResource();
-                        if (value != null) 
-                        	tr.setValue(BaseEncoding.base64().decode(String.valueOf(value)));
-                        r = tr;
-                    } else {
-                        throw new RuntimeException("unsupported array type: " + c);
-                    }
-                } else if (Schedule.class.isAssignableFrom(c)) {
-                    assert scheduleType != null;
-                    ScheduleResource sched = null;
-                    if (BooleanResource.class.isAssignableFrom(scheduleType)) {
-                        sched = new BooleanSchedule();
-                    } else if (FloatResource.class.isAssignableFrom(scheduleType)) {
-                        sched = new FloatSchedule();
-                    } else if (IntegerResource.class.isAssignableFrom(scheduleType)) {
-                        sched = new IntegerSchedule();
-                    } else if (ByteArrayResource.class.isAssignableFrom(scheduleType) || org.ogema.core.model.simple.OpaqueResource.class.isAssignableFrom(scheduleType)) {
-                        sched = new OpaqueSchedule();
-                    } else if (StringResource.class.isAssignableFrom(scheduleType)) {
-                        sched = new StringSchedule();
-                    } else if (TimeResource.class.isAssignableFrom(scheduleType)) {
-                        sched = new TimeSchedule();
-                    } else {
-                        throw new RuntimeException("unsupported schedule resource type: " + c);
-                    }
-                    sched.getEntry().addAll(schedule);
-                    sched.setStart(start);
-                    sched.setEnd(end);
-                    sched.setLastUpdateTime(lastUpdateTime);
-                    sched.setLastCalculationTime(lastCalculationTime);
-                    r = sched;
+                } else if (org.ogema.core.model.ResourceList.class.isAssignableFrom(c)) {
+                    r = new ResourceList();
+                    ((ResourceList) r).setElementType(elementType);
                 } else {
-                    throw new RuntimeException("unsupported value resource type: " + c);
+                    r = new Resource();
                 }
-            } else if (org.ogema.core.model.ResourceList.class.isAssignableFrom(c)){
-                r = new ResourceList();
-                ((ResourceList)r).setElementType(elementType);
-            } else {
+            } catch (ClassNotFoundException cnfe) {
                 r = new Resource();
             }
             r.setName(name);
             r.setPath(path);
-            r.setType(c);
+            r.setType(getType());
             r.getSubresources().addAll(getSubresources());
             r.setActive(isActive());
             return r;
@@ -250,12 +260,13 @@ public class JsonReaderJackson {
             do {
                 c.add((Resource)readResource(null, p));
             } while (p.nextToken() != JsonToken.END_ARRAY);
-        } catch (JsonParseException | ClassNotFoundException e) {
+        } catch (JsonParseException e) {
             throw new IOException(e.getMessage());
         }
         return c;
     }
 
+    // does not actually throw ClassNotFoundException any more, only kept to maintain compatibility
     public Resource read(Reader reader) throws IOException, ClassNotFoundException {
         try (JsonParser p = createParser(reader)) {
             p.nextToken(); //TODO: test startObject
@@ -268,7 +279,7 @@ public class JsonReaderJackson {
     /**
      * call when on object start.
      */
-    private Object readResource(CompositeResource parent, JsonParser p) throws IOException, ClassNotFoundException {
+    private Object readResource(CompositeResource parent, JsonParser p) throws IOException {
         assert p.getCurrentToken() == JsonToken.START_OBJECT;
         JsonToken tok;
         CompositeResource res = new CompositeResource();
@@ -335,7 +346,7 @@ public class JsonReaderJackson {
         return res.toSpecializedResource();
     }
 
-    private List<Object> readSubResources(CompositeResource parent, JsonParser p) throws IOException, ClassNotFoundException {
+    private List<Object> readSubResources(CompositeResource parent, JsonParser p) throws IOException {
         acceptStartArray(p);
         if (p.nextToken() == JsonToken.END_ARRAY) {
             return Collections.emptyList();
@@ -368,30 +379,34 @@ public class JsonReaderJackson {
     }
 
     @SuppressWarnings("deprecation")
-    private void readScheduleEntries(CompositeResource res, CompositeResource parent, JsonParser p) throws IOException, ClassNotFoundException {
+    private void readScheduleEntries(CompositeResource res, CompositeResource parent, JsonParser p) throws IOException {
         acceptStartArray(p);
         if (parent == null || parent.getType() == null) {
             throw new IOException("malformed document, cannot determine schedule type at " + p.getCurrentLocation());
         }
-        Class<?> parentClass = Class.forName(parent.getType());
-        if (!SingleValueResource.class.isAssignableFrom(parentClass)) {
-            throw new IOException("malformed document, schedule on unsupported parent type '" + parentClass + "' at " + p.getCurrentLocation());
-        }
-        res.scheduleType = parentClass;
-        if (BooleanResource.class.isAssignableFrom(parentClass)) {
-            SCHEDULEREADERBOOLEAN.readSchedule(res, p);
-        } else if (FloatResource.class.isAssignableFrom(parentClass)) {
-            SCHEDULEREADERFLOAT.readSchedule(res, p);
-        } else if (IntegerResource.class.isAssignableFrom(parentClass)) {
-            SCHEDULEREADERINT.readSchedule(res, p);
-        } else if (org.ogema.core.model.simple.OpaqueResource.class.isAssignableFrom(parentClass) || ByteArrayResource.class.isAssignableFrom(parentClass)) {
-            SCHEDULEREADEROPAQUE.readSchedule(res, p);
-        } else if (StringResource.class.isAssignableFrom(parentClass)) {
-            SCHEDULEREADERSTRING.readSchedule(res, p);
-        } else if (TimeResource.class.isAssignableFrom(parentClass)) {
-            SCHEDULEREADERTIME.readSchedule(res, p);
-        } else {
-            throw new RuntimeException("unsupported schedule type: " + parentClass);
+        try {
+            Class<?> parentClass = Class.forName(parent.getType());
+            if (!SingleValueResource.class.isAssignableFrom(parentClass)) {
+                throw new IOException("malformed document, schedule on unsupported parent type '" + parentClass + "' at " + p.getCurrentLocation());
+            }
+            res.scheduleType = parentClass;
+            if (BooleanResource.class.isAssignableFrom(parentClass)) {
+                SCHEDULEREADERBOOLEAN.readSchedule(res, p);
+            } else if (FloatResource.class.isAssignableFrom(parentClass)) {
+                SCHEDULEREADERFLOAT.readSchedule(res, p);
+            } else if (IntegerResource.class.isAssignableFrom(parentClass)) {
+                SCHEDULEREADERINT.readSchedule(res, p);
+            } else if (org.ogema.core.model.simple.OpaqueResource.class.isAssignableFrom(parentClass) || ByteArrayResource.class.isAssignableFrom(parentClass)) {
+                SCHEDULEREADEROPAQUE.readSchedule(res, p);
+            } else if (StringResource.class.isAssignableFrom(parentClass)) {
+                SCHEDULEREADERSTRING.readSchedule(res, p);
+            } else if (TimeResource.class.isAssignableFrom(parentClass)) {
+                SCHEDULEREADERTIME.readSchedule(res, p);
+            } else {
+                throw new RuntimeException("unsupported schedule type: " + parentClass);
+            }
+        } catch (ClassNotFoundException cnfe) {
+            throw new RuntimeException("unsupported schedule type (parent): " + parent.getType());
         }
     }
 
