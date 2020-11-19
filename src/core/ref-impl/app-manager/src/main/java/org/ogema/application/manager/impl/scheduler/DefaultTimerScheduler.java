@@ -49,7 +49,7 @@ public class DefaultTimerScheduler implements TimerScheduler, FrameworkClock.Clo
                 synchronized (timers) {
                     if (timers.isEmpty()) {
                         try {
-                            timers.wait();
+                            timers.wait(1000);
                         } catch (InterruptedException ex) {
                             break;
                         }
