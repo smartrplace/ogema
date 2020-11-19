@@ -3,7 +3,8 @@ body {
 }
 
 #logo{
-    width: 250px;
+    min-width: 120px;
+    max-width: 360px;
     margin: 0px;
 }
 
