@@ -124,8 +124,8 @@ public class MinimalDeviceService implements IndicationListener<Void> {
     //TODO: array access for readProperty
     private void serviceReadPropertyRequest(Indication i) {
         ObjectIdentifierTag requestOid = new ObjectIdentifierTag(i.getData());
+        UnsignedIntTag propId = new UnsignedIntTag(i.getData());
         if (objects.containsKey(requestOid)) {
-            UnsignedIntTag propId = new UnsignedIntTag(i.getData());
             logger.debug("got readProperty request for property {}/{}", requestOid.getInstanceNumber(), propId.getValue());
             if (i.getData().remaining() > 0) {
                 UnsignedIntTag index = new UnsignedIntTag(i.getData());
@@ -138,8 +138,8 @@ public class MinimalDeviceService implements IndicationListener<Void> {
                 sendProperty(i, requestOid, id);
             }
         } else {
-            logger.debug("got readProperty request for unknown property {}/{}",
-                    requestOid.getObjectType(), requestOid.getInstanceNumber());
+            logger.debug("got readProperty request for unknown type/instance/property {}/{}/{}",
+                    requestOid.getObjectType(), requestOid.getInstanceNumber(), propId.getValue());
         }
     }
 
@@ -262,7 +262,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
 
     private void sendObjectList(Indication i) {
         logger.trace("Send objectList to "+i.getSource().toDestinationAddress()+" from MinimalDeviceService");
-        ByteBuffer buf = ByteBuffer.allocate(1500);
+        ByteBuffer buf = ByteBuffer.allocate(8192); //XXX: need to check maximum sizes / segmentation
         ProtocolControlInformation pci = new ProtocolControlInformation(
                 ApduConstants.APDU_TYPES.COMPLEX_ACK, BACnetConfirmedServiceChoice.readProperty);
         pci = pci.withInvokeId(i.getProtocolControlInfo().getInvokeId());
@@ -277,6 +277,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
             }
         }
         Tag.createClosingTag(3).write(buf);
+        logger.trace("build object list response, {} bytes", buf.position());
         buf.flip();
         try {
             i.getTransport().request(i.getSource(), buf, Transport.Priority.Normal, false, null);
