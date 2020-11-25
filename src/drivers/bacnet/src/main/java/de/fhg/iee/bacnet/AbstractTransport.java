@@ -230,8 +230,9 @@ public abstract class AbstractTransport implements Transport {
     protected final void receivedPackage(Indication indication) {
         boolean indicationHandled = false;
         ProtocolControlInformation pci = indication.getProtocolControlInfo();
+        int invokeId = -1;
         if (hasLocalInvokeId(pci)) {
-            int invokeId = pci.getInvokeId();
+            invokeId = pci.getInvokeId();
             invokeIds.release(invokeId);
             logger.trace("received message from {} for invoke ID {}", indication.getSource(), invokeId);
             synchronized (pendingReplies) {
@@ -253,9 +254,9 @@ public abstract class AbstractTransport implements Transport {
             logger.trace("indication PDU type={}", Integer.toBinaryString(pci.getPduType()));
         }
         if (!indicationHandled) {
-            logger.trace("calling {} default handlers for unhandled indication from {}",
-                    listeners.size(), indication.getSource());
-            for (IndicationListener l : listeners) {
+            logger.trace("calling {} default handlers for unhandled indication from {}, invoke ID {}",
+                    listeners.size(), indication.getSource(), invokeId);
+            for (IndicationListener<?> l : listeners) {
                 //TODO: needs executor
                 Indication i = new DefaultIndication(indication);
                 l.event(i);
@@ -264,12 +265,12 @@ public abstract class AbstractTransport implements Transport {
     }
 
     @Override
-    public final void addListener(IndicationListener l) {
+    public final void addListener(IndicationListener<?> l) {
         listeners.add(l);
     }
 
     @Override
-    public final void removeListener(IndicationListener l) {
+    public final void removeListener(IndicationListener<?> l) {
         Iterator<IndicationListener<?>> it = listeners.iterator();
         while (it.hasNext()) {
             if (it.next() == l) {
@@ -333,6 +334,7 @@ public abstract class AbstractTransport implements Transport {
             return result != null;
         }
         
+        @SuppressWarnings("unchecked")
         private void resolve(Object result, Throwable t) {
             this.result = (V) result;
             this.t = t;
