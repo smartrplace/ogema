@@ -63,6 +63,19 @@ public interface RestAccess {
 	 */
 	String authenticateToUser(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException;
 	
+	/** Like {@link #authenticateToUser(HttpServletRequest, HttpServletResponse)}, but does not always send an error
+	 * response itself when the login fails. This is left to the calling application
+	 * 
+	 * @param req
+	 * @param resp
+	 * @param sendErrorResponseIfLoginFailed default is true
+	 * @return null if authentication fails
+	 * @throws ServletException
+	 * @throws IOException
+	 */
+	String authenticateToUser(HttpServletRequest req, HttpServletResponse resp,
+			boolean sendErrorResponseIfLoginFailed) throws ServletException, IOException;
+	
 	/**
 	 * Like {@link #authenticate(HttpServletRequest, HttpServletResponse)}, but returns the {@link AccessControlContext}
 	 * applicable to the app or user that initiated the request.

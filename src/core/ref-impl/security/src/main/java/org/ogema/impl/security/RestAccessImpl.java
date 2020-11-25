@@ -167,9 +167,16 @@ public class RestAccessImpl implements RestAccess, Application {
 	@Override
 	public String authenticateToUser(HttpServletRequest req, HttpServletResponse resp)
 			throws ServletException, IOException {
+		return authenticateToUser(req, resp, true);
+	}
+	@Override
+	public String authenticateToUser(HttpServletRequest req, HttpServletResponse resp,
+			boolean sendErrorResponseIfLoginFailed)
+			throws ServletException, IOException {
 		final AppManagerInternalResult fullRes = getAppManagerInternal(req, req.getPathInfo());
 		if (fullRes == null || fullRes.appManInternal == null) {
-			resp.sendError(HttpServletResponse.SC_FORBIDDEN);
+			if(sendErrorResponseIfLoginFailed)
+				resp.sendError(HttpServletResponse.SC_FORBIDDEN);
 			return null;
 		}
 		return fullRes.userName;
