@@ -111,19 +111,15 @@ public class LoggingUtils {
 	public static void activateLogging(RecordedData rd, long updateInterval)
 			throws IllegalArgumentException {
 		RecordedDataConfiguration rcd = new RecordedDataConfiguration();
-		switch ((int) updateInterval) {
-		case -1:
+		if(updateInterval == -1)
 			rcd.setStorageType(StorageType.ON_VALUE_CHANGED);
-			break;
-		case -2:
+		else if(updateInterval == -2)
 			rcd.setStorageType(StorageType.ON_VALUE_UPDATE);
-			break;
-		default:
+		else {
 			if (updateInterval <= 0)
 				throw new IllegalArgumentException("Logging interval must be positive");
 			rcd.setStorageType(StorageType.FIXED_INTERVAL);
 			rcd.setFixedInterval(updateInterval);
-			break;
 		}
 		rd.setConfiguration(rcd);
 	}

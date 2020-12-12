@@ -54,7 +54,8 @@ public class RoomController {
 
 				@Override
 				public void run() {
-
+					if(Boolean.getBoolean("org.ogema.apps.openweathermap.testwithoutconnection"))
+						return;
 					appMan.getLogger().info(
 							"update weather info for location " + device.model.getName() + " next update in "
 									+ scheduleUpdateTime + "ms");
@@ -71,6 +72,10 @@ public class RoomController {
                     } else {
                         data = owmremote.getWeatherForcast(device.city.getValue(), device.country.getValue());
                         current = owmremote.getWeatherCurrent(device.city.getValue(), device.country.getValue());
+                    }
+                    if(data == null) {
+    					appMan.getLogger().warn("No OPEN_WEATHERMAP Data !! Will not start !!");
+                    	return;
                     }
                     util.store(data, current);
 				}
