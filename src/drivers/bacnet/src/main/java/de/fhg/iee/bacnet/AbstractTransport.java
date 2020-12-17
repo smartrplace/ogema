@@ -58,7 +58,8 @@ public abstract class AbstractTransport implements Transport {
     final Logger logger = LoggerFactory.getLogger(getClass());
     final Thread timeoutThread;
 
-    private long messageTimeout = 1000;
+    private long messageTimeout = 350;
+    private long segmentTimeout = 350;
     private int messageRetries = 3;
     
     private final ThreadGroup executorThreads = new ThreadGroup("BACnet UDP transport executors");
@@ -75,7 +76,7 @@ public abstract class AbstractTransport implements Transport {
         });
     }
 
-    private static class InvokeIds {
+    protected static class InvokeIds {
 
         BitSet ids = new BitSet(256);
         int lastId = 42;
@@ -107,15 +108,22 @@ public abstract class AbstractTransport implements Transport {
         private final IndicationFuture<?> f;
         private int tryNumber = 1;
         private volatile long expiryTime;
+        private final boolean isSegmentTransmission;
 
-        public PendingReply(int invokeId, DeviceAddress destination, ByteBuffer data, Priority prio, IndicationListener<?> listener, IndicationFuture<?> f) {
+        public PendingReply(boolean isSegmentTransmission, int invokeId, DeviceAddress destination, ByteBuffer data,
+                Priority prio, IndicationListener<?> listener, IndicationFuture<?> f) {
             this.invokeId = invokeId;
             this.destination = destination;
             this.data = data.duplicate();
             this.prio = prio;
             this.listener = listener;
             this.f = f;
-            expiryTime = System.currentTimeMillis() + messageTimeout;
+            this.isSegmentTransmission = isSegmentTransmission;
+            if (isSegmentTransmission) {
+                expiryTime = System.currentTimeMillis() + segmentTimeout;
+            } else {
+                expiryTime = System.currentTimeMillis() + messageTimeout;
+            }
         }
 
         public int getInvokeId() {
@@ -131,6 +139,15 @@ public abstract class AbstractTransport implements Transport {
         }
 
         public long getExpiryTime() {
+            return expiryTime;
+        }
+        
+        public long increaseExpiryTime() {
+            if (isSegmentTransmission) {
+                expiryTime = System.currentTimeMillis() + segmentTimeout;
+            } else {
+                expiryTime = System.currentTimeMillis() + messageTimeout;
+            }
             return expiryTime;
         }
 
@@ -170,7 +187,7 @@ public abstract class AbstractTransport implements Transport {
                             logger.warn("no reply from {} for invoke ID {}", next.destination, next.invokeId);
                         } else {
                             next.tryNumber++;
-                            next.expiryTime = now + messageTimeout;
+                            next.increaseExpiryTime();
                             pendingReplies.offer(next);
                             try {
                                 logger.trace("resending message to {} for invoke ID {}", next.destination, next.invokeId);
@@ -233,12 +250,13 @@ public abstract class AbstractTransport implements Transport {
         int invokeId = -1;
         if (hasLocalInvokeId(pci)) {
             invokeId = pci.getInvokeId();
-            invokeIds.release(invokeId);
+            boolean isSegmentAck = pci.getPduType() == ApduConstants.TYPE_SEGMENT_ACK;
             logger.trace("received message from {} for invoke ID {}", indication.getSource(), invokeId);
             synchronized (pendingReplies) {
                 Iterator<PendingReply> it = pendingReplies.iterator();
                 while (it.hasNext()) {
                     PendingReply r = it.next();
+                    //FIXME pending replies for segments need special treatment 
                     if (r.getInvokeId() == invokeId) {
                         logger.trace("executing callback for invoke ID {}", invokeId);
                         it.remove();
@@ -289,10 +307,22 @@ public abstract class AbstractTransport implements Transport {
     public final <V> Future<V> request(DeviceAddress destination, ByteBuffer data, Priority prio, boolean expectingReply, IndicationListener<V> l) throws IOException {
         ProtocolControlInformation pci = new ProtocolControlInformation(data);
         IndicationFuture<V> f = new IndicationFuture<>();
+        
+        if (pci.isSegmented()) {
+            data.rewind();
+            PendingReply r = new PendingReply(true, pci.getInvokeId(), destination, data, prio, l, f);
+            synchronized (pendingReplies) {
+                pendingReplies.add(r);
+                pendingReplies.notifyAll();
+            }
+            executeSend(data, prio, expectingReply, destination);
+            return f;
+        }
+        
         if (pci.getPduType() == ApduConstants.TYPE_CONFIRMED_REQ) {
             int invokeId = invokeIds.getId();
             
-            PendingReply r = new PendingReply(invokeId, destination, data, prio, l, f);
+            PendingReply r = new PendingReply(false, invokeId, destination, data, prio, l, f);
             synchronized (pendingReplies) {
                 pendingReplies.add(r);
                 pendingReplies.notifyAll();
@@ -306,9 +336,27 @@ public abstract class AbstractTransport implements Transport {
         	logger.trace("Schedulding unconfirmed message {} bytes to {}, expReply:{}",data.limit(), destination, expectingReply);
         }
         data.rewind();
-        //sendData(data, prio, expectingReply, destination);
+        
+        if (pci.getPduType() == ApduConstants.TYPE_COMPLEX_ACK) {
+            int segSize = getMaxSegmentSize(destination);
+            if (data.limit() > segSize) {
+                logger.trace("sending {} bytes to {} with segment size {}", data.limit(),segSize);
+                //int invokeId = invokeIds.getId();
+                pci = new ProtocolControlInformation(data);//.withInvokeId(invokeId);
+                ByteBuffer rawData = data.slice();
+                new SegmentationSender(this).complexAck(destination, pci,
+                        rawData, prio, expectingReply, l, segSize - 20);
+                return f;
+            }    
+        }
+
         executeSend(data, prio, expectingReply, destination);
         return f;
+    }
+    
+    int getMaxSegmentSize(DeviceAddress destination) {
+        //TODO respect the segment size specified by receiver
+        return 1476;
     }
     
     private class IndicationFuture<V> implements Future<V> {

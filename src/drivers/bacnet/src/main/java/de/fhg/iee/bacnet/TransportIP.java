@@ -35,6 +35,8 @@ import java.nio.ByteOrder;
  * @author jlapp
  */
 public class TransportIP extends AbstractTransport {
+    
+    public final static int MAX_APDU_SIZE = 1476;
 
     final int port;
     final DatagramSocket sock;
@@ -46,6 +48,7 @@ public class TransportIP extends AbstractTransport {
      * Create a new BACnet IP transport on the selected interface and port.
      * @param iface network interface
      * @param port port number, using 0 will automatically select a free port.
+     * @throws IOException
      */
     public TransportIP(NetworkInterface iface, int port) throws IOException {
         for (InterfaceAddress ia : iface.getInterfaceAddresses()) {
@@ -113,12 +116,10 @@ public class TransportIP extends AbstractTransport {
                     if (bvlcType != 0x81) {
                         logger.debug("package is not a BACnet/IP message, BVLC Type field has value {}", Integer.toHexString(bvlcType));
                         continue;
-                        //return;
                     }
                     if (bvlcFunction != 0x0a && bvlcFunction != 0x0b) {
                         logger.warn("received unsupported BVLC Function: {}", Integer.toHexString(bvlcType));
                         continue;
-                        //return;
                     }
                     Npdu npdu = new Npdu(bb);
 
@@ -224,9 +225,8 @@ public class TransportIP extends AbstractTransport {
     protected void sendData(ByteBuffer data, Priority prio, boolean expectingReply, DeviceAddress destination) throws IOException {
         BACnetIpAddress addr = (BACnetIpAddress) destination;
         Npdu npdu = addr.npdu.withExpectingReply(expectingReply);
-        
         npdu = npdu.withoutDestination();
-        
+
         byte[] npduOctets = npdu.toArray();
         int vlcSize = 4;
         int packetSize = vlcSize + npduOctets.length + data.limit();

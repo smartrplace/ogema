@@ -34,9 +34,12 @@ import de.fhg.iee.bacnet.tags.TagConstants;
 import de.fhg.iee.bacnet.tags.UnsignedIntTag;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -83,7 +86,9 @@ public class MinimalDeviceService implements IndicationListener<Void> {
             this.consumer = consumer;
         }
     }
-    Map<ObjectIdentifierTag, Map<Integer, PropertyConversion>> objects = new ConcurrentHashMap<>();
+    Map<ObjectIdentifierTag, Map<Integer, PropertyConversion>> objects =
+            //FIXME: needs insertion order with device at [0] + concurrency
+            new LinkedHashMap<>(); //new ConcurrentHashMap<>();
 
     public void addProperty(ObjectIdentifierTag oid, BACnetPropertyIdentifier prop, Supplier<? extends Object> value) {
         addProperty(oid, prop, value, null);
@@ -126,20 +131,31 @@ public class MinimalDeviceService implements IndicationListener<Void> {
         ObjectIdentifierTag requestOid = new ObjectIdentifierTag(i.getData());
         UnsignedIntTag propId = new UnsignedIntTag(i.getData());
         if (objects.containsKey(requestOid)) {
-            logger.debug("got readProperty request for property {}/{}", requestOid.getInstanceNumber(), propId.getValue());
-            if (i.getData().remaining() > 0) {
-                UnsignedIntTag index = new UnsignedIntTag(i.getData());
-                logger.warn("got unsupported readProperty request with index for {}[{}]", propId.getValue(), index);
-            }
             int id = propId.getValue().intValue();
+            int index = -1;
+            if (i.getData().remaining() > 0) {
+                index = new UnsignedIntTag(i.getData()).getValue().intValue();
+                //sendPropertyAt(i, oid, id, index.getValue().intValue());
+                //logger.warn("got unsupported readProperty request with index for {}[{}]", propId.getValue(), index);
+            }
+            logger.debug("got readProperty request for property {}/{}, index {}", requestOid.getInstanceNumber(), propId.getValue(), index);
             if (id == BACnetPropertyIdentifier.object_list.getBACnetEnumValue()) {
-                sendObjectList(i);
+                if (index != -1) {
+                    sendObjectAt(i, index);
+                } else {
+                    sendObjectList(i);
+                }
             } else {
-                sendProperty(i, requestOid, id);
+                if (index != -1) {
+                    sendPropertyAt(i, oid, id, index);
+                } else {
+                    sendProperty(i, requestOid, id);
+                }
             }
         } else {
             logger.debug("got readProperty request for unknown type/instance/property {}/{}/{}",
                     requestOid.getObjectType(), requestOid.getInstanceNumber(), propId.getValue());
+            sendError(i, BACnetErrorClass.object, BACnetErrorCode.unknown_object);
         }
     }
 
@@ -198,7 +214,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
     }
 
     private void sendError(Indication i, BACnetErrorClass eClass, BACnetErrorCode eCode) {
-        logger.trace("Send Error to "+i.getSource().toDestinationAddress()+" from MinimalDeviceService");
+        logger.trace("Send Error {},{} to {}", eClass, eCode, i.getSource().toDestinationAddress());
         ByteBuffer buf = ByteBuffer.allocate(30);
         ProtocolControlInformation pci = new ProtocolControlInformation(ApduConstants.APDU_TYPES.ERROR, i.getProtocolControlInfo().getServiceChoice()).withInvokeId(i.getProtocolControlInfo().getInvokeId());
         pci.write(buf);
@@ -259,10 +275,104 @@ public class MinimalDeviceService implements IndicationListener<Void> {
             LoggerFactory.getLogger(MinimalDeviceService.class).error("sending of object list failed", ex);
         }
     }
+    
+    private void sendPropertyAt(Indication i, ObjectIdentifierTag oid, int propId, int index) {
+        logger.trace("Send Property {}[{}] to {}", propId, index, i.getSource().toDestinationAddress());
+        PropertyConversion p = objects.getOrDefault(oid, Collections.emptyMap()).get(propId);
+        if (p == null || p.supplier == null) {
+            sendError(i, BACnetErrorClass.property, BACnetErrorCode.unknown_property);
+            return;
+        }
+        Supplier<? extends Object> propertyTag = p.supplier;
+        ByteBuffer buf = ByteBuffer.allocate(1500);
+        ProtocolControlInformation pci = new ProtocolControlInformation(ApduConstants.APDU_TYPES.COMPLEX_ACK, BACnetConfirmedServiceChoice.readProperty);
+        pci = pci.withInvokeId(i.getProtocolControlInfo().getInvokeId());
+        pci.write(buf);
+        new ObjectIdentifierTag(0, Tag.TagClass.Context, oid.getObjectType(), oid.getInstanceNumber()).write(buf);
+        new UnsignedIntTag(1, Tag.TagClass.Context, propId).write(buf);
+        new UnsignedIntTag(2, Tag.TagClass.Context, index).write(buf);
+        Tag.createOpeningTag(3).write(buf);
+        Object value = propertyTag.get();
+        if (value != null) {
+            if (value instanceof Tag) {
+                ((Tag) value).write(buf);
+            } else if (value instanceof Collection) {
+                if (value instanceof List) {
+                    if (index == 0) {
+                        new UnsignedIntTag(((List)value).size()).write(buf);
+                    } else {
+                        Tag t = (Tag)((List)value).get(index-1);
+                        t.write(buf);
+                    }
+                } else {
+                    if (index == 0) {
+                        new UnsignedIntTag(((Collection)value).size()).write(buf);
+                    } else {
+                        @SuppressWarnings("unchecked")
+                        List<Object> l = new ArrayList<>((Collection)value);
+                        Tag t = (Tag)l.get(index-1);
+                        t.write(buf);
+                    }
+                }
+            } else if (value.getClass().isArray()) {
+                if (index == 0) {
+                    new UnsignedIntTag(((Tag[])value).length).write(buf);
+                } else {
+                    ((Tag[]) value)[index-1].write(buf);
+                }
+            }
+        }
+        Tag.createClosingTag(3).write(buf);
+        //FIXME error for unavailable index / IndexOutOfBoundsException
+        buf.flip();
+        try {
+            i.getTransport().request(i.getSource(), buf, Transport.Priority.Normal, false, null);
+        } catch (IOException ex) {
+            LoggerFactory.getLogger(MinimalDeviceService.class).error("sending of object list failed", ex);
+        }
+    }
+    
+    private void sendObjectAt(Indication i, int index) {
+        logger.trace("Send object at [{}] to {}", index, i.getSource().toDestinationAddress());
+        ByteBuffer buf = ByteBuffer.allocate(50);
+        ProtocolControlInformation pci = new ProtocolControlInformation(
+                ApduConstants.APDU_TYPES.COMPLEX_ACK, BACnetConfirmedServiceChoice.readProperty);
+        pci = pci.withInvokeId(i.getProtocolControlInfo().getInvokeId());
+        pci.write(buf);
+        new ObjectIdentifierTag(0, Tag.TagClass.Context, oid.getObjectType(), oid.getInstanceNumber()).write(buf);
+        new UnsignedIntTag(1, Tag.TagClass.Context, BACnetPropertyIdentifier.object_list.getBACnetEnumValue()).write(buf);
+        new UnsignedIntTag(2, Tag.TagClass.Context, index).write(buf);
+        
+        if (index == 0) {
+            logger.trace("write array size: {}", objects.size());
+            Tag.createOpeningTag(3).write(buf);
+            new UnsignedIntTag(objects.size()).write(buf);
+            //new UnsignedIntTag(3, Tag.TagClass.Context, index).write(buf);
+            Tag.createClosingTag(3).write(buf);
+        } else {
+
+            Tag.createOpeningTag(3).write(buf);
+            oid.write(buf);
+            if (index != 0) {
+                List<ObjectIdentifierTag> oids = new ArrayList<>(objects.keySet());
+                oids.get(index - 1).write(buf);
+            } else {
+                //send size
+                new UnsignedIntTag(3, Tag.TagClass.Context, index).write(buf);
+            }
+            Tag.createClosingTag(3).write(buf);
+        }
+        buf.flip();
+        try {
+            i.getTransport().request(i.getSource(), buf, Transport.Priority.Normal, false, null);
+        } catch (IOException ex) {
+            LoggerFactory.getLogger(MinimalDeviceService.class).error("sending of object list failed", ex);
+        }
+    }
 
     private void sendObjectList(Indication i) {
         logger.trace("Send objectList to "+i.getSource().toDestinationAddress()+" from MinimalDeviceService");
-        ByteBuffer buf = ByteBuffer.allocate(8192); //XXX: need to check maximum sizes / segmentation
+        ByteBuffer buf = ByteBuffer.allocate(8 * objects.size() + 50); //XXX: need to check maximum sizes / segmentation
         ProtocolControlInformation pci = new ProtocolControlInformation(
                 ApduConstants.APDU_TYPES.COMPLEX_ACK, BACnetConfirmedServiceChoice.readProperty);
         pci = pci.withInvokeId(i.getProtocolControlInfo().getInvokeId());

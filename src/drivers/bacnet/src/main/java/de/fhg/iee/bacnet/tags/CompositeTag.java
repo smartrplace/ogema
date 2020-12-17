@@ -96,8 +96,8 @@ public class CompositeTag implements CompositeTagBase {
                 && ((basicTagData.lengthValueType & TagConstants.CONTEXT_CLOSING_TAG) == TagConstants.CONTEXT_CLOSING_TAG);
     }
 
-   @SuppressWarnings("unchecked")
    @Override
+   @SuppressWarnings("unchecked")
    public Collection<CompositeTag> getSubTags() {
         return Collections.unmodifiableCollection(subTags);
     }

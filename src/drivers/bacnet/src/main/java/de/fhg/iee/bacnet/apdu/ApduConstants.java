@@ -26,10 +26,10 @@ public abstract class ApduConstants {
     
     public static final byte TYPE_CONFIRMED_REQ = 0;
     public static final byte TYPE_UNCONFIRMED_REQ = 0b0001_0000;
-    public static final byte TYPE_SIMPLE_ACK      = 0b0010_0000;
-    public static final byte TYPE_COMPLEX_ACK     = 0b0011_0000;
-    public static final byte TYPE_SEGMENT_ACK     = 0b0100_0000;
-    public static final byte TYPE_ERROR           = 0b0101_0000;
+    public static final byte TYPE_SIMPLE_ACK      = 0b0010_0000; //32
+    public static final byte TYPE_COMPLEX_ACK     = 0b0011_0000; //48
+    public static final byte TYPE_SEGMENT_ACK     = 0b0100_0000; //64
+    public static final byte TYPE_ERROR           = 0b0101_0000; //80
     public static final byte TYPE_REJECT          = 0b0110_0000;
     public static final byte TYPE_ABORT           = 0b0111_0000;
     
