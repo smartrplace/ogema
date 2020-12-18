@@ -74,6 +74,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
     public MinimalDeviceService(ObjectIdentifierTag oid, Logger logger) {
         this.oid = oid;
         this.logger = logger;
+        addProperty(oid, BACnetPropertyIdentifier.object_list, () -> objects.keySet());
     }
 
     static class PropertyConversion {
@@ -90,7 +91,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
             //FIXME: needs insertion order with device at [0] + concurrency
             new LinkedHashMap<>(); //new ConcurrentHashMap<>();
 
-    public void addProperty(ObjectIdentifierTag oid, BACnetPropertyIdentifier prop, Supplier<? extends Object> value) {
+    public final void addProperty(ObjectIdentifierTag oid, BACnetPropertyIdentifier prop, Supplier<? extends Object> value) {
         addProperty(oid, prop, value, null);
     }
 
@@ -117,6 +118,8 @@ public class MinimalDeviceService implements IndicationListener<Void> {
             } else if (pci.getServiceChoice() == BACnetConfirmedServiceChoice.writeProperty.getBACnetEnumValue()) {
                 serviceWritePropertyRequest(i);
             } else if (pci.getServiceChoice() == BACnetConfirmedServiceChoice.readPropertyMultiple.getBACnetEnumValue()) {
+                serviceReadPropertyMultipleRequest(i);
+            } else {
                 ObjectIdentifierTag requestOid = new ObjectIdentifierTag(i.getData());
                 if (objects.containsKey(requestOid)) {
                     sendReject(i, BACnetRejectReason.unrecognized_service.getBACnetEnumValue());
@@ -126,7 +129,6 @@ public class MinimalDeviceService implements IndicationListener<Void> {
         return null;
     }
 
-    //TODO: array access for readProperty
     private void serviceReadPropertyRequest(Indication i) {
         ObjectIdentifierTag requestOid = new ObjectIdentifierTag(i.getData());
         UnsignedIntTag propId = new UnsignedIntTag(i.getData());
@@ -156,6 +158,104 @@ public class MinimalDeviceService implements IndicationListener<Void> {
             logger.debug("got readProperty request for unknown type/instance/property {}/{}/{}",
                     requestOid.getObjectType(), requestOid.getInstanceNumber(), propId.getValue());
             sendError(i, BACnetErrorClass.object, BACnetErrorCode.unknown_object);
+        }
+    }
+    
+    static class PropertyReference {
+        final ObjectIdentifierTag oid;
+        final int index;
+
+        public PropertyReference(ObjectIdentifierTag oid, int index) {
+            this.oid = oid;
+            this.index = index;
+        }
+        
+    }
+    
+    private void serviceReadPropertyMultipleRequest(Indication ind) {
+        ByteBuffer data = ind.getData();
+        //XXX allocating fixed buffer...
+        ByteBuffer output = ByteBuffer.allocate(8192);
+        ProtocolControlInformation pci = new ProtocolControlInformation(ApduConstants.APDU_TYPES.COMPLEX_ACK, BACnetConfirmedServiceChoice.readPropertyMultiple);
+        pci = pci.withInvokeId(ind.getProtocolControlInfo().getInvokeId());
+        pci.write(output);
+        
+        while (data.remaining() > 0) {
+            CompositeTag object = new CompositeTag(data);
+            ObjectIdentifierTag oid = new ObjectIdentifierTag(
+                    0, Tag.TagClass.Context, object.getOidType(), object.getOidInstanceNumber());
+            CompositeTag propSpecListTag = new CompositeTag(data);
+            List<CompositeTag> propSpecList = new ArrayList<>(propSpecListTag.getSubTags());
+            oid.write(output);
+            Tag.createOpeningTag(1).write(output);
+            for (int i = 0; i < propSpecList.size(); i++) {
+                int property = propSpecList.get(i).getUnsignedInt().intValue();
+                //TODO: meta properties 'all', 'required' & 'optional'
+                int index = -1;
+                if (i < propSpecList.size() - 1 && propSpecList.get(i+1).getTagNumber() == 1) {
+                    i++;
+                    index = propSpecList.get(i).getUnsignedInt().intValue();
+                }
+                new UnsignedIntTag(2, Tag.TagClass.Context, property).write(output);
+                if (index != -1) {
+                    new UnsignedIntTag(3, Tag.TagClass.Context, index).write(output);
+                }
+                try {
+                    Object value = getPropertyAt(oid, property, index);
+                    if (value != null) {
+                        Tag.createOpeningTag(4).write(output);
+                        writeValue(value, output);
+                        Tag.createClosingTag(4).write(output);
+                    } else {
+                        logger.error("implement me: return error value, no value for {},{}[{}]", oid, property, index);
+                    }
+                } catch (IndexOutOfBoundsException ex) {
+                    logger.error("implement me: return error value", ex);
+                }
+            }
+            Tag.createClosingTag(1).write(output);
+        }
+        output.flip();
+        try {
+            ind.getTransport().request(ind.getSource().toDestinationAddress(),
+                    output, Transport.Priority.Normal, false, null);
+        } catch (IOException ex) {
+            LoggerFactory.getLogger(MinimalDeviceService.class).error("sending of object list failed", ex);
+        }
+    }
+    
+    @SuppressWarnings("unchecked")
+    private void writeValue(Object val, ByteBuffer out) {
+        if (val instanceof Tag) {
+            ((Tag)val).write(out);
+        } else if (val instanceof Collection) {
+            //logger.trace("writing NULL tag for null value in collection");
+            //new Tag(0, Tag.TagClass.Application, TagConstants.TAG_NULL).write(buf);
+            System.out.println("write Collection");
+            for (Object o : (Collection) val) {
+                if (o == null) {
+                    logger.trace("writing NULL tag for null value in collection");
+                    new Tag(0, Tag.TagClass.Application, TagConstants.TAG_NULL).write(out);
+                } else {
+                    ((Tag) o).write(out);
+                }
+            }
+        } else if (val == null) {
+            logger.warn("writing NULL tag for null value"); //probably an error
+            new Tag(0, Tag.TagClass.Application, TagConstants.TAG_NULL).write(out);
+        } else if (val.getClass().isArray()) {
+            Tag[] a = (Tag[]) val;
+            for (Tag t : a) {
+                if (t == null) {
+                    logger.trace("writing NULL tag for null value in array");
+                    new Tag(0, Tag.TagClass.Application, TagConstants.TAG_NULL).write(out);
+                } else {
+                    t.write(out);
+                }
+            }
+        } else {
+            logger.warn("asked to write unsupported type, writing NULL tag: {}", val); //probably an error
+            new Tag(0, Tag.TagClass.Application, TagConstants.TAG_NULL).write(out);
         }
     }
 
@@ -236,7 +336,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
             return;
         }
         Supplier<? extends Object> propertyTag = p.supplier;
-        ByteBuffer buf = ByteBuffer.allocate(1500);
+        ByteBuffer buf = ByteBuffer.allocate(8192);
         ProtocolControlInformation pci = new ProtocolControlInformation(ApduConstants.APDU_TYPES.COMPLEX_ACK, BACnetConfirmedServiceChoice.readProperty);
         pci = pci.withInvokeId(i.getProtocolControlInfo().getInvokeId());
         pci.write(buf);
@@ -244,29 +344,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
         new UnsignedIntTag(1, Tag.TagClass.Context, propId).write(buf);
         Tag.createOpeningTag(3).write(buf);
         Object value = propertyTag.get();
-        if (value != null) {
-            if (value instanceof Tag) {
-                ((Tag) value).write(buf);
-            } else if (value instanceof Collection) {
-                for (Object e : ((Collection) value)) {
-                    if (e != null) {
-                        ((Tag) e).write(buf);
-                    } else {
-                        logger.trace("writing NULL tag for null value in collection");
-                        new Tag(0, Tag.TagClass.Application, TagConstants.TAG_NULL).write(buf);
-                    }
-                }
-            } else if (value.getClass().isArray()) {
-                for (Tag e : ((Tag[]) value)) {
-                    if (e != null) {
-                        e.write(buf);
-                    } else {
-                        logger.trace("writing NULL tag for null value in array");
-                        new Tag(0, Tag.TagClass.Application, TagConstants.TAG_NULL).write(buf);
-                    }
-                }
-            }
-        }
+        writeValue(value, buf);
         Tag.createClosingTag(3).write(buf);
         buf.flip();
         try {
@@ -274,6 +352,43 @@ public class MinimalDeviceService implements IndicationListener<Void> {
         } catch (IOException ex) {
             LoggerFactory.getLogger(MinimalDeviceService.class).error("sending of object list failed", ex);
         }
+    }
+    
+    private Object getPropertyAt(ObjectIdentifierTag oid, int propId, int index) throws IndexOutOfBoundsException {
+        PropertyConversion p = objects.getOrDefault(oid, Collections.emptyMap()).get(propId);
+        if (p == null || p.supplier == null) {
+            return null;
+        }
+        if (index == -1) {
+            return p.supplier.get();
+        }
+        Object value = p.supplier.get();
+        if (value != null) {
+            if (value instanceof Collection) {
+                if (value instanceof List) {
+                    if (index == 0) {
+                        return new UnsignedIntTag(((List)value).size());
+                    } else {
+                        return ((List)value).get(index-1);
+                    }
+                } else {
+                    if (index == 0) {
+                        return new UnsignedIntTag(((Collection)value).size());
+                    } else {
+                        @SuppressWarnings("unchecked")
+                        List<Object> l = new ArrayList<>((Collection)value);
+                        return l.get(index-1);
+                    }
+                }
+            } else if (value.getClass().isArray()) {
+                if (index == 0) {
+                    return new UnsignedIntTag(((Tag[])value).length);
+                } else {
+                    return ((Tag[]) value)[index-1];
+                }
+            }
+        }
+        return null;
     }
     
     private void sendPropertyAt(Indication i, ObjectIdentifierTag oid, int propId, int index) {
@@ -284,7 +399,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
             return;
         }
         Supplier<? extends Object> propertyTag = p.supplier;
-        ByteBuffer buf = ByteBuffer.allocate(1500);
+        ByteBuffer buf = ByteBuffer.allocate(1024);
         ProtocolControlInformation pci = new ProtocolControlInformation(ApduConstants.APDU_TYPES.COMPLEX_ACK, BACnetConfirmedServiceChoice.readProperty);
         pci = pci.withInvokeId(i.getProtocolControlInfo().getInvokeId());
         pci.write(buf);
