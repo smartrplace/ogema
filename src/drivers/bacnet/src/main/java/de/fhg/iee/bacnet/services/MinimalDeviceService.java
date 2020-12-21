@@ -41,7 +41,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -172,6 +171,66 @@ public class MinimalDeviceService implements IndicationListener<Void> {
         
     }
     
+    //writes a ReadAccessResult list-of-results entry, see BACnet 135-2016 p.870
+    private void writeReadPropertyMultipleResult(ObjectIdentifierTag oid,
+            int property, int index, ByteBuffer output) {
+        new UnsignedIntTag(2, Tag.TagClass.Context, property).write(output);
+        if (index != -1) {
+            new UnsignedIntTag(3, Tag.TagClass.Context, index).write(output);
+        }
+        if (objects.get(oid) == null) { // unknown object? §15.7.1.3.1
+            Tag.createOpeningTag(5).write(output);
+            new UnsignedIntTag(BACnetErrorClass.object.getBACnetEnumValue()).write(output);
+            new UnsignedIntTag(BACnetErrorCode.unknown_object.getBACnetEnumValue()).write(output);
+            Tag.createClosingTag(5).write(output);
+            return;
+        }
+        if (!objects.get(oid).containsKey(property)) { // unknown property? §15.7.1.3.1
+            Tag.createOpeningTag(5).write(output);
+            new UnsignedIntTag(BACnetErrorClass.property.getBACnetEnumValue()).write(output);
+            new UnsignedIntTag(BACnetErrorCode.unknown_property.getBACnetEnumValue()).write(output);
+            Tag.createClosingTag(5).write(output);
+            return;
+        }
+        try {
+            Object value = getPropertyAt(oid, property, index);
+            if (value != null) {
+                Tag.createOpeningTag(4).write(output);
+                writeValue(value, output);
+                Tag.createClosingTag(4).write(output);
+            } else {
+                Tag.createOpeningTag(4).write(output);
+                new Tag(0, Tag.TagClass.Application, TagConstants.TAG_NULL).write(output);
+                Tag.createClosingTag(4).write(output);
+            }
+        } catch (IndexOutOfBoundsException ex) {
+            //§15.7.1.3.1
+            Tag.createOpeningTag(5).write(output);
+            new UnsignedIntTag(BACnetErrorClass.property.getBACnetEnumValue()).write(output);
+            new UnsignedIntTag(BACnetErrorCode.invalid_array_index.getBACnetEnumValue()).write(output);
+            Tag.createClosingTag(5).write(output);
+        }
+    }
+    
+    private void writeAllProperties(ObjectIdentifierTag oid, int property, ByteBuffer output) {
+        Map<Integer, PropertyConversion> allProps = objects.get(oid);
+        if (allProps == null) {
+            new UnsignedIntTag(2, Tag.TagClass.Context, property).write(output);
+            Tag.createOpeningTag(5).write(output);
+            new UnsignedIntTag(BACnetErrorClass.object.getBACnetEnumValue()).write(output);
+            new UnsignedIntTag(BACnetErrorCode.unknown_object.getBACnetEnumValue()).write(output);
+            Tag.createClosingTag(5).write(output);
+            return;
+        }
+        for (int prop: allProps.keySet()) {
+            if (prop == BACnetPropertyIdentifier.property_list.getBACnetEnumValue()) {
+                continue;
+            }
+            writeReadPropertyMultipleResult(oid, prop, -1, output);
+        }
+    }
+    
+    // see BACnet 135-2016 §15.7
     private void serviceReadPropertyMultipleRequest(Indication ind) {
         ByteBuffer data = ind.getData();
         //XXX allocating fixed buffer...
@@ -179,39 +238,30 @@ public class MinimalDeviceService implements IndicationListener<Void> {
         ProtocolControlInformation pci = new ProtocolControlInformation(ApduConstants.APDU_TYPES.COMPLEX_ACK, BACnetConfirmedServiceChoice.readPropertyMultiple);
         pci = pci.withInvokeId(ind.getProtocolControlInfo().getInvokeId());
         pci.write(output);
-        
         while (data.remaining() > 0) {
             CompositeTag object = new CompositeTag(data);
-            ObjectIdentifierTag oid = new ObjectIdentifierTag(
+            ObjectIdentifierTag readOid = new ObjectIdentifierTag(
                     0, Tag.TagClass.Context, object.getOidType(), object.getOidInstanceNumber());
             CompositeTag propSpecListTag = new CompositeTag(data);
             List<CompositeTag> propSpecList = new ArrayList<>(propSpecListTag.getSubTags());
-            oid.write(output);
+            readOid.write(output);
             Tag.createOpeningTag(1).write(output);
             for (int i = 0; i < propSpecList.size(); i++) {
                 int property = propSpecList.get(i).getUnsignedInt().intValue();
-                //TODO: meta properties 'all', 'required' & 'optional'
+                //TODO: meta properties 'all', 'required' & 'optional', see §15.7.3.1.2
+                // do not return property-list for 'all' or 'required'
+                if (property == BACnetPropertyIdentifier.all.getBACnetEnumValue()
+                        || property == BACnetPropertyIdentifier.required.getBACnetEnumValue()
+                        || property == BACnetPropertyIdentifier.required.getBACnetEnumValue()) {
+                    writeAllProperties(readOid, property, output);
+                    continue;
+                }
                 int index = -1;
                 if (i < propSpecList.size() - 1 && propSpecList.get(i+1).getTagNumber() == 1) {
                     i++;
                     index = propSpecList.get(i).getUnsignedInt().intValue();
                 }
-                new UnsignedIntTag(2, Tag.TagClass.Context, property).write(output);
-                if (index != -1) {
-                    new UnsignedIntTag(3, Tag.TagClass.Context, index).write(output);
-                }
-                try {
-                    Object value = getPropertyAt(oid, property, index);
-                    if (value != null) {
-                        Tag.createOpeningTag(4).write(output);
-                        writeValue(value, output);
-                        Tag.createClosingTag(4).write(output);
-                    } else {
-                        logger.error("implement me: return error value, no value for {},{}[{}]", oid, property, index);
-                    }
-                } catch (IndexOutOfBoundsException ex) {
-                    logger.error("implement me: return error value", ex);
-                }
+                writeReadPropertyMultipleResult(readOid, property, index, output);
             }
             Tag.createClosingTag(1).write(output);
         }
@@ -229,9 +279,6 @@ public class MinimalDeviceService implements IndicationListener<Void> {
         if (val instanceof Tag) {
             ((Tag)val).write(out);
         } else if (val instanceof Collection) {
-            //logger.trace("writing NULL tag for null value in collection");
-            //new Tag(0, Tag.TagClass.Application, TagConstants.TAG_NULL).write(buf);
-            System.out.println("write Collection");
             for (Object o : (Collection) val) {
                 if (o == null) {
                     logger.trace("writing NULL tag for null value in collection");
