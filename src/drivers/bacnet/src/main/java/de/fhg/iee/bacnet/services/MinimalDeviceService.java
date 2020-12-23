@@ -140,23 +140,11 @@ public class MinimalDeviceService implements IndicationListener<Void> {
                 //logger.warn("got unsupported readProperty request with index for {}[{}]", propId.getValue(), index);
             }
             logger.debug("got readProperty request for property {}/{}, index {}", requestOid.getInstanceNumber(), propId.getValue(), index);
-            if (id == BACnetPropertyIdentifier.object_list.getBACnetEnumValue()) {
-                if (index != -1) {
-                    sendObjectAt(i, index);
-                } else {
-                    sendObjectList(i);
-                }
-            } else {
-                if (index != -1) {
-                    sendPropertyAt(i, oid, id, index);
-                } else {
-                    sendProperty(i, requestOid, id);
-                }
-            }
+            sendPropertyAt(i, requestOid, id, index);
         } else {
             logger.debug("got readProperty request for unknown type/instance/property {}/{}/{}",
                     requestOid.getObjectType(), requestOid.getInstanceNumber(), propId.getValue());
-            sendError(i, BACnetErrorClass.object, BACnetErrorCode.unknown_object);
+            sendReadPropertyError(i, BACnetErrorClass.object, BACnetErrorCode.unknown_object);
         }
     }
     
@@ -248,6 +236,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
             Tag.createOpeningTag(1).write(output);
             for (int i = 0; i < propSpecList.size(); i++) {
                 int property = propSpecList.get(i).getUnsignedInt().intValue();
+                logger.trace("readPropertyMultiple: {}, {}", readOid.getInstanceNumber(), property);
                 //TODO: meta properties 'all', 'required' & 'optional', see §15.7.3.1.2
                 // do not return property-list for 'all' or 'required'
                 if (property == BACnetPropertyIdentifier.all.getBACnetEnumValue()
@@ -316,7 +305,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
                 return Collections.emptyMap();
             }).get(id);
             if (p == null || p.consumer == null) {
-                sendError(i, BACnetErrorClass.property, BACnetErrorCode.write_access_denied);
+                sendReadPropertyError(i, BACnetErrorClass.property, BACnetErrorCode.write_access_denied);
             } else {
                 CompositeTag ct = new CompositeTag(i.getData());
                 if (i.getData().remaining() > 0) {
@@ -360,7 +349,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
         }
     }
 
-    private void sendError(Indication i, BACnetErrorClass eClass, BACnetErrorCode eCode) {
+    private void sendReadPropertyError(Indication i, BACnetErrorClass eClass, BACnetErrorCode eCode) {
         logger.trace("Send Error {},{} to {}", eClass, eCode, i.getSource().toDestinationAddress());
         ByteBuffer buf = ByteBuffer.allocate(30);
         ProtocolControlInformation pci = new ProtocolControlInformation(ApduConstants.APDU_TYPES.ERROR, i.getProtocolControlInfo().getServiceChoice()).withInvokeId(i.getProtocolControlInfo().getInvokeId());
@@ -375,33 +364,10 @@ public class MinimalDeviceService implements IndicationListener<Void> {
         }
     }
 
-    private void sendProperty(Indication i, ObjectIdentifierTag oid, int propId) {
-        logger.trace("Send Property to "+i.getSource().toDestinationAddress()+" from MinimalDeviceService");
-        PropertyConversion p = objects.getOrDefault(oid, Collections.emptyMap()).get(propId);
-        if (p == null || p.supplier == null) {
-            sendError(i, BACnetErrorClass.property, BACnetErrorCode.unknown_property);
-            return;
-        }
-        Supplier<? extends Object> propertyTag = p.supplier;
-        ByteBuffer buf = ByteBuffer.allocate(8192);
-        ProtocolControlInformation pci = new ProtocolControlInformation(ApduConstants.APDU_TYPES.COMPLEX_ACK, BACnetConfirmedServiceChoice.readProperty);
-        pci = pci.withInvokeId(i.getProtocolControlInfo().getInvokeId());
-        pci.write(buf);
-        new ObjectIdentifierTag(0, Tag.TagClass.Context, oid.getObjectType(), oid.getInstanceNumber()).write(buf);
-        new UnsignedIntTag(1, Tag.TagClass.Context, propId).write(buf);
-        Tag.createOpeningTag(3).write(buf);
-        Object value = propertyTag.get();
-        writeValue(value, buf);
-        Tag.createClosingTag(3).write(buf);
-        buf.flip();
-        try {
-            i.getTransport().request(i.getSource(), buf, Transport.Priority.Normal, false, null);
-        } catch (IOException ex) {
-            LoggerFactory.getLogger(MinimalDeviceService.class).error("sending of object list failed", ex);
-        }
-    }
-    
-    private Object getPropertyAt(ObjectIdentifierTag oid, int propId, int index) throws IndexOutOfBoundsException {
+    // throws IllegalArgumentException if index != -1 and property is not an array
+    // throws IndexOutOfBoundsException if index != -1 and index is out of bounds
+    private Object getPropertyAt(ObjectIdentifierTag oid, int propId, int index)
+            throws IndexOutOfBoundsException, IllegalArgumentException {
         PropertyConversion p = objects.getOrDefault(oid, Collections.emptyMap()).get(propId);
         if (p == null || p.supplier == null) {
             return null;
@@ -433,6 +399,9 @@ public class MinimalDeviceService implements IndicationListener<Void> {
                 } else {
                     return ((Tag[]) value)[index-1];
                 }
+            } else {
+                throw new IllegalArgumentException(
+                    String.format("property %s, %d is not an array", oid, propId));
             }
         }
         return null;
@@ -440,116 +409,37 @@ public class MinimalDeviceService implements IndicationListener<Void> {
     
     private void sendPropertyAt(Indication i, ObjectIdentifierTag oid, int propId, int index) {
         logger.trace("Send Property {}[{}] to {}", propId, index, i.getSource().toDestinationAddress());
-        PropertyConversion p = objects.getOrDefault(oid, Collections.emptyMap()).get(propId);
-        if (p == null || p.supplier == null) {
-            sendError(i, BACnetErrorClass.property, BACnetErrorCode.unknown_property);
+        if (!objects.containsKey(oid)) {
+            sendReadPropertyError(i, BACnetErrorClass.object, BACnetErrorCode.unknown_object);
             return;
         }
-        Supplier<? extends Object> propertyTag = p.supplier;
-        ByteBuffer buf = ByteBuffer.allocate(1024);
+        PropertyConversion p = objects.getOrDefault(oid, Collections.emptyMap()).get(propId);
+        if (p == null || p.supplier == null) {
+            sendReadPropertyError(i, BACnetErrorClass.property, BACnetErrorCode.unknown_property);
+            return;
+        }
+        //FIXME huge allocation that may still be insufficient, maybe switch to netty ByteBuf?
+        ByteBuffer buf = ByteBuffer.allocate(8192);
         ProtocolControlInformation pci = new ProtocolControlInformation(ApduConstants.APDU_TYPES.COMPLEX_ACK, BACnetConfirmedServiceChoice.readProperty);
         pci = pci.withInvokeId(i.getProtocolControlInfo().getInvokeId());
         pci.write(buf);
         new ObjectIdentifierTag(0, Tag.TagClass.Context, oid.getObjectType(), oid.getInstanceNumber()).write(buf);
         new UnsignedIntTag(1, Tag.TagClass.Context, propId).write(buf);
-        new UnsignedIntTag(2, Tag.TagClass.Context, index).write(buf);
+        if (index > -1) {
+            new UnsignedIntTag(2, Tag.TagClass.Context, index).write(buf);
+        }
         Tag.createOpeningTag(3).write(buf);
-        Object value = propertyTag.get();
-        if (value != null) {
-            if (value instanceof Tag) {
-                ((Tag) value).write(buf);
-            } else if (value instanceof Collection) {
-                if (value instanceof List) {
-                    if (index == 0) {
-                        new UnsignedIntTag(((List)value).size()).write(buf);
-                    } else {
-                        Tag t = (Tag)((List)value).get(index-1);
-                        t.write(buf);
-                    }
-                } else {
-                    if (index == 0) {
-                        new UnsignedIntTag(((Collection)value).size()).write(buf);
-                    } else {
-                        @SuppressWarnings("unchecked")
-                        List<Object> l = new ArrayList<>((Collection)value);
-                        Tag t = (Tag)l.get(index-1);
-                        t.write(buf);
-                    }
-                }
-            } else if (value.getClass().isArray()) {
-                if (index == 0) {
-                    new UnsignedIntTag(((Tag[])value).length).write(buf);
-                } else {
-                    ((Tag[]) value)[index-1].write(buf);
-                }
-            }
+        try {
+            Object value = getPropertyAt(oid, propId, index);
+            writeValue(value, buf);
+        } catch (IndexOutOfBoundsException ioobe) {
+            sendReadPropertyError(i, BACnetErrorClass.property, BACnetErrorCode.invalid_array_index);
+            return;
+        } catch (IllegalArgumentException iae) {
+            sendReadPropertyError(i, BACnetErrorClass.property, BACnetErrorCode.property_is_not_an_array);
+            return;
         }
         Tag.createClosingTag(3).write(buf);
-        //FIXME error for unavailable index / IndexOutOfBoundsException
-        buf.flip();
-        try {
-            i.getTransport().request(i.getSource(), buf, Transport.Priority.Normal, false, null);
-        } catch (IOException ex) {
-            LoggerFactory.getLogger(MinimalDeviceService.class).error("sending of object list failed", ex);
-        }
-    }
-    
-    private void sendObjectAt(Indication i, int index) {
-        logger.trace("Send object at [{}] to {}", index, i.getSource().toDestinationAddress());
-        ByteBuffer buf = ByteBuffer.allocate(50);
-        ProtocolControlInformation pci = new ProtocolControlInformation(
-                ApduConstants.APDU_TYPES.COMPLEX_ACK, BACnetConfirmedServiceChoice.readProperty);
-        pci = pci.withInvokeId(i.getProtocolControlInfo().getInvokeId());
-        pci.write(buf);
-        new ObjectIdentifierTag(0, Tag.TagClass.Context, oid.getObjectType(), oid.getInstanceNumber()).write(buf);
-        new UnsignedIntTag(1, Tag.TagClass.Context, BACnetPropertyIdentifier.object_list.getBACnetEnumValue()).write(buf);
-        new UnsignedIntTag(2, Tag.TagClass.Context, index).write(buf);
-        
-        if (index == 0) {
-            logger.trace("write array size: {}", objects.size());
-            Tag.createOpeningTag(3).write(buf);
-            new UnsignedIntTag(objects.size()).write(buf);
-            //new UnsignedIntTag(3, Tag.TagClass.Context, index).write(buf);
-            Tag.createClosingTag(3).write(buf);
-        } else {
-
-            Tag.createOpeningTag(3).write(buf);
-            oid.write(buf);
-            if (index != 0) {
-                List<ObjectIdentifierTag> oids = new ArrayList<>(objects.keySet());
-                oids.get(index - 1).write(buf);
-            } else {
-                //send size
-                new UnsignedIntTag(3, Tag.TagClass.Context, index).write(buf);
-            }
-            Tag.createClosingTag(3).write(buf);
-        }
-        buf.flip();
-        try {
-            i.getTransport().request(i.getSource(), buf, Transport.Priority.Normal, false, null);
-        } catch (IOException ex) {
-            LoggerFactory.getLogger(MinimalDeviceService.class).error("sending of object list failed", ex);
-        }
-    }
-
-    private void sendObjectList(Indication i) {
-        logger.trace("Send objectList to "+i.getSource().toDestinationAddress()+" from MinimalDeviceService");
-        ByteBuffer buf = ByteBuffer.allocate(8 * objects.size() + 50); //XXX: need to check maximum sizes / segmentation
-        ProtocolControlInformation pci = new ProtocolControlInformation(
-                ApduConstants.APDU_TYPES.COMPLEX_ACK, BACnetConfirmedServiceChoice.readProperty);
-        pci = pci.withInvokeId(i.getProtocolControlInfo().getInvokeId());
-        pci.write(buf);
-        new ObjectIdentifierTag(0, Tag.TagClass.Context, oid.getObjectType(), oid.getInstanceNumber()).write(buf);
-        new UnsignedIntTag(1, Tag.TagClass.Context, BACnetPropertyIdentifier.object_list.getBACnetEnumValue()).write(buf);
-        Tag.createOpeningTag(3).write(buf);
-        oid.write(buf); // always include self
-        for (ObjectIdentifierTag id : objects.keySet()) {
-            if (!oid.equals(id)) {
-                id.write(buf);
-            }
-        }
-        Tag.createClosingTag(3).write(buf);
-        logger.trace("build object list response, {} bytes", buf.position());
         buf.flip();
         try {
             i.getTransport().request(i.getSource(), buf, Transport.Priority.Normal, false, null);
