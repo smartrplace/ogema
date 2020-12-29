@@ -39,6 +39,7 @@ import org.ogema.model.sensors.TemperatureSensor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
+import static org.ogema.drivers.homematic.xmlrpc.hl.channels.IpThermostatBChannel.CONTROL_MODE_DECORATOR;
 import org.ogema.tools.resource.util.ResourceUtils;
 
 /**
@@ -207,15 +208,46 @@ public class ThermostatChannel extends AbstractDeviceHandler {
         setpoint.addValueListener(new ResourceValueListener<TemperatureResource>() {
             @Override
             public void resourceChanged(TemperatureResource resource) {
-                //XXX fails without the String conversion...
+                //XXX value type ??? does the homematic CCU really need string?
                 String value = String.format(Locale.ENGLISH, "%.1f", resource.getCelsius());
-                conn.performSetValue(deviceAddress, "SET_TEMPERATURE", value);
+                conn.performSetValue(deviceAddress, "SET_TEMPERATURE", Double.valueOf(resource.getCelsius()));
             }            
         }, true);
         
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
         setupHmParameterValues(thermos, parent.address().getValue());
         setupTempSensLinking(thermos);
+        setupControlModeResource(thermos, deviceAddress);
+    }
+    
+    /* the control_mode param is not writeable on the bidcos model
+      to set manual mode (1): write temperature (double) to MANU_MODE (use setpoint value)
+      to set auto mode (0): write true to AUTO_MODE
+    */
+    private void setupControlModeResource(final Thermostat thermos, final String deviceAddress) {
+        IntegerResource controlMode = thermos.addDecorator(CONTROL_MODE_DECORATOR, IntegerResource.class);
+        controlMode.create().activate(false);
+        controlMode.addValueListener(new ResourceValueListener<IntegerResource>() {
+            @Override
+            public void resourceChanged(IntegerResource resource) {
+                int mode = resource.getValue();
+                if (mode != 0 && mode != 1) {
+                    logger.warn("invalid value ({}) set for HomeMatic CONTROL_MODE on {}", mode, resource.getLocation());
+                    return;
+                }
+                //conn.performSetValue(deviceAddress, "CONTROL_MODE", CONTROL_MODES[mode]);
+                setManualModeState(thermos, deviceAddress, mode == 1);
+            }
+        }, true);
+    }
+    
+    void setManualModeState(Thermostat thermos, final String deviceAddress, boolean on) {
+        if (on) {
+            double val = thermos.temperatureSensor().settings().setpoint().getCelsius();
+            conn.performSetValue(deviceAddress, "MANU_MODE", val);
+        } else {
+            conn.performSetValue(deviceAddress, "AUTO_MODE", true);
+        }
     }
     
     class ParameterListener implements ResourceValueListener<SingleValueResource> {

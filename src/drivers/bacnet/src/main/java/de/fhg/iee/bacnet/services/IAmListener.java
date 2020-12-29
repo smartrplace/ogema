@@ -27,6 +27,7 @@ import de.fhg.iee.bacnet.enumerations.BACnetUnconfirmedServiceChoice;
 import de.fhg.iee.bacnet.tags.ObjectIdentifierTag;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -43,6 +44,8 @@ public class IAmListener implements IndicationListener<Boolean> {
     final int maxApduSizeAccepted;
     final BACnetSegmentation segmentationSupport;
     final int vendorId;
+    
+    static final Logger LOGGER = LoggerFactory.getLogger(IAmListener.class);
 
     public IAmListener(int instanceNumber, int maxApduSizeAccepted, BACnetSegmentation segmentationSupport, int vendorId) {
         this.instanceNumber = instanceNumber;
@@ -52,16 +55,16 @@ public class IAmListener implements IndicationListener<Boolean> {
     }
     
     public void broadcastIAm(Transport t) {
+        LOGGER.trace("broadcasting i-am");
         sendIAm(t, t.getBroadcastAddress());
     }
 
     public void sendIAm(Transport t, DeviceAddress target) {
-        //TODO
-    	System.out.println("Send Iam to "+target+" from IamListner");
         ByteBuffer iAmPdu = UnconfirmedServices.createIAmApdu(
                 new ObjectIdentifierTag(BACnetObjectType.device, instanceNumber),
                 maxApduSizeAccepted, segmentationSupport, vendorId);
         try {
+            LOGGER.trace("sending i-am to {}", target);
             t.request(target, iAmPdu, Transport.Priority.Normal, false, null);
         } catch (IOException ex) {
             LoggerFactory.getLogger(getClass()).error("sending of i-am request failed", ex);
@@ -73,6 +76,7 @@ public class IAmListener implements IndicationListener<Boolean> {
         ProtocolControlInformation pci = i.getProtocolControlInfo();
         if (pci.getPduType() == ApduConstants.TYPE_UNCONFIRMED_REQ
                 && pci.getServiceChoice() == BACnetUnconfirmedServiceChoice.who_Is.getBACnetEnumValue()) {
+            LOGGER.trace("received who-is from {}", i.getSource());
             sendIAm(i.getTransport(), i.getSource().toDestinationAddress());
             return true;
         }

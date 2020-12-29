@@ -15,8 +15,12 @@
  */
 package org.ogema.impl.administration;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.security.AllPermission;
+import java.security.Permission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -34,6 +38,7 @@ import org.apache.felix.scr.annotations.Properties;
 import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.Service;
+import org.apache.felix.service.command.CommandSession;
 import org.apache.felix.service.command.Descriptor;
 import org.apache.felix.service.command.Parameter;
 import org.ogema.accesscontrol.AccessManager;
@@ -42,6 +47,7 @@ import org.ogema.accesscontrol.ResourcePermission;
 import org.ogema.core.administration.AdminApplication;
 import org.ogema.core.administration.AdminLogger;
 import org.ogema.core.administration.AdministrationManager;
+import org.ogema.core.administration.CredentialStore;
 import org.ogema.core.administration.FrameworkClock;
 import org.ogema.core.administration.PatternCondition;
 import org.ogema.core.administration.RegisteredAccessModeRequest;
@@ -68,6 +74,7 @@ import org.osgi.service.condpermadmin.ConditionalPermissionInfo;
 import org.osgi.service.permissionadmin.PermissionInfo;
 import org.osgi.service.useradmin.Group;
 import org.osgi.service.useradmin.Role;
+import org.osgi.service.useradmin.User;
 import org.osgi.service.useradmin.UserAdmin;
 
 /**
@@ -79,7 +86,7 @@ import org.osgi.service.useradmin.UserAdmin;
 		"apps", "clock", "loggers", "log", "dump_cache", "update", 
 		"listUsers", "getUserProps", "setUserProp", "removeUserProp", "createUser", "deleteUser", 
 		"listGroups", "createGroup", "addMember", "removeMember",
-		"setNewPassword" }) })
+		"setNewPassword", "setUserPassword" }) })
 @Service(ShellCommands.class)
 @Descriptor("OGEMA administration commands")
 public class ShellCommands {
@@ -92,6 +99,9 @@ public class ShellCommands {
 	
 	@Reference
 	private UserAdmin userAdmin;
+    
+    @Reference
+    private CredentialStore credentials;
 
 	@Descriptor("list running OGEMA apps")
 	public void apps(@Descriptor("show listeners registered by app") @Parameter(names = { "-l",
@@ -233,13 +243,13 @@ public class ShellCommands {
 
 	@Descriptor("List loggers")
 	public void loggers() {
-		loggers("", "", "");
+		loggers("unused", "", "");
 	}
 
 	@Descriptor("List/configure loggers")
 	public void loggers(
-			@Descriptor("set log level for selected loggers") @Parameter(names = { "-l",
-					"--level" }, absentValue = "") String level,
+			@Descriptor("set log level for selected loggers (null to clear override)") @Parameter(names = { "-l",
+					"--level" }, absentValue = "unused") String level,
 			@Descriptor("comma separated list of outputs (file, console or cache) for which to set the log level (default: all outputs)") @Parameter(names = {
 					"-o", "--output" }, absentValue = "") String output,
 			@Descriptor("select loggers by regex (case-insensitive subsequence match)") String match) {
@@ -265,15 +275,19 @@ public class ShellCommands {
 		}
 		for (AdminLogger l : loggers) {
 			String loggerName = l.getName();
-			if (p != null && !p.matcher(loggerName).find()) {
-				continue;
-			}
-			if (!level.isEmpty()) {
-				LogLevel ll = LogLevel.valueOf(level.toUpperCase());
-				for (LogOutput o : outputs) {
-					l.setMaximumLogLevel(o, ll);
-				}
-			}
+            if (p != null && !p.matcher(loggerName).find()) {
+                continue;
+            }
+            if (!"unused".equals(level)) {
+                LogLevel ll = null;
+                if (level != null && !level.isEmpty()) {
+                    ll = LogLevel.valueOf(level.toUpperCase());
+                }
+
+                for (LogOutput o : outputs) {
+                    l.overwriteMaximumLogLevel(o, ll);
+                }
+            }
 			System.out.printf("  %s {%s=%s, %s=%s, %s=%s}%n", loggerName, LogOutput.CONSOLE,
 					l.getMaximumLogLevel(LogOutput.CONSOLE), LogOutput.FILE, l.getMaximumLogLevel(LogOutput.FILE),
 					LogOutput.CACHE, l.getMaximumLogLevel(LogOutput.CACHE));
@@ -565,6 +579,73 @@ public class ShellCommands {
 			System.out.println("Old password does not match");
 		}
 	}
+    
+    @Descriptor("Change another users password")
+    @SuppressWarnings("unchecked")
+    public void setUserPassword(CommandSession shell,
+            @Descriptor("Administrator user")
+            String adminUser,
+            @Descriptor("Set new password for this user")
+            String user) throws IOException {
+        final UserAccount adminAccount;
+        final UserAccount userAccount;
+		try {
+			userAccount = admin.getUser(user);
+		} catch (RuntimeException e) {
+			shell.getConsole().printf("User %s does not exist.", user);
+			return;
+		}
+        try {
+			adminAccount = admin.getUser(adminUser);
+		} catch (RuntimeException e) {
+			shell.getConsole().printf("User %s does not exist.", adminUser);
+			return;
+		}
+        final AccessManager accessManager = permMan.getAccessManager();
+		// machine user should not be admin
+		if (!accessManager.isNatural(adminUser)) {
+			shell.getConsole().printf("%s is not a natural user", adminUser);
+            return;
+		}
+        // check permission manually, in case security is not enabled
+        boolean haveAllPermission = false;
+        for (ConditionalPermissionInfo cpi: accessManager.getPolicies(adminUser).getGrantedPerms().values()) {
+            for (PermissionInfo pi: cpi.getPermissionInfos()) {
+                //XXX should we also check the condition?
+                if ("java.security.AllPermission".equals(pi.getType())) {
+                    haveAllPermission = true;
+                    break;
+                }
+            }
+        }
+        if (!haveAllPermission) {
+            shell.getConsole().printf("%s is not an admin user", adminUser);
+            return;
+        }
+        // works only with enabled security
+        if (!permMan.handleSecurity(adminUser, new AllPermission())) {
+            shell.getConsole().printf("%s is not an admin user", adminUser);
+            return;
+        }
+		try (BufferedReader br = new BufferedReader(new InputStreamReader(shell.getKeyboard()))) {
+            shell.getConsole().printf("Enter password for %s: ", adminUser);
+            String adminPw = br.readLine();
+            if (!credentials.login(adminUser, adminPw)) {
+                shell.getConsole().printf("Wrong password.");
+                return;
+            }
+            shell.getConsole().printf("Enter new password for %s: ", user);
+            String pw1 = br.readLine();
+            shell.getConsole().printf("Reenter new password for %s: ", user);
+            String pw2 = br.readLine();
+            if (!pw1.equals(pw2)) {
+                shell.getConsole().printf("Passwords do not match.");
+                return;
+            }
+            ((User)userAdmin.getRole(user)).getCredentials().put("pwd", pw1);
+        }
+        shell.getConsole().printf("Password changed for user %s", user);
+    }
 	
 	@Descriptor("Updates an ogema app and enforces package refresh before it is started again.")
 	public void update(@Descriptor("The bundle id of the app to be updated.") final long id) throws BundleException, InterruptedException {

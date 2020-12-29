@@ -488,6 +488,7 @@ final class SerializationCore {
 						// already exists: " + name);
 					} else {
 						target = resman.createResource(name, inputOgemaType.asSubclass(Resource.class));
+                        checkResourceList(input, target);
 					}
 				} else {
 					Resource sub = target.getSubResource(name, inputOgemaType);
@@ -495,6 +496,7 @@ final class SerializationCore {
 						target.addDecorator(name, inputOgemaType);
 					}
 					target = sub;
+                    checkResourceList(input, target);
 				}
 				unresolvedLinks.addAll(apply(input, target, true));
 			}
@@ -505,6 +507,23 @@ final class SerializationCore {
 			throw new InvalidResourceTypeException("class not found", cnfe);
 		}
 	}
+    
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void checkResourceList(org.ogema.serialization.jaxb.Resource input, Resource target) throws ClassNotFoundException {
+        if (target instanceof ResourceList) {
+            ResourceList targetList = (ResourceList) target;
+            if (targetList.getElementType() != null) {
+                return;
+            }
+            org.ogema.serialization.jaxb.ResourceList inputList
+                    = (org.ogema.serialization.jaxb.ResourceList) input;
+            if (inputList.getElementType() == null) {
+                return;
+            }
+            Class<?> elementType = Class.forName(inputList.getElementType());
+            targetList.setElementType(elementType.asSubclass(Resource.class));
+        }
+    }
 
 	/**
 	 * @param input

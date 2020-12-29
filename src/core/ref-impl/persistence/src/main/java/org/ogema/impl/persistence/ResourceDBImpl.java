@@ -622,8 +622,13 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 		e = resNodeByID.get(elem.resID);
 		if (e != null && e.equals(elem))
 			return true;
-		else if ((e != null) && Configuration.LOGGING)
-			logger.debug("A sub level Resource exists with the same name: " + elem.name);
+		//else if ((e != null) && Configuration.LOGGING)
+		//	logger.debug("A sub level Resource exists with the same name: " + elem.name);
+		else if (e != null)
+			logger.error("A sub level Resource exists with the same name: " + elem.name+" resID:"+elem.resID+" other type:"+
+					(e.typeName!=null?e.typeName:"(no type info"));
+		else
+			logger.error("No sub level Resouce found for name: " + elem.name+" resID:"+elem.resID);
 		return false;
 	}
 

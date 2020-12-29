@@ -18,21 +18,27 @@ package org.ogema.util.test;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
 
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.ogema.core.channelmanager.measurements.FloatValue;
 import org.ogema.core.channelmanager.measurements.Quality;
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.model.Resource;
+import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.array.ByteArrayResource;
 import org.ogema.core.model.array.StringArrayResource;
 import org.ogema.core.model.schedule.Schedule;
 import org.ogema.core.model.simple.FloatResource;
+import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.model.units.PowerResource;
 import org.ogema.core.resourcemanager.ResourceManagement;
 import org.ogema.core.tools.SerializationManager;
@@ -212,6 +218,36 @@ public class JsonSerializationOsgiTest extends OsgiAppTestBase {
         sman.applyJson(output.toString(), f, true);
         Assert.assertTrue(Float.isInfinite(f.getValue()));
         Assert.assertTrue(0 > f.getValue());
+    }
+    
+    @Ignore
+    @Test
+    public void listOrderIsPreserved() throws IOException {
+        @SuppressWarnings("unchecked")
+        ResourceList<StringResource> rl = resman.createResource(newResourceName(), ResourceList.class);
+        rl.setElementType(StringResource.class);
+        String name = rl.getName();
+        List<String> elementOrder = new ArrayList<>();
+        int len = 10;
+        for (int i = 0; i < len; i++) {
+            StringResource s = rl.getSubResource("_" + UUID.randomUUID().toString().replace('-', '_'), StringResource.class);
+            s.create();
+            elementOrder.add(s.getName());
+            System.out.println(s.getName());
+        }
+        StringWriter output = new StringWriter();
+        sman.writeJson(output, rl);
+        rl.delete();
+        Assert.assertNull(getApplicationManager().getResourceAccess().getResource(name));
+        System.out.println(output.toString());
+        sman.createFromJson(output.toString());
+        ResourceList<StringResource> l2 = getApplicationManager().getResourceAccess().getResource(name);
+        Assert.assertNotNull(l2);
+        Assert.assertEquals(StringResource.class, l2.getElementType());
+        assertEquals(elementOrder.size(), l2.getAllElements().size());
+        for (int i = 0; i < elementOrder.size(); i++) {
+            assertEquals(elementOrder.get(i), l2.getAllElements().get(i).getName());
+        }
     }
     
     @Test

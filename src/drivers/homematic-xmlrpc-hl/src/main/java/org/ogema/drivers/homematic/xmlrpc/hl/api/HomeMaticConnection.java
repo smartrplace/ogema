@@ -21,6 +21,7 @@ import java.util.Map;
 import org.ogema.core.model.Resource;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEventListener;
+import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 
 /**
  * Used by {@link DeviceHandler} implementations to communicate with its HomeMatic
@@ -101,5 +102,9 @@ public interface HomeMaticConnection {
     void removeEventListener(HmEventListener l);
     
     <T> T getValue(String address, String value_key) throws IOException;
+    
+    Map<String, Object> getParamset(String address, String set) throws IOException;
+    
+    Map<String, ParameterDescription<?>> getParamsetDescription(String address, String set) throws IOException;
     
 }

@@ -4,7 +4,7 @@
     <parent>
         <artifactId>ogema-tools</artifactId>
         <groupId>org.ogema.tools</groupId>
-        <version>2.2.1</version>
+        <version>2.2.2-SNAPSHOT</version>
     </parent>
 
     <artifactId>rest-importer</artifactId>
@@ -13,7 +13,7 @@
     <description>
         Imports resources at framework start-up from configuration files
     </description>
-    <url>http://www.ogema-source.net</url>
+    <!-- <url>http://www.ogema-source.net</url> -->
     
     <packaging>bundle</packaging>
     

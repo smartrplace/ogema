@@ -2,7 +2,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.ogema</groupId>
 	<artifactId>ogema</artifactId>
-	<version>2.2.0</version>
+	<version>2.2.2-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<name>OGEMA</name>
 
@@ -22,53 +22,28 @@
 	</properties>
 
 	<scm>
-		<connection>scm:ssh:git@github.com:ogema/ogema.git</connection>
-		<developerConnection>scm:git:ssh:git@github.com:ogema/ogema.git</developerConnection>
-		<url>scm:ssh:git@github.com:ogema/ogema.git</url>
-	  <tag>ogema-2.2.0</tag>
+		<connection>scm:ssh:git@github.com:smartrplace/ogema.git</connection>
+		<developerConnection>scm:git:ssh:git@github.com:smartrplace/ogema.git</developerConnection>
+		<url>scm:ssh:git@github.com:smartrplace/ogema.git</url>
   </scm>
 
-	<repositories>
-		<repository>
-			<snapshots />
-			<releases>
-				<enabled>false</enabled>
-			</releases>
-			<id>ogema-snapshots</id>
-			<name>ogema-snapshots</name>
-			<url>https://www.ogema-source.net/artifactory/libs-snapshot</url>
-		</repository>
-		<repository>
-			<releases />
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-			<id>ogema-releases</id>
-			<name>ogema-releases</name>
-			<url>https://www.ogema-source.net/artifactory/libs-release</url>
-		</repository>
-		<repository>
-			<releases />
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-			<id>external-opensource</id>
-			<name>external-opensource</name>
-			<url>https://www.ogema-source.net/artifactory/external-opensource</url>
-		</repository>
-	</repositories>
-	<distributionManagement>
-		<repository>
-			<id>ogema-releases</id>
-			<name>Internal Releases</name>
-			<url>https://www.ogema-source.net/artifactory/libs-release-local</url>
-		</repository>
-		<snapshotRepository>
-			<id>ogema-snapshots</id>
-			<name>Internal Snapshots</name>
-			<url>https://www.ogema-source.net/artifactory/libs-snapshot-local</url>
-		</snapshotRepository>
-	</distributionManagement>
+    <distributionManagement>
+        <repository>
+            <uniqueVersion>false</uniqueVersion>
+            <id>sp-central</id>
+            <name>Smartrplace Repository</name>
+            <url>https://repository.smartrplace.de/artifactory/libs-release</url>
+            <layout>default</layout>
+        </repository>
+        <snapshotRepository>
+            <uniqueVersion>true</uniqueVersion>
+            <id>sp-snapshots</id>
+            <name>Smartrplace Snapshots</name>
+            <url>https://repository.smartrplace.de/artifactory/libs-snapshot</url>
+            <layout>default</layout>
+        </snapshotRepository>
+    </distributionManagement>
+	
 
 	<pluginRepositories>
 		<!-- Repository for the Header Tool -->
@@ -108,51 +83,51 @@
 			<dependency>
 				<groupId>org.ogema.core</groupId>
 				<artifactId>api</artifactId>
-				<version>2.2.0</version>
+				<version>2.2.2-SNAPSHOT</version>
 			</dependency>
 			<dependency>
 				<groupId>org.ogema.core</groupId>
 				<artifactId>models</artifactId>
-				<version>2.2.0</version>
+				<version>2.2.2-SNAPSHOT</version>
 			</dependency>
 
 			<!-- OGEMA Reference Implementation -->
 			<dependency>
 				<groupId>org.ogema.ref-impl</groupId>
 				<artifactId>internal-api</artifactId>
-				<version>2.2.0</version>
+				<version>2.2.2-SNAPSHOT</version>
 			</dependency>
 			<dependency>
 				<groupId>org.ogema.ref-impl</groupId>
 				<artifactId>persistence</artifactId>
-				<version>2.2.0</version>
+				<version>2.2.2-SNAPSHOT</version>
 			</dependency>
 			<dependency>
 				<groupId>org.ogema.ref-impl</groupId>
 				<artifactId>util</artifactId>
-				<version>2.2.0</version>
+				<version>2.2.2-SNAPSHOT</version>
 			</dependency>
 			<dependency>
 				<groupId>org.ogema.ref-impl</groupId>
 				<artifactId>ogema-exam-base</artifactId>
-				<version>2.2.0</version>
+				<version>2.2.2-SNAPSHOT</version>
 			</dependency>
 
 			<!-- OGEMA Tools and Services -->
 			<dependency>
 				<groupId>org.ogema.tools</groupId>
 				<artifactId>memory-timeseries</artifactId>
-				<version>2.2.0</version>
+				<version>2.2.2-SNAPSHOT</version>
 			</dependency>
 			<dependency>
 				<groupId>org.ogema.tools</groupId>
 				<artifactId>resource-manipulators</artifactId>
-				<version>2.2.0</version>
+				<version>2.2.2-SNAPSHOT</version>
 			</dependency>
 			<dependency>
 				<groupId>org.ogema.tools</groupId>
 				<artifactId>resource-utils</artifactId>
-				<version>2.2.0</version>
+				<version>2.2.2-SNAPSHOT</version>
 			</dependency>
 
 			<!-- Others -->
@@ -197,6 +172,11 @@
 			 	<artifactId>guava</artifactId>
 			 	<version>19.0</version>
 			 </dependency>
+			 <dependency>
+                <groupId>javax.xml.bind</groupId>
+                <artifactId>jaxb-api</artifactId>
+                <version>2.3.1</version>
+             </dependency>
 		</dependencies>
 	</dependencyManagement>
 
@@ -262,7 +242,7 @@
 					<groupId>org.apache.felix</groupId>
 					<artifactId>maven-bundle-plugin</artifactId>
 					<extensions>true</extensions>
-					<version>4.0.0</version>
+					<version>5.1.1</version>
 					<executions>
 						<execution>
 							<id>bundle-manifest</id>
@@ -702,15 +682,9 @@
             </build>
         </profile>
         <profile>
-            <id>java9</id><!-- java versions 9 and greater -->
+            <id>java9</id><!-- java versions 9 & 10  -->
             <activation>
-                <!-- 
-                note: not using <jdk> due to a bug in our ancient ci server
-                    <jdk>[9,)</jdk>
-                -->
-                <file>
-                    <exists>${java.home}/jmods</exists>
-                </file>
+                <jdk>[9,10]</jdk>
             </activation>
             <properties>
                 <surefire-args>
@@ -718,6 +692,32 @@
                     --illegal-access=warn
                     --add-opens=java.base/jdk.internal.loader=ALL-UNNAMED
                     --add-modules java.xml.bind,java.xml.ws.annotation
+                </surefire-args>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <argLine>
+                                ${surefire-args}
+                            </argLine>
+                            <trimStackTrace>false</trimStackTrace>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>java11+</id>
+            <activation>
+                <jdk>[11,)</jdk>
+            </activation>
+            <properties>
+                <surefire-args>
+                    -ea
+                    --illegal-access=warn
+                    --add-opens=java.base/jdk.internal.loader=ALL-UNNAMED
                 </surefire-args>
             </properties>
             <build>

@@ -32,6 +32,7 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Collection;
@@ -77,9 +78,15 @@ import org.slf4j.Logger;
  */
 public class OgemaHttpContext implements HttpContext {
 
-	private static final String SESSION_COOKIE_PROP = "org.eclipse.jetty.servlet.SesionCookie";
-	static final Boolean httpEnable;
-	// private static final boolean xservletEnable;
+    /** System property defining the additional attributes of the session cookie,
+     default <pre>'{@value #COOKIE_ATTRIBUTES_DEFAULT}'</pre> */
+    public static final String COOKIE_ATTRIBUTES_PROPERTY = "org.ogema.security.http.cookieoptions";
+    public static final String COOKIE_ATTRIBUTES_DEFAULT = "; HttpOnly; SameSite=Strict";
+	private static final String SESSION_COOKIE_PROP = "org.eclipse.jetty.servlet.SessionCookie";
+	static final Boolean HTTP_ENABLE;
+    
+    private static final String COOKIE_ATTRIBUTES =
+            System.getProperty(COOKIE_ATTRIBUTES_PROPERTY, COOKIE_ATTRIBUTES_DEFAULT);
 	
 	private final String cookie;
 	
@@ -197,7 +204,7 @@ public class OgemaHttpContext implements HttpContext {
 		String scheme = request.getScheme();
 		// System.out.println("Testing on non-secure allow: httpEnable:"+httpEnable+"
 		// remoteAddr:"+request.getRemoteAddr()+" scheme:"+scheme);
-		if (!httpEnable && (!isLoopbackAddress(request.getRemoteAddr()) && !scheme.equals("https"))) {
+		if (!HTTP_ENABLE && (!isLoopbackAddress(request.getRemoteAddr()) && !scheme.equals("https"))) {
 			logger.error("\tSecure connection is required.");
 			response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 			response.getOutputStream().write("\tSecure connection is required.".getBytes());
@@ -214,7 +221,7 @@ public class OgemaHttpContext implements HttpContext {
 			// Store the request, so that it could be responded after successful login.
 			if (!request.getRequestURL().toString().endsWith("favicon.ico")) {
 				if (request.getRequestURI().equals("/ogema") || request.getRequestURI().equals("/ogema/")) {
-					httpses.setAttribute(LoginServlet.OLDREQ_ATTR_NAME, "/ogema/index.html");
+					httpses.setAttribute(LoginServlet.OLDREQ_ATTR_NAME, System.getProperty("org.ogema.impl.security.starturl", "/ogema/index.html"));
 					logger.debug("Saved old request URI -> default page");
 				}
 				else {
@@ -244,9 +251,7 @@ public class OgemaHttpContext implements HttpContext {
 						logger.debug("New Session is forwarded to Login page.");
 					request.getRequestDispatcher(LoginServlet.LOGIN_SERVLET_PATH).forward(request, response);
 				}
-			} catch (ServletException e) {
-				logger.error(this.getClass().getSimpleName(), e);
-			} catch (IOException e) {
+			} catch (ServletException | IOException e) {
 				logger.error(this.getClass().getSimpleName(), e);
 			} catch (IllegalStateException e) {
 				logger.debug(
@@ -306,7 +311,7 @@ public class OgemaHttpContext implements HttpContext {
 				// access
 				AdminApplication app = appReg.getAppById(usr);
 				final WebAccessManager wam = app != null ? permMan.getWebAccess(app.getID()) : null;
-				if (wam == null) { // happens when the bundle gets updated -> need to refresh the session 
+				if (app == null || wam == null) { // happens when the bundle gets updated -> need to refresh the session 
 					response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 					return false;
 				}
@@ -331,7 +336,7 @@ public class OgemaHttpContext implements HttpContext {
 		 * Set HttpOnly and secure flags which helps mitigate the client side XSS attacks accessing the session cookie.
 		 */
 		String sessionid = httpses.getId();
-		response.addHeader("SET-COOKIE", cookie + "=" + sessionid + ";HttpOnly");
+		response.addHeader("SET-COOKIE", cookie + "=" + sessionid + COOKIE_ATTRIBUTES);
 
 		// Look for access right of the user to the app sites according this http context.
 		String usrName = sesAuth.getName();
@@ -339,16 +344,10 @@ public class OgemaHttpContext implements HttpContext {
 		try {
 			permitted = accessMngr.isAppPermitted(usrName, owner);
 		} catch (Throwable e) {
-			e.printStackTrace();
+			logger.error("permission test failed", e);
 		}
 		if (!permitted) {
-			String message = "User " + usrName + " is not permitted to access to " + request.getPathInfo();
-			// request.getSession().invalidate(); // why invalidate the session, because the access is not authorized only.
-			response.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
-
-			if (Configuration.DEBUG)
-				logger.debug(message);
-			return false;
+            return handleUserNotAuthorized(request, response, usrName, owner);
 		}
 		else {
 			accessMngr.setCurrentUser(usrName);
@@ -392,6 +391,45 @@ public class OgemaHttpContext implements HttpContext {
 			return true;
 		}
 	}
+    
+    private boolean handleUserNotAuthorized(HttpServletRequest request,
+            HttpServletResponse response, String user, AppID app) throws IOException {
+        String message = "User " + user + " is not permitted access to " + request.getPathInfo();
+        String oldReq = request.getPathInfo() == null
+                ? ""
+                : URLEncoder.encode(request.getPathInfo(), "UTF-8");
+        HttpSession ses = request.getSession(false);
+
+        String otpwd = "???";
+        String otusr = app.getIDString();
+
+        if (ses != null) {
+            SessionAuth sa = (SessionAuth) ses.getAttribute("ogemaAuth");
+            otpwd = sa.registerAppOtp(app);
+        }
+        
+        StringBuilder vars = new StringBuilder();
+        vars.append("var ").append("otusr='").append(otusr).append("';");
+        vars.append("var ").append("otpwd='").append(otpwd).append("';");
+        vars.append("var ").append("userName='").append(user).append("';");
+        vars.append("var ").append("oldReq='").append(oldReq).append("';");
+        vars.append("var ").append("appBsn='").append(app.getBundle().getSymbolicName()).append("';");
+        vars.append("var ").append("redirect='").append("/login/noaccess.html").append("';");
+        vars.append("var ").append("startPage='").append(LoginServlet.START_PAGE).append("';");
+
+        String resp = String.format("<HTML><HEAD><SCRIPT type='application/javascript'>"
+                + "%s"
+                + "var get = new XMLHttpRequest(); get.open('GET', redirect,true);"
+                + "get.onreadystatechange = process; get.send(); "
+                + "function process(){ "
+                + "if(get.readyState == 4) { var data = get.responseText; document.write(data); }"
+                + "}</SCRIPT></HEAD></HTML>", vars.toString());
+        response.setContentType("text/html");
+        response.getWriter().print(resp);
+        response.flushBuffer();
+        response.getWriter().close();
+        return false;
+    }
 	
 	private static Map.Entry<String, String> getBestMatchingEntry(final String uri, final Map<String, String> map) {
 		Map.Entry<String, String> result = null;
@@ -452,10 +490,7 @@ public class OgemaHttpContext implements HttpContext {
 		if (Configuration.DEBUG)
 			logger.debug("getResource: {}", name);
 		Application app = owner.getApplication();
-		URL url = null;
-
 		String key = Util.startsWithAnyValue(resources, name);
-
 		HttpSession sesid = null;
 		if (key != null) {
 			// Check if there request for this page registered as which is a candidate for an otp.
@@ -487,7 +522,7 @@ public class OgemaHttpContext implements HttpContext {
 			return app.getClass().getResource(name);
 		}
 		
-		url = owner.getOneTimePasswordInjector(name, sesid);
+		URL url = owner.getOneTimePasswordInjector(name, sesid);
 		return url;
 	}
 
@@ -518,7 +553,7 @@ public class OgemaHttpContext implements HttpContext {
 		return staticReg;
 	}
 
-	private final boolean isNonOtpResource(final String alias) {
+	private boolean isNonOtpResource(final String alias) {
 		final Collection<String> nonOtps = this.nonOtpResources;
 		if (nonOtps == null)
 			return false;
@@ -543,7 +578,7 @@ public class OgemaHttpContext implements HttpContext {
 	}
 
 	static {
-		httpEnable = AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
+		HTTP_ENABLE = AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
 
 			@Override
 			public Boolean run() {

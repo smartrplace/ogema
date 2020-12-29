@@ -29,7 +29,7 @@ public class LoginFailureInspector {
 	// NOTE: do not store in session because this can be easily faked.
 	private static Map<String, IpLoginFailureInfo> loginFailureMap = new ConcurrentHashMap<String, IpLoginFailureInfo>();
 	private static final int MAX_LOGIN_TRIES = 3;
-	private static final long LOGIN_BLOCK_TIME = 60 * 1000 * 10;
+	private static final long LOGIN_BLOCK_TIME = 10000;
 	
 	public boolean isUserBlocked(String ip) {
 		IpLoginFailureInfo ipLoginFailureInfo = loginFailureMap.get(ip);

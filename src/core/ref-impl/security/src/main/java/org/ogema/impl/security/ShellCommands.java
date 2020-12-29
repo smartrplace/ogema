@@ -354,6 +354,10 @@ class ShellCommands {
 
     @Descriptor("list all system permissions applying to a bundle")
     public List<ConditionalPermissionInfo> bundlePermissions(Bundle b) {
+        return bundlePermissionsList(cpa, b);
+    }
+    
+    static List<ConditionalPermissionInfo> bundlePermissionsList(ConditionalPermissionAdmin cpa, Bundle b) {
         final ConditionalPermissionUpdate cpu = cpa.newConditionalPermissionUpdate();
         List<ConditionalPermissionInfo> l = new ArrayList<>();
         for (ConditionalPermissionInfo cpi : cpu.getConditionalPermissionInfos()) {
@@ -369,7 +373,6 @@ class ShellCommands {
             if (cis.length == 0) {
                 l.add(cpi);
             }
-
         }
         return l;
     }
@@ -482,42 +485,23 @@ class ShellCommands {
         ConditionalPermissionUpdate cpu = cpa.newConditionalPermissionUpdate();
         ConditionInfo[] bundleLocationInfo = new ConditionInfo[]{
             new ConditionInfo("org.osgi.service.condpermadmin.BundleLocationCondition", new String[]{b.getLocation()})};
-        try (
-                InputStream is = u.openStream();
-                InputStreamReader isr = new InputStreamReader(is, StandardCharsets.UTF_8);
-                BufferedReader r = new BufferedReader(isr)) {
-            List<ConditionalPermissionInfo> systemPermissions = bundlePermissions(b);
-            for (PermissionInfo pi : readLocalPermissions(b)) {
-                boolean skip = false;
-                if (!addAll) {
-                    skip = isImplied(ctx, pi, systemPermissions);
-                    if (skip) {
-                        System.out.printf("skipping %s - already implied%n", pi);
-                    }
-                }
-                if (!skip) {
-                    ConditionalPermissionInfo cpi = cpa.newConditionalPermissionInfo(null,
-                            bundleLocationInfo, new PermissionInfo[]{pi}, "allow");
-                    cpu.getConditionalPermissionInfos().add(cpi);
-                    System.out.printf("allow %s%n", pi);
+        List<ConditionalPermissionInfo> systemPermissions = bundlePermissions(b);
+        for (PermissionInfo pi : readLocalPermissions(b)) {
+            boolean skip = false;
+            if (!addAll) {
+                skip = isImplied(ctx, pi, systemPermissions);
+                if (skip) {
+                    System.out.printf("skipping %s - already implied%n", pi);
                 }
             }
-            /*
-            String line;
-            while ((line = r.readLine())!=null) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#") || line.startsWith("//")) {
-                    continue;
-                }
-                PermissionInfo pi = new PermissionInfo(line);
-                ConditionalPermissionInfo cpi = cpa.newConditionalPermissionInfo(null, 
+            if (!skip) {
+                ConditionalPermissionInfo cpi = cpa.newConditionalPermissionInfo(null,
                         bundleLocationInfo, new PermissionInfo[]{pi}, "allow");
                 cpu.getConditionalPermissionInfos().add(cpi);
                 System.out.printf("allow %s%n", pi);
             }
-             */
-            return cpu.commit();
         }
+        return cpu.commit();
     }
     
     @Descriptor("Get the list of all installed authenticators, including disabled ones.")

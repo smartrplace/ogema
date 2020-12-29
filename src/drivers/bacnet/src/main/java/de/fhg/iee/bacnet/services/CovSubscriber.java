@@ -34,6 +34,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -129,25 +130,10 @@ public class CovSubscriber implements Closeable {
 
         public Future<Boolean> cancel() {
             logger.debug("Cancel subscription on {} / {}", object.getObjectType(), object.getInstanceNumber());
-        	subscriptions.remove(id);
             if (refreshHandle != null) {
                 refreshHandle.cancel(false);
             }
-            try {
-                //TODO: indication listener
-                IndicationListener<Boolean> simpleAckListener = new IndicationListener<Boolean>() {
-                    @Override
-                    public Boolean event(Indication ind) {
-                        ProtocolControlInformation pci = ind.getProtocolControlInfo();
-                        return pci.getPduType() == ApduConstants.TYPE_SIMPLE_ACK;
-                    }
-                };
-                return transport.request(destination, createCancellationMessage(this), Transport.Priority.Normal, true, simpleAckListener);
-            } catch (IOException ex) {
-                logger.error("sending of cancellation message failed", ex);
-            }
-            //FIXME:
-            return null;
+            return CovSubscriber.this.cancel(destination, object, id);
         }
 
     }
@@ -159,22 +145,45 @@ public class CovSubscriber implements Closeable {
     }
 
     private ByteBuffer createCancellationMessage(Subscription sub) {
+        return createCancellationMessage(sub.object, sub.id);
+    }
+    
+    private ByteBuffer createCancellationMessage(ObjectIdentifierTag oid, int subId) {
         ByteBuffer bb = ByteBuffer.allocate(50);
         ProtocolControlInformation pci = new ProtocolControlInformation(
                 ApduConstants.APDU_TYPES.CONFIRMED_REQUEST, BACnetConfirmedServiceChoice.subscribeCOV)
                 .withAcceptanceInfo(false, ApduConstants.MAX_SEGMENTS.UNSPECIFIED, ApduConstants.RESPONSE_SIZE.UPTO_1476);
         pci.write(bb);
-        UnsignedIntTag subscriberProcessIdentifier = new UnsignedIntTag(0, Tag.TagClass.Context, sub.id);
+        UnsignedIntTag subscriberProcessIdentifier = new UnsignedIntTag(0, Tag.TagClass.Context, subId);
         subscriberProcessIdentifier.write(bb);
         ObjectIdentifierTag monitoredObjectId = new ObjectIdentifierTag(
-                1, Tag.TagClass.Context, sub.object.getObjectType(), sub.object.getInstanceNumber());
+                1, Tag.TagClass.Context, oid.getObjectType(), oid.getInstanceNumber());
         monitoredObjectId.write(bb);
         bb.flip();
         return bb;
     }
+    
+    private Future<Boolean> cancel(DeviceAddress dest, ObjectIdentifierTag oid, int subId) {
+        logger.debug("Cancel subscription {} on {} / {}", subId, oid.getObjectType(), oid.getInstanceNumber());
+        subscriptions.remove(subId);
+        try {
+            IndicationListener<Boolean> simpleAckListener = new IndicationListener<Boolean>() {
+                @Override
+                public Boolean event(Indication ind) {
+                    ProtocolControlInformation pci = ind.getProtocolControlInfo();
+                    return pci.getPduType() == ApduConstants.TYPE_SIMPLE_ACK;
+                }
+            };
+            return transport.request(dest, createCancellationMessage(oid, subId), Transport.Priority.Normal, true, simpleAckListener);
+        } catch (IOException ex) {
+            logger.error("sending of cancellation message failed", ex);
+            CompletableFuture<Boolean> rval = new CompletableFuture<>();
+            rval.completeExceptionally(ex);
+            return rval;
+        }
+    }
 
     private ByteBuffer createSubscriptionMessage(int id, ObjectIdentifierTag object, boolean confirmed, int lifetime) {
-
         ByteBuffer bb = ByteBuffer.allocate(50);
         ProtocolControlInformation pci = new ProtocolControlInformation(
                 ApduConstants.APDU_TYPES.CONFIRMED_REQUEST, BACnetConfirmedServiceChoice.subscribeCOV)
@@ -255,15 +264,15 @@ public class CovSubscriber implements Closeable {
                     && pci.getServiceChoice() == BACnetUnconfirmedServiceChoice.unconfirmedCOVNotification.getBACnetEnumValue())) {
                 int id = new UnsignedIntTag(i.getData()).getValue().intValue();
 
+                ObjectIdentifierTag device = new ObjectIdentifierTag(i.getData());
+                ObjectIdentifierTag object = new ObjectIdentifierTag(i.getData());
                 Subscription sub = subscriptions.get(id);
                 if (sub == null) {
-                    //TODO: subscription cancellation ?
-                    logger.debug("received COVNotification for unknown ID {}", id);
+                    logger.debug("received COVNotification for unknown ID {}, sending cancellation", id);
+                    cancel(i.getSource().toDestinationAddress(), object, id);
                     return null;
                 }
 
-                ObjectIdentifierTag device = new ObjectIdentifierTag(i.getData());
-                ObjectIdentifierTag object = new ObjectIdentifierTag(i.getData());
                 UnsignedIntTag timeRemaining = new UnsignedIntTag(i.getData());
                 CompositeTag values = new CompositeTag(i.getData());
                 Map<Integer, CompositeTag> valueMap = new HashMap<>();

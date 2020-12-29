@@ -54,7 +54,12 @@ class RestTypesServlet extends HttpServlet  {
 		this.permMan = Objects.requireNonNull(permMan);
 		this.restAcc = Objects.requireNonNull(restAcc);
 	}
-	
+
+    @Override
+    protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        resp.setStatus(200);
+        resp.setHeader("Allow", "GET, OPTIONS");
+    }
 
 	// TODO get subresources of specific type
 	@SuppressWarnings("unchecked")

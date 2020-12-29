@@ -17,6 +17,7 @@ package org.ogema.drivers.homematic.xmlrpc.hl.types;
 
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
+import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.StringResource;
 import org.ogema.model.actors.OnOffSwitch;
@@ -92,5 +93,7 @@ public interface HmLogicInterface extends Resource {
     
     StringResource ccuUser();
     StringResource ccuPw();
+    
+    BooleanResource disablePingCheck();
     
 }

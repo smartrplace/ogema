@@ -77,7 +77,7 @@ public class M2MLogin extends HttpServlet {
 		boolean auth = permMan.getAccessManager().authenticate(usr, pwd, false);
 		HttpSession ses = req.getSession();
 		if (auth) {
-			User user = (User) admin.getRole(usr);
+			User user = (User) AccessManagerImpl.findRole(admin, usr);
 			Authorization author = admin.getAuthorization(user);
 			SessionAuth sauth = new SessionAuth(author, permMan.getAccessManager(), ses);
 			ses.setAttribute(Constants.AUTH_ATTRIBUTE_NAME, sauth);

@@ -16,7 +16,9 @@
 package org.ogema.impl.security;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.security.AccessControlContext;
+import java.security.AccessControlException;
 import java.security.AccessController;
 import java.security.Permission;
 import java.security.PrivilegedAction;
@@ -32,7 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.Vector;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
@@ -125,7 +127,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 
 	UserAdmin usrAdmin;
 
-	private BundleContext osgi;
+	private final BundleContext osgi;
 
 	static final String ALLAPPS = "ALL APPS";
 	static final String NOAPPS = "NO APPS";
@@ -140,7 +142,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
         }
     };
 
-	final ConcurrentHashMap<String, UserRightsProxy> urpMap;
+	final Map<String, UserRightsProxy> urpMap;
 	final PermissionManager permMan;
 	final ApplicationRegistry appReg;
 	final CredentialStore cStore;
@@ -156,7 +158,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 		this.cStore = cs;
 		this.usrAdmin = ua;
 		this.osgi = osgi;
-		this.urpMap = new ConcurrentHashMap<>();
+		this.urpMap = new ConcurrentSkipListMap<>(String.CASE_INSENSITIVE_ORDER);
 		this.permMan = pm;
 		this.appReg = permMan.getApplicationRegistry();
 		this.authenticators = ((DefaultPermissionManager) pm).authenticators;
@@ -173,10 +175,12 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 		configChanged(config);
 	}
 
-	void configChanged(final Map<String, Object> properties) {
-		final Object authenticators = properties == null ? null : properties.get(ConfigurationConstants.OGEMA_AUTHENTICATORS_CONFIG);
+	final void configChanged(final Map<String, Object> properties) {
+		final Object auths = properties == null
+                ? null
+                : properties.get(ConfigurationConstants.OGEMA_AUTHENTICATORS_CONFIG);
 		this.globallyAdmissibleAuthenticatorIds = 
-				authenticators instanceof String ? Arrays.asList(((String) authenticators).split(ConfigurationConstants.AUTH_SEP)) : null;
+				auths instanceof String ? Arrays.asList(((String) auths).split(ConfigurationConstants.AUTH_SEP)) : null;
 	}
 	
 	private void postInitUsers(Set<String> initedUsers) {
@@ -329,8 +333,8 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 		return urpMap.get(usr);
 	}
 
-	static final String rolesFile = "ogema.roles";
-	static final String rolesDir = "ogema";
+	static final String ROLES_FILE = "ogema.roles";
+	static final String ROLES_DIR = "ogema";
 
 	private static final String USER_URP_ID_NAME = "URPid";
 
@@ -351,21 +355,23 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 	public boolean createUser(final String user, final String pwd, final boolean natural) {
 		final String pwd2 = pwd != null ? pwd : user;
 		Bundle b = AccessController.doPrivileged(new PrivilegedAction<Bundle>() {
+            @Override
 			public Bundle run() {
-				Role role = usrAdmin.getRole(user);
+				Role role = findRole(user);
 				final boolean existed = role != null;
 				if (role instanceof Group)
 					throw new IllegalArgumentException("The role " + user + " already exists as a group");
 				Bundle result = null;
+                String userLowerCase = user.toLowerCase();
 				if (role == null) {
-					role = usrAdmin.createRole(user, Role.USER);
+					role = usrAdmin.createRole(userLowerCase, Role.USER);
 					// add to credential store
 					try {
-						cStore.createUser(user, pwd2, null, null);
+						cStore.createUser(userLowerCase, pwd2, null, null);
 					} catch (IOException e) {
 						logger.error("Credential store reported exception during user crreation. User is not crated.",
 								e);
-						usrAdmin.removeRole(user);
+						usrAdmin.removeRole(userLowerCase);
 						return null;
 					}
 
@@ -387,17 +393,17 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 					UserRightsProxy urp = urpMap.get(user);
 					if (urp == null) {
 						try {
-							result = installURPBundle(user);
+							result = installURPBundle(userLowerCase);
 						} catch (BundleException e) {
 							 // if the bundle creation failed we remove the user, but only if it did not exist previously
 							if (!existed) {
 								try {
-									usrAdmin.removeRole(user);
+									usrAdmin.removeRole(userLowerCase);
 								} catch (Exception ee) {
 									logger.warn("Failed to remove user from user admin after unsuccessful user creation",ee);
 								}
 								try {
-									cStore.removeUser(user);
+									cStore.removeUser(userLowerCase);
 								} catch (Exception ee) {
 									logger.warn("Failed to remove user from credential store after unsuccessful user creation",ee);
 								} 
@@ -490,6 +496,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 		if (urp == null)
 			throw new IllegalStateException(
 					String.format("User rights proxy installation for the user %s not yet completed.", user));
+        logger.debug("adding permissions for user '{}': {}", user, permissions);
 		Bundle b = urp.getBundle();
 		final ConditionalPermissionAdmin cpa = (ConditionalPermissionAdmin) permMan.getSystemPermissionAdmin();
 		final ConditionalPermissionUpdate cpu = cpa.newConditionalPermissionUpdate();
@@ -565,12 +572,11 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 		args[1] = null;
 
 		AppPermission ap = permMan.getPolicies(appid);
-		{
-			ap.addPermission(WEB_ACCESS_PERMISSION_CLASS_NAME, args, null);
-		}
+    	ap.addPermission(WEB_ACCESS_PERMISSION_CLASS_NAME, args, null);
 		// To commit the made changes the following is needed.
-		permMan.installPerms(ap);
-
+		boolean success = permMan.installPerms(ap);
+        logger.debug("added web accesspermission for '{}': {} ({})",
+                appid.getBundle().getLocation(), args[0], success);
 	}
 
 	@Override
@@ -580,7 +586,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 
 	@Override
 	public Role getRole(String name) {
-		Role r = usrAdmin.getRole(name);
+		Role r = findRole(name);
 		return r;
 	}
 
@@ -592,12 +598,14 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 			roles = usrAdmin.getRoles(null);
 		} catch (InvalidSyntaxException e) {
 		}
-		if (roles != null)
+		if (roles != null) {
 			v = new Vector<>();
-		for (Role r : roles) {
-			if (r.getType() == Role.USER)
-				v.add(r.getName());
-		}
+            for (Role r : roles) {
+                if (r.getType() == Role.USER) {
+                    v.add(r.getName());
+                }
+        	}
+        }
 		return v;
 	}
 
@@ -629,8 +637,10 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 	}
 
 	private boolean isPermitted(String username, AppID app) {
-		if (!permMan.isSecure())
+		if (!permMan.isSecure() && (!Boolean.getBoolean("org.ogema.impl.security.nosecactivated.restrictuserpageaccess"))) {
+            logger.trace("webaccess restrictions are disabled");
 			return true;
+        }
 		Bundle b = app.getBundle();
 		WebAccessPermission wap = new WebAccessPermission(b.getSymbolicName(), username, null, b.getVersion());
 		UserRightsProxy urp = urpMap.get(username);
@@ -638,9 +648,50 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 			logger.error("Unknown user " + username);
 			return false;
 		}
+        if (!permMan.isSecure()) {
+            return isPermittedManual(urp.getBundle(), wap);
+        }
 		AccessControlContext acc = permMan.getBundleAccessControlContext(urp.getClass());
-		return permMan.handleSecurity(wap, acc);
+		try {
+			acc.checkPermission(wap);
+            logger.trace("webaccess permitted for {}@{}", username, app.getBundle().getSymbolicName());
+			return true;
+		} catch(AccessControlException e) {
+            logger.trace("webaccess denied for {}@{} ({})", username, app.getBundle().getSymbolicName(), wap);
+			return false;
+		}
 	}
+    
+    /*
+    test the given permission manually against the bundle's permission information
+    in the ConditionalPermissionAdmin.
+    */
+    private boolean isPermittedManual(Bundle bundle, Permission perm) {
+        List<ConditionalPermissionInfo> perms = ShellCommands.bundlePermissionsList(
+                (ConditionalPermissionAdmin) permMan.getSystemPermissionAdmin(), bundle);
+        for (ConditionalPermissionInfo cpi: perms) {
+            boolean isAllow = "ALLOW".equalsIgnoreCase(cpi.getAccessDecision());
+            for (PermissionInfo pi : cpi.getPermissionInfos()) {
+                try {
+                    Class<?> pc = getClass().getClassLoader().loadClass(pi.getType());
+                    Permission p = (Permission) pc.getConstructor(String.class, String.class).newInstance(pi.getName(), pi.getActions());
+                    if (isAllow) {
+                        if (p.implies(perm)) {
+                            return true;
+                        }
+                    } else {
+                        if (perm.implies(p)) {
+                            return false;
+                        }
+                    }
+                } catch (RuntimeException | ClassNotFoundException | IllegalAccessException 
+                        | InstantiationException | NoSuchMethodException | InvocationTargetException ex) {
+                    logger.warn("could not evaluate permission '{}' for bundle {}", pi, bundle, ex);
+                }
+            }
+        }
+        return false;
+    }
 
 	@Override
 	public boolean authenticate(String usrName, final String pwd, boolean isnatural) {
@@ -677,7 +728,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 	@Override
 	public void setCredential(String user, String credential, String value) {
 		User usr;
-		Role role = usrAdmin.getRole(user);
+		Role role = findRole(user);
 		if (role == null) {
 			throw new IllegalArgumentException();
 		}
@@ -710,17 +761,44 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 
 	@Override
 	public void setProperty(String user, String propName, String propValue) {
-		Role role = usrAdmin.getRole(user);
+		Role role = findRole(user);
 		if (role == null)
 			return;
 		@SuppressWarnings("unchecked")
 		Dictionary<String, Object> dict = role.getProperties();
 		dict.put(propName, propValue);
 	}
+    
+    public static Role findRole(UserAdmin usrAdmin, String username) {
+        Role role = usrAdmin.getRole(username);
+        if (role != null) {
+            return role;
+        }
+        role = usrAdmin.getRole(username.toLowerCase());
+        if (role != null) {
+            return role;
+        }
+        try {
+            Role[] allRoles = usrAdmin.getRoles(null);
+            for (Role r: allRoles) {
+                if (r.getName().equalsIgnoreCase(username)) {
+                    return r;
+                }
+            }
+        } catch (InvalidSyntaxException ex) {
+            // not likely with filter=null
+        }
+        return null;
+    }
+    
+    /* non case sensitive get role operation */
+    private Role findRole(String username) {
+        return AccessManagerImpl.findRole(usrAdmin, username);
+    }
 
 	@Override
 	public String getProperty(String user, String propName) {
-		Role role = usrAdmin.getRole(user);
+		Role role = findRole(user);
 		if (role == null)
 			return null;
 		@SuppressWarnings("unchecked")
@@ -750,7 +828,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 
 	@Override
 	public boolean isAllAppsPermitted(String user) {
-		User usr = (User) usrAdmin.getRole(user);
+		User usr = (User) findRole(user);
 		if (usr == null)
 			return false;
 		Authorization auth = usrAdmin.getAuthorization(usr);
@@ -759,7 +837,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 
 	@Override
 	public boolean isNoAppPermitted(String user) {
-		User usr = (User) usrAdmin.getRole(user);
+		User usr = (User) findRole(user);
 		if (usr == null)
 			return false;
 		Authorization auth = usrAdmin.getAuthorization(usr);
@@ -768,9 +846,9 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 
 	@Override
 	public Group createGroup(String name) {
-		Role role = usrAdmin.getRole(name);
+		Role role = findRole(name);
 		if (role == null) {
-			role = usrAdmin.createRole(name, Role.GROUP);
+			role = usrAdmin.createRole(name.toLowerCase(), Role.GROUP);
 		}
 		return (Group) role;
 	}
@@ -823,10 +901,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 	
 	private boolean checkSystemAdminPerm(){
 		AdminPermission perm = new AdminPermission("system");
-		if(permMan.handleSecurity(perm)){
-			return true;
-		}
-		return false;
+		return permMan.handleSecurity(perm);
 	}
 	
 	@Override
@@ -845,7 +920,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 		if (isNatural == null || 
 				isAuthenticatorAdmitted(isNatural ? OGEMA_NATURAL_USER : OGEMA_MACHINE_USER, Authenticator.DEFAULT_USER_PW_ID)) {
 			// the default pw-based login uses different parameters for machine users and natural users...
-			final String user = (String) req.getParameter(Constants.OTUNAME);
+			final String user = req.getParameter(Constants.OTUNAME);
 			final String pw = req.getParameter(Constants.OTPNAME);
 			if (user != null && pw != null	&& isAuthenticatorAdmitted(user, Authenticator.DEFAULT_USER_PW_ID)) {
 				if (authenticate(user, pw, isNatural != null ? isNatural : isNatural(user)))
@@ -864,7 +939,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 				final String usr = auth.authenticate(req);
 				if (usr != null) {
 					if (isAuthenticatorAdmitted(usr, entry.getKey())) {
-						final Role r = usrAdmin.getRole(usr);
+						final Role r = findRole(usr);
 						if (!(r instanceof User)) {
 							logger.warn("Invalid user authenticated by {}", entry.getKey());
 							continue;
@@ -912,7 +987,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 	@Override
 	public Collection<String> getSupportedAuthenticators(String user) {
 		Objects.requireNonNull(user);
-		final Role role = usrAdmin.getRole(user);
+		final Role role = findRole(user);
 		if (role == null)
 			return null;
 		final Object auths = role.getProperties().get(ConfigurationConstants.OGEMA_AUTHENTICATORS_CONFIG);
@@ -942,7 +1017,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 	public void addSupportedAuthenticator(String user, String authenticatorId) {
 		Objects.requireNonNull(user);
 		Objects.requireNonNull(authenticatorId);
-		final Role role = usrAdmin.getRole(user);
+		final Role role = findRole(user);
 		if (role == null) {
 			logger.warn("Invalid user or group {}", user);
 			return;
@@ -967,7 +1042,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 	public void removeSupportedAuthenticator(String user, String authenticatorId) {
 		Objects.requireNonNull(user);
 		Objects.requireNonNull(authenticatorId);
-		final Role role = usrAdmin.getRole(user);
+		final Role role = findRole(user);
 		if (role == null) {
 			logger.warn("Invalid user {}", user);
 			return;
@@ -994,7 +1069,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 	@Override
 	public void setSupportedAuthenticators(String user, Collection<String> authenticatorIds) {
 		Objects.requireNonNull(user);
-		final Role role = usrAdmin.getRole(user);
+		final Role role = findRole(user);
 		if (role == null) {
 			logger.warn("Invalid user {}", user);
 			return;
@@ -1071,7 +1146,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 		setProperty(ConfigurationConstants.OGEMA_AUTHENTICATORS_CONFIG, buildAuthenticatorsString(authenticators));
 	}
 	
-	private static final String buildAuthenticatorsString(final Collection<String> ids) {
+	private static String buildAuthenticatorsString(final Collection<String> ids) {
 		final StringBuilder sb = new StringBuilder();
 		boolean first = true;
 		for (String id: ids) {
@@ -1083,7 +1158,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 		return sb.toString();
 	}
 	
-	private final void setProperty(final String key, final String value) {
+	private void setProperty(final String key, final String value) {
 		Objects.requireNonNull(key);
 		ServiceReference<ConfigurationAdmin> sr = null;
 		try {

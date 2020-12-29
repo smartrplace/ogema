@@ -31,6 +31,7 @@ import org.ogema.core.application.Timer;
 import org.ogema.timer.TimerRemovedListener;
 import org.ogema.timer.TimerScheduler;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component
 @Service(TimerScheduler.class)
@@ -38,6 +39,8 @@ public class DefaultTimerScheduler implements TimerScheduler, FrameworkClock.Clo
 
     protected final PriorityQueue<ApplicationTimer> timers = new PriorityQueue<>();
     protected Thread dispatchThread;
+    
+    //protected final Logger logger = LoggerFactory.getLogger(DefaultTimerScheduler.class);
 
     @Reference
     protected FrameworkClock clock;
@@ -47,9 +50,10 @@ public class DefaultTimerScheduler implements TimerScheduler, FrameworkClock.Clo
         public void run() {
             while (!Thread.interrupted()) {
                 synchronized (timers) {
+                    // logger.trace("scheduling {} timers", timers.size());
                     if (timers.isEmpty()) {
                         try {
-                            timers.wait();
+                            timers.wait(1000);
                         } catch (InterruptedException ex) {
                             break;
                         }
@@ -57,6 +61,7 @@ public class DefaultTimerScheduler implements TimerScheduler, FrameworkClock.Clo
                     }
                     long now = clock.getExecutionTime();
                     long next = timers.peek().getNextRunTime();
+                    // logger.trace("next run at {}", next);
                     if (next <= now) {
                         processTimer(timers.poll(), now);
                     }
@@ -141,7 +146,12 @@ public class DefaultTimerScheduler implements TimerScheduler, FrameworkClock.Clo
         }
         synchronized(timers) {
 	        timer.period = period;
-	        timer.nextRun = getExecutionTime() + period;
+            try {
+                timer.nextRun = Math.addExact(getExecutionTime(), period);
+            } catch (ArithmeticException ae) {
+                timer.nextRun = Long.MAX_VALUE;
+                
+            }
 	        reschedule(timer);
         }
     }

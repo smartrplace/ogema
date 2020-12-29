@@ -33,6 +33,7 @@ public class TestPattern extends ResourcePattern<CoolingDevice> {
 	public final TemperatureSensor tempSens = model.temperatureSensor();
 
 	@Equals(value=290)
+    @SuppressWarnings("deprecation")
 	public final TemperatureResource reading = tempSens.reading();
 	
 	public final StringResource room = model.location().room().name();

@@ -8,8 +8,7 @@
 	License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS 
 	OF ANY KIND, either express or implied. See the License for the specific 
 	language governing permissions and limitations under the License. -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<artifactId>felix-parent</artifactId>
@@ -19,7 +18,7 @@
 
 	<groupId>org.ogema.external</groupId>
 	<artifactId>org.apache.felix.useradmin</artifactId>
-	<version>1.0.3</version>
+	<version>1.0.4-SNAPSHOT</version>
 	<packaging>bundle</packaging>
 	<description>Provides an implementation for the UserAdmin OSGi compendium service.</description>
 
@@ -28,13 +27,13 @@
 		<felix.java.version>7</felix.java.version><!-- min version; must be set > 5, otherwise this fails for Java 9+ -->
 	</properties>
 
-	<distributionManagement>
+	<!-- <distributionManagement>
 		<repository>
 			<id>external-opensource</id>
 			<name>external-opensource</name>
 			<url>https://www.ogema-source.net/artifactory/external-opensource</url>
 		</repository>
-	</distributionManagement>
+	</distributionManagement>-->
 
 	<dependencies>
 		<dependency>

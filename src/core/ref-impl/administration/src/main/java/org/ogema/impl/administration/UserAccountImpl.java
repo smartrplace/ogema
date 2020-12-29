@@ -16,6 +16,7 @@
 package org.ogema.impl.administration;
 
 import java.util.Dictionary;
+import java.util.Map;
 import java.util.Objects;
 
 import org.ogema.accesscontrol.AccessManager;
@@ -79,4 +80,10 @@ class UserAccountImpl implements UserAccount {
 		Dictionary<String, Object> dict = usr.getCredentials();
 		return (String) dict.get("user_" + storeName);
 	}
+
+    @Override
+    public Map<String, Object> getProperties() {
+        return new DictionaryMap(usr.getProperties());
+    }
+    
 }

@@ -60,6 +60,7 @@ public enum BACnetPropertyIdentifier implements BACnetEnumeration {
     cov_increment(22),
     cov_period(180),
     cov_resubscription_interval(128),
+    current_command_priority(431),
     database_revision(155),
     date_list(23),
     daylight_savings_status(24),
@@ -176,6 +177,7 @@ public enum BACnetPropertyIdentifier implements BACnetEnumeration {
     program_change(90),
     program_location(91),
     program_state(92),
+    property_list(371),
     proportional_constant(93),
     proportional_constant_units(94),
     protocol_object_types_supported(96),
@@ -249,6 +251,7 @@ public enum BACnetPropertyIdentifier implements BACnetEnumeration {
         this.code = code;
     }
     
+    @Override
     public int getBACnetEnumValue() {
         return code;
     }

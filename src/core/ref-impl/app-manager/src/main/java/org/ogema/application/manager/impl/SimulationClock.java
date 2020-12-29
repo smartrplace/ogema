@@ -207,6 +207,7 @@ public class SimulationClock implements FrameworkClock {
 		return setSimulationTimeAndFactorInternal(timestamp, factor, null, true);
 	}
 	
+    @SuppressWarnings("deprecation")
 	private synchronized boolean setSimulationTimeAndFactorInternal(long timestamp, float factor, 
 			Long systemTime, boolean doPersist) {
 		final float oldFactor = this.simulationFactor;
@@ -239,6 +240,7 @@ public class SimulationClock implements FrameworkClock {
 	}
 	
 	@Override
+    @SuppressWarnings("deprecation")
 	public synchronized boolean setSimulationTime(long timestamp) {
 		final long oldTimestamp = getExecutionTime();
 		final boolean result  = setSimulationTimeInternal(timestamp, null);

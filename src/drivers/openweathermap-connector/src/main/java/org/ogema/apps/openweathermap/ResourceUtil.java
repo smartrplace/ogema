@@ -17,6 +17,7 @@ package org.ogema.apps.openweathermap;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.ogema.apps.openweathermap.dao.CurrentData;
 
 import org.ogema.apps.openweathermap.dao.ForecastData;
 import org.ogema.apps.openweathermap.dao.OpenWeatherMapREST;
@@ -66,21 +67,9 @@ public class ResourceUtil {
 		
 		this.appMan = appMan;
 	}
-
-	/**
-	 * calculate/interpolate weather information (temperature, solarirradiation)
-	 * 
-	 * @param city
-	 *            name of the city
-	 * @param county
-	 *            shortcut of the country
-	 */
-	public void update(String city, String county) {
-
-		ForecastData data = OpenWeatherMapREST.getInstance().getWeatherForcast(city, county);
-		if (data == null)
-			return;
-		WeatherUtil.getInstance().calculateIrradiation(data);
+    
+    public void store(ForecastData data, CurrentData current) {
+        WeatherUtil.getInstance().calculateIrradiation(data, current);
 		boolean ignoreWind = (windDirectionForecast == null || windSpeedForecast == null);
 
 		List<SampledValue> tempList = new ArrayList<>();
@@ -92,7 +81,6 @@ public class ResourceUtil {
 			windSpeedList = new ArrayList<>();
 			windDirectionList = new ArrayList<>();
 		}
-		appMan.getLogger().debug("got {} values for {}/{}", data.getList().size(), county, city);
 
 		for (org.ogema.apps.openweathermap.dao.List entry : data.getList()) {
 
@@ -126,8 +114,24 @@ public class ResourceUtil {
 		appMan.getLogger().debug("wrote {} values to {}", tempList.size(), temperatureForecast.getPath());
 		appMan.getLogger().debug("wrote {} values to {}", humidityList.size(), humidityForecast.getPath());
 		appMan.getLogger().debug("wrote {} values to {}", irradiationList.size(), irradiationForecast.getPath());
-	}
+    }
 
+	/**
+	 * calculate/interpolate weather information (temperature, solarirradiation)
+	 * 
+	 * @param city
+	 *            name of the city
+	 * @param county
+	 *            shortcut of the country
+	 */
+	public void update(String city, String county) {
+		ForecastData data = OpenWeatherMapREST.getInstance().getWeatherForcast(city, county);
+		if (data == null)
+			return;
+		appMan.getLogger().debug("got {} values for {}/{}", data.getList().size(), county, city);
+        store(data, OpenWeatherMapREST.getInstance().getWeatherCurrent(city, county));
+	}
+    
 	private SampledValue newSampledDouble(Double value, long timestamp) {
 		DoubleValue c = new DoubleValue(value);
 		SampledValue e = new SampledValue(c, timestamp, Quality.GOOD);

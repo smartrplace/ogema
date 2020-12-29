@@ -39,12 +39,19 @@ public interface EnergyResource extends PhysicalUnitResource {
 	boolean setValue(float value);
 
 	/**
-	 * Returns "J".
+	 * Returns "J" (the default) or the unit set through {@link #setUnit}.
 	 *
 	 * @see PhysicalUnitResource#getUnit()
 	 */
 	@Override
 	PhysicalUnit getUnit();
+    
+    /**
+     * Set this resource's unit.
+     * 
+     * @param u the new unit.
+     */
+    void setUnit(PhysicalUnit u);
 	
 	/**
 	 * Get the energy in kWhs.

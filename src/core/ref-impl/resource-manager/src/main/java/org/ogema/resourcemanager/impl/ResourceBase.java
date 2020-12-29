@@ -431,7 +431,9 @@ public abstract class ResourceBase implements ConnectedResource {
             if (recursive) {
                 return getSubResources(Resource.class, true);
             }
-
+            if (this instanceof ResourceList && ((ResourceList)this).getElementType() != null) {
+                return getListSubResources();
+            }
             List<TreeElement> children = getElInternal().getChildren();
             List<Resource> result = new ArrayList<>(children.size());
             for (TreeElement child : children) {
@@ -450,60 +452,42 @@ public abstract class ResourceBase implements ConnectedResource {
             resMan.getDatabaseManager().unlockStructureRead();
         }
     }
+    
+    //preserve order of list elements
+    private List<Resource> getListSubResources() {
+        @SuppressWarnings("unchecked")
+        ResourceList<Resource> rl = (ResourceList) this;
+        List<TreeElement> children = getElInternal().getChildren();
+        List<Resource> result = new ArrayList<>(children.size());
+        Class<?> elType = rl.getElementType();
+        for (TreeElement child : children) {
+            if (!validResourceName(child)) {
+                continue;
+            }
+            if (elType.isAssignableFrom(child.getType())) {
+                continue;
+            }
+            try {
+                Resource resource = resMan.getResource(path + "/" + child.getName());
+                result.add(resource);
+            } catch (SecurityException se) {
+                resMan.logger.trace("missing permission for sub resource", se);
+            }
+        }
+        result.addAll(rl.getAllElements());
+        return result;
+    }
 
 	protected <T extends Resource> List<T> getDirectSubResources(Class<T> type, final boolean recursive) {
 		if (type == Resource.class)
 			type = null; // more efficient
 		resMan.getDatabaseManager().lockStructureRead();
         try {
-//			return getDirectSubResourcesClassical(type, recursive);
 			return getDirectSubResourcesViaTreeElements(type, recursive);
         } finally {
             resMan.getDatabaseManager().unlockStructureRead();
         }
 	}
-
-	@Deprecated
-    private <T extends Resource> List<T> getDirectSubResourcesClassical(final Class<T> type, final boolean recursive) {
-        /*
-         * note: in case of only direct subresources, no loops can occur in the resource graph. Hence, they do not have
-         * to be taken care of.
-         */
-
-        List<TreeElement> children = getEl().getChildren();
-        List<T> result = new ArrayList<>(children.size());
-        for (TreeElement child : getEl().getChildren()) {
-            if (!validResourceName(child)) {
-                continue;
-            }
-            if (child.isReference()) {
-                continue;
-            }
-            ResourceBase resource;
-            boolean typeMatches = type == null || (child.getType() != null && type.isAssignableFrom(child.getType()));
-            boolean recurse = recursive && !child.getChildren().isEmpty();
-            if (typeMatches || recurse) {
-                try {
-                    resource = resMan.getResource(path + "/" + child.getName());
-                } catch (InvalidResourceTypeException e) { // happens e.g. in case of missing permission to export a resource type
-                    resMan.logger.error("Subresource of {} could not be loaded", this, e);
-                    continue;
-                } catch (SecurityException ex) {
-                    resMan.logger.trace("no permission: {}", ex.getMessage());
-                    continue;
-                }
-                if (typeMatches) {
-                    @SuppressWarnings("unchecked")
-                    T t = (T) resource;
-                    result.add(t);
-                }
-                if (recurse) {
-                    result.addAll(resource.getDirectSubResources(type, true));
-                }
-            }
-        }
-        return result;
-    }
 
 	// read lock must be held
     @SuppressWarnings("unchecked")

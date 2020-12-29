@@ -15,7 +15,12 @@
  */
 package org.ogema.impl.logging;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 
 import org.ogema.core.administration.AdminLogger;
@@ -38,6 +43,68 @@ public class DefaultAdminLogger implements AdminLogger {
 	protected DefaultAdminLogger(DefaultLogger logger) {
 		this.logger = logger;
 	}
+    
+    static void storeOverrides(String name, LogOutput output, LogLevel level) {
+        String currentSetting = DefaultLogger.loglevel_overrides.getProperty(name);
+        try {
+            StringBuilder newSetting = new StringBuilder();
+            boolean first = true;
+            if (level != null) {
+                newSetting.append(output.name()).append(":").append(level.name());
+                first = false;
+            }
+            for (LogOutput o : LogOutput.values()) {
+                if (o != output) {
+                    LogLevel ol = getOutputLevel(currentSetting, o);
+                    if (ol != null) {
+                        if (!first) {
+                            newSetting.append(",");
+                        }
+                        newSetting.append(o.name()).append(":").append(ol.name());
+                        first = false;
+                    }
+                }
+            }
+            String s = newSetting.toString();
+            if (s.isEmpty()) {
+                DefaultLogger.loglevel_overrides.remove(name);
+            } else {
+                DefaultLogger.loglevel_overrides.put(name, s);
+            }
+        } catch (RuntimeException re) {
+            System.err.printf("cannot store override for %s: %s=%s (%s)%n",
+                    name, output, level, re.getMessage());
+            return;
+        }
+        File overrideFile = new File(DefaultLogger.overrideFileName);
+        try {
+            File tmp = File.createTempFile("loglevels_override_out", "tmp", overrideFile.getAbsoluteFile().getParentFile());
+            tmp.deleteOnExit();
+            try (FileOutputStream fos = new FileOutputStream(tmp);
+                    BufferedOutputStream bos = new BufferedOutputStream(fos)) {
+                DefaultLogger.loglevel_overrides.store(bos, "");
+            }
+            Files.move(tmp.toPath(), overrideFile.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException ex) {
+            System.err.printf("cannot store override for %s: %s%n", name, ex);
+        }
+    }
+    
+    private static LogLevel getOutputLevel(String overrideSetting, LogOutput out) {
+        if (overrideSetting == null) {
+            return null;
+        }
+        int i = overrideSetting.indexOf(out.name()+":");
+        if (i == -1) {
+            return null;
+        }
+        String level = overrideSetting.substring(i + out.name().length() + 1);
+        int end = level.indexOf(",");
+        if (end != -1) {
+            level = level.substring(0, end);
+        }
+        return LogLevel.valueOf(level.trim().toUpperCase());
+    }
 
 	@Override
 	public File getFilePath() {
@@ -50,6 +117,7 @@ public class DefaultAdminLogger implements AdminLogger {
 			throw new IllegalArgumentException("output must not be null");
 		}
 		logger.overrideLogLevel(output, level);
+        storeOverrides(getName(), output, level);
 	}
 
 	@Override

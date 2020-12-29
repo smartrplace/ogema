@@ -19,8 +19,10 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
@@ -46,6 +48,7 @@ import org.ogema.core.model.array.TimeArrayResource;
 import org.ogema.core.model.schedule.AbsoluteSchedule;
 import org.ogema.core.model.schedule.Schedule;
 import org.ogema.core.model.simple.IntegerResource;
+import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.resourcemanager.ResourceManagement;
 import org.ogema.core.tools.SerializationManager;
 import org.ogema.exam.OsgiAppTestBase;
@@ -293,6 +296,35 @@ public class XmlSerializationOsgiTest extends OsgiAppTestBase {
 		org.ogema.serialization.jaxb.Resource r = unmarshal(u, output.toString());
 		Assert.assertTrue("workplaces is not a ResourceList: " + r, r instanceof ResourceList);
 	}
+    
+    @Test
+    public void listOrderIsPreserved() throws IOException {
+        @SuppressWarnings("unchecked")
+        org.ogema.core.model.ResourceList<StringResource> rl = resman.createResource(newResourceName(), org.ogema.core.model.ResourceList.class);
+        rl.setElementType(StringResource.class);
+        String name = rl.getName();
+        List<String> elementOrder = new ArrayList<>();
+        int len = 10;
+        for (int i = 0; i < len; i++) {
+            StringResource s = rl.getSubResource("_" + UUID.randomUUID().toString().replace('-', '_'), StringResource.class);
+            s.create();
+            elementOrder.add(s.getName());
+            System.out.println(s.getName());
+        }
+        StringWriter output = new StringWriter();
+        sman.writeXml(output, rl);
+        rl.delete();
+        Assert.assertNull(getApplicationManager().getResourceAccess().getResource(name));
+        System.out.println(output.toString());
+        sman.createFromXml(output.toString());
+        org.ogema.core.model.ResourceList<StringResource> l2 = getApplicationManager().getResourceAccess().getResource(name);
+        Assert.assertNotNull(l2);
+        Assert.assertEquals(StringResource.class, l2.getElementType());
+        assertEquals(elementOrder.size(), l2.getAllElements().size());
+        for (int i = 0; i < elementOrder.size(); i++) {
+            assertEquals(elementOrder.get(i), l2.getAllElements().get(i).getName());
+        }
+    }
 
 	@Test
 	public void arrayResourceValidation() throws Exception {

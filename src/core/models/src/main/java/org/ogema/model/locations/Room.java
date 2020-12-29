@@ -41,6 +41,9 @@ public interface Room extends PhysicalElement {
 	 * 3: Kitchen (private)<br>
 	 * 4: Private bath room (with bath / shower, may also contain toilet)<br>
 	 * 5: Toilet (without bath / shower)
+	 * 6: Hall / corridor
+	 * 7: staircase area
+	 * 8: store room
 	 * 10: Bed room (private)<br>
 	 * 20: Garage (private)<br>
 	 * 100: Office room<br>

@@ -52,7 +52,7 @@ public class LoginServlet extends HttpServlet {
 	protected static final String LOGIN_SERVLET_PATH = "/ogema/login";
 	protected static final String OLDREQ_ATTR_NAME = "requestBeforeLogin";
 	
-	private static final String START_PAGE;
+	static final String START_PAGE;
 
 	private static final String LOGIN_FAILED_MSG = "Login failed: Username and/or Password wrong";
 	private static final String MAX_LOGIN_TRIES_EXCEEDED_MSG = "Max number of tries for login exceeded."
@@ -62,7 +62,7 @@ public class LoginServlet extends HttpServlet {
 		final boolean useCdn = Boolean.getBoolean(PROPERTY_USE_CDN);
 		LOGIN_PATH = useCdn ? LOGIN_PATH_REMOTE : LOGIN_PATH_LOCAL;
 		final String startProp = System.getProperty(PROPERTY_START_PAGE);
-		START_PAGE = startProp != null ? startProp : useCdn ? "/ogema/index2.html" : "/ogema/index.html";
+		START_PAGE = startProp != null ? startProp : useCdn ? "/ogema/index2.html" : System.getProperty("org.ogema.impl.security.starturl", "/ogema/index.html");
 	}
 	
 	private volatile String ICON;
@@ -205,19 +205,22 @@ public class LoginServlet extends HttpServlet {
 		// Check if the user authentication is valid
 		final String usr = permissionManager.getAccessManager().authenticate(req, true);
 		if (usr != null) {
-			User user = (User) ua.getRole(usr);
+			User user = (User) AccessManagerImpl.findRole(ua, usr);
 			Authorization author = ua.getAuthorization(user);
-			HttpSession session = req.getSession();
-			SessionAuth sauth = new SessionAuth(author,permissionManager.getAccessManager(), session);
-			// check if we had an old req to redirect to the originally requested URL before invalidating
-			String newLocation = START_PAGE;
-			if (session.getAttribute(OLDREQ_ATTR_NAME) != null) {
-				newLocation = session.getAttribute(OLDREQ_ATTR_NAME).toString();
-			}
 
 			// invalidate old session to prevent session hijacking:
-			req.getSession(false).invalidate();
-			session = req.getSession(true);
+			HttpSession oldSession = req.getSession(false);
+   			String newLocation = START_PAGE;
+            if (oldSession != null) {
+                // check if we had an old req to redirect to the originally requested URL before invalidating
+       			if (oldSession.getAttribute(OLDREQ_ATTR_NAME) != null) {
+    				newLocation = oldSession.getAttribute(OLDREQ_ATTR_NAME).toString();
+                    logger.debug("page requested originally: {}", newLocation);
+                }
+                oldSession.invalidate();
+            }
+			final HttpSession session = req.getSession(true);
+   			SessionAuth sauth = new SessionAuth(author,permissionManager.getAccessManager(), session);
 			session.setAttribute(Constants.AUTH_ATTRIBUTE_NAME, sauth);
 			// only applicable in case of pw-base access
 			final String pwd = req.getParameter(Constants.OTPNAME);

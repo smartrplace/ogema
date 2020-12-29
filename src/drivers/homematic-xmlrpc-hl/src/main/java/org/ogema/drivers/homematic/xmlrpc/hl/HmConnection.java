@@ -59,6 +59,7 @@ import org.ogema.drivers.homematic.xmlrpc.hl.channels.MotionDetectorChannel;
 import org.ogema.drivers.homematic.xmlrpc.hl.channels.PMSwitchDevice;
 import org.ogema.drivers.homematic.xmlrpc.hl.channels.PowerMeterChannel;
 import org.ogema.drivers.homematic.xmlrpc.hl.channels.ShutterContactChannel;
+import org.ogema.drivers.homematic.xmlrpc.hl.channels.SmokeDetectorChannel;
 import org.ogema.drivers.homematic.xmlrpc.hl.channels.SwitchChannel;
 import org.ogema.drivers.homematic.xmlrpc.hl.channels.ThermostatChannel;
 import org.ogema.drivers.homematic.xmlrpc.hl.channels.WeatherChannel;
@@ -72,6 +73,7 @@ import org.ogema.drivers.homematic.xmlrpc.ll.HomeMaticService;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEventListener;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HomeMatic;
+import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.event.EventAdmin;
@@ -150,7 +152,7 @@ public class HmConnection implements HomeMaticConnection {
 		// this.eventAdmin = eventAdmin;
 		this.ctx = ctx;
 		this.hmDriver = hmDriver;
-		writer = new WriteScheduler(appman, eventAdmin);
+		writer = new WriteScheduler(baseResource.getName(), appman, eventAdmin);
 		this.handlers = new ArrayList<>();
 		for (DeviceHandlerFactory fac : handlerFactories) {
 			this.handlers.add(fac.createHandler(this));
@@ -163,6 +165,7 @@ public class HmConnection implements HomeMaticConnection {
 		this.handlers.add(new WeatherChannel(this));
 		this.handlers.add(new ShutterContactChannel(this));
 		this.handlers.add(new MotionDetectorChannel(this));
+        this.handlers.add(new SmokeDetectorChannel(this));
 		this.handlers.add(new KeyChannel(this));
 		writer.start();
 	}
@@ -190,7 +193,9 @@ public class HmConnection implements HomeMaticConnection {
 		if (installModePoller == null) {
 			installModePoller = t.scheduleWithFixedDelay(installModePolling, 0, 60, TimeUnit.SECONDS);
 		}
-		if (pingCheck == null) {
+                baseResource.disablePingCheck().create();
+                baseResource.disablePingCheck().activate(false);
+		if ((!baseResource.disablePingCheck().getValue()) && pingCheck == null) {
 			pingCheck = t.scheduleWithFixedDelay(new Runnable() {
 				@Override
 				public void run() {
@@ -257,6 +262,7 @@ public class HmConnection implements HomeMaticConnection {
 				if (events.size() == 1) {
 					HmEvent e = events.get(0);
 					if ("PONG".equals(e.getValueKey())) {
+                                                logger.debug("received PONG from {} / {}", e.getAddress(), e.getInterfaceId());
 						// BidCos vs IP
 						if ("CENTRAL".equals(e.getAddress()) || "CENTRAL:0".equals(e.getAddress())) {
 							if (callerId.equals(e.getValueString())) {
@@ -275,10 +281,10 @@ public class HmConnection implements HomeMaticConnection {
 				try {
 					client.ping(callerId);
 					if (pongReceived.await(pingTimeoutSec, TimeUnit.SECONDS)) {
-						logger.debug("ping OK");
+						logger.debug("ping OK for {}", baseResource.getName());
 						return true;
 					} else {
-						logger.warn("Homematic service does not respond, registering again...");
+						logger.warn("Homematic service for {} does not respond, registering again...", baseResource.getName());
 						performConnect();
 						return false;
 					}
@@ -312,6 +318,24 @@ public class HmConnection implements HomeMaticConnection {
 		writer.addWriteAction(WriteAction.createPutParamset(client, address, set, values));
 	}
 
+    @Override
+    public Map<String, Object> getParamset(String address, String set) throws IOException {
+        try {
+            return client.getParamset(address, set).toMap();
+        } catch (XmlRpcException e) {
+            throw new IOException(e.getMessage());
+        }
+    }
+
+    @Override
+    public Map<String, ParameterDescription<?>> getParamsetDescription(String address, String set) throws IOException {
+        try {
+            return client.getParamsetDescription(address, set);
+        } catch (XmlRpcException e) {
+            throw new IOException(e.getMessage());
+        }
+    }
+    
 	@Override
 	public void performAddLink(String sender, String receiver, String name, String description) {
 		WriteAction writeAction = WriteAction.createAddLink(client, sender, receiver, name, description);
@@ -397,9 +421,6 @@ public class HmConnection implements HomeMaticConnection {
 		channel.controlledResources().add(ogemaDevice);
 	}
 
-	/*
-	 * TODO: error handling. If this fails (e.g. CCU not available) then we should retry later.
-	 */
 	public void init() {
 		try {
 			final HmLogicInterface config = baseResource;

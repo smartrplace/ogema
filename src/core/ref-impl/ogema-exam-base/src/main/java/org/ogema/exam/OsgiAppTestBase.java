@@ -52,6 +52,12 @@ import org.osgi.framework.ServiceRegistration;
  */
 @RunWith(PaxExam.class)
 public abstract class OsgiAppTestBase {
+    
+	protected static final String JACKSON_VERSION = "2.9.9";
+    protected static final String JACKSON_DATABIND_VERSION = "2.9.10.3";
+	protected static final String MOXY_VERSION = "2.7.4";
+	protected static int HTTP_PORT = 4712;
+    
 	@Inject
 	protected BundleContext ctx;
 	@Inject
@@ -63,9 +69,7 @@ public abstract class OsgiAppTestBase {
 	private static final Path osgiStorage = Paths.get("data/osgi-storage");
 
 	protected final static String ogemaVersion = MavenUtils.asInProject().getVersion("org.ogema.core", "api");
-	protected static final String MOXY_VERSION = "2.7.4";
 
-	protected static int HTTP_PORT = 4712;
 	protected final boolean includeTestBundle;
 
 	static final AtomicInteger resourceCounter = new AtomicInteger(0);
@@ -109,6 +113,7 @@ public abstract class OsgiAppTestBase {
 						.useOptions(CoreOptions.bundle("reference:file:target/classes/").start()),
 				CoreOptions.composite(frameworkBundles()),
 				CoreOptions.when(getJavaVersion() >= 11).useOptions(
+						CoreOptions.vmOption("--add-opens=java.base/jdk.internal.loader=ALL-UNNAMED"), //required for extension bundles in felix
 						CoreOptions.mavenBundle("com.sun.activation", "javax.activation", "1.2.0"),
 						CoreOptions.mavenBundle("javax.annotation", "javax.annotation-api", "1.3.2"),
 						CoreOptions.mavenBundle("javax.xml.bind", "jaxb-api", "2.4.0-b180830.0359"),
@@ -126,21 +131,29 @@ public abstract class OsgiAppTestBase {
 
 	public Option[] frameworkBundles() {
 		return new Option[] {
-				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.framework.security", "2.6.0").start(),
-				CoreOptions.mavenBundle("org.ogema.ref-impl", "permission-admin").version(ogemaVersion).startLevel(1)
-						.start(),
+				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.framework.security", "2.6.0").noStart(),
+				CoreOptions.mavenBundle("org.ogema.ref-impl", "permission-admin")
+                        .version(ogemaVersion).startLevel(1).start(),
 
 				CoreOptions.mavenBundle("org.ow2.asm", "asm-all", "5.1").start(),
 
-				 // cannot update to current version 2.0.12 in tests, due to older system packages in test framework bundle
-				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.scr", "1.8.2").start(),
+                CoreOptions.mavenBundle("org.osgi", "org.osgi.service.log", "1.3.0").start(),
+                CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.scr", "2.0.14").start(),
+                /*
+                CoreOptions.mavenBundle("org.osgi", "org.osgi.util.function", "1.1.0").start(),
+                CoreOptions.mavenBundle("org.osgi", "org.osgi.util.promise", "1.1.1").start(),
+                CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.scr", "2.1.16").start(),
+                */
 				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.eventadmin", "1.4.6").start(),
-				CoreOptions.mavenBundle("org.ogema.external", "org.apache.felix.useradmin.filestore", "1.0.2").start(),
+                
+				CoreOptions.mavenBundle("org.osgi", "org.osgi.service.useradmin", "1.1.0").start(),
+                CoreOptions.mavenBundle("org.ogema.external", "org.apache.felix.useradmin.filestore", "1.0.2").start(),
 				CoreOptions.mavenBundle("org.ogema.external", "org.apache.felix.useradmin", "1.0.3").start(),
 				// alternatively to the 2 above:
 //				CoreOptions.mavenBundle("org.osgi", "org.knopflerfish.bundle.useradmin", "4.1.1").start(),
-				// not using latest version 1.8.8, since it causes problems with security -> 1.8.14 should work
-				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.configadmin", "1.6.0").start(), 
+                CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.metatype", "1.2.0"),
+                // not using latest version 1.8.8, since it causes problems with security -> 1.8.14 should work
+				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.configadmin", "1.8.14").start(), 
 				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.http.api", "2.3.2").start(),
 				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.http.jetty", "3.0.2").start(),
                 CoreOptions.mavenBundle("org.eclipse.jetty", "jetty-servlets", "9.2.11.v20150529"),
@@ -151,10 +164,10 @@ public abstract class OsgiAppTestBase {
 //				CoreOptions.mavenBundle("joda-time", "joda-time", "2.9.3"), // not required any more
 
 				// jackson (for serialization manager) -->
-				CoreOptions.mavenBundle("com.fasterxml.jackson.core", "jackson-core", "2.7.4"),
-				CoreOptions.mavenBundle("com.fasterxml.jackson.core", "jackson-annotations", "2.7.4"),
-				CoreOptions.mavenBundle("com.fasterxml.jackson.core", "jackson-databind", "2.7.4"),
-				CoreOptions.mavenBundle("com.fasterxml.jackson.module", "jackson-module-jaxb-annotations", "2.7.4"),
+				CoreOptions.mavenBundle("com.fasterxml.jackson.core", "jackson-core", JACKSON_VERSION),
+				CoreOptions.mavenBundle("com.fasterxml.jackson.core", "jackson-annotations", JACKSON_VERSION),
+				CoreOptions.mavenBundle("com.fasterxml.jackson.core", "jackson-databind", JACKSON_DATABIND_VERSION),
+				CoreOptions.mavenBundle("com.fasterxml.jackson.module", "jackson-module-jaxb-annotations", JACKSON_VERSION),
 				// <-- jackson
 
 				// apache commons (for recordeddata-storage and framework-administration)-->
@@ -207,13 +220,14 @@ public abstract class OsgiAppTestBase {
 	 */
 	public Option webConsoleOption() {
 		return CoreOptions.composite(
-				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.webconsole", "4.2.14"),
+                CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.metatype", "1.2.0"),
+				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.webconsole", "4.3.12"),
 //				CoreOptions.mavenBundle("org.apache.servicemix.bundles", "org.apache.servicemix.bundles.commons-io",
 //						"1.4_3"),
-				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.webconsole.plugins.event", "1.1.4"),
-				// CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.inventory", "1.0.4"), // required with
+				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.webconsole.plugins.event", "1.1.8"),
+				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.inventory", "1.0.6"), // required with
 				// newer version of plugins.ds
-				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.webconsole.plugins.ds", "1.0.0"),
+				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.webconsole.plugins.ds", "2.1.0"),
 				CoreOptions.mavenBundle("commons-fileupload", "commons-fileupload", "1.3.1"),
 				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.webconsole.plugins.obr", "1.0.2"),
 				CoreOptions.mavenBundle("org.apache.felix", "org.apache.felix.webconsole.plugins.memoryusage",

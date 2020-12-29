@@ -21,6 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -38,6 +39,8 @@ import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.resourcemanager.ResourceDemandListener;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandler;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandlerFactory;
+import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
+import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticDeviceAccess;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmLogicInterface;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
@@ -58,8 +61,8 @@ import org.slf4j.LoggerFactory;
  *
  * @author jlapp
  */
-@Component(service = Application.class)
-public class HomeMaticDriver implements Application {
+@Component(service = { Application.class, HomeMaticDeviceAccess.class })
+public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 
     private ApplicationManager appman;
     private EventAdmin eventAdmin;
@@ -70,7 +73,31 @@ public class HomeMaticDriver implements Application {
     private final SortedSet<HandlerRegistration> handlerFactories = new TreeSet<>();
    
     // store accepted devices (by address) so they are not offered again on a different connection
-    private final Map<String, Class<? extends DeviceHandler>> acceptedDevices = new HashMap<>();
+    private final Map<String, ConnectedDevice> acceptedDevices = new HashMap<>();
+    
+    private static class ConnectedDevice {
+        
+        final HmDevice toplevelDevice;
+        
+        final HmDevice device;
+        
+        final HomeMaticConnection connection;
+        
+        final DeviceHandler handler;
+
+        public ConnectedDevice(HmDevice toplevelDevice, HmDevice device, HomeMaticConnection connection, DeviceHandler handler) {
+            this.toplevelDevice = toplevelDevice;
+            this.device = device;
+            this.connection = connection;
+            this.handler = handler;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s (%s): %s%n", device.getPath(), toplevelDevice.getPath(), handler.getClass().getSimpleName());
+        }
+        
+    }
 
     private static class HandlerRegistration implements Comparable<HandlerRegistration> {
 
@@ -193,10 +220,10 @@ public class HomeMaticDriver implements Application {
 
     protected HmConnection findConnection(HmDevice dev) {
         Resource p = dev;
-        while (p.getParent() != null) {
+        while (p.getParent() != null && !(p instanceof HmLogicInterface)) {
             p = p.getParent();
         }
-        if (!(p instanceof HmLogicInterface)) {
+        if (p == null) {
             throw new IllegalStateException("HmDevice in wrong place: " + dev.getPath());
         }
         return connections.get((HmLogicInterface) p);
@@ -226,10 +253,10 @@ public class HomeMaticDriver implements Application {
                         logger.trace("requesting paramset {} of device {}", set, address);
                         paramSets.put(set, conn.client.getParamsetDescription(address, set));
                     }
-                    HmDevice masterDevice = channelDesc.isDevice() ?
+                    HmDevice toplevelDevice = channelDesc.isDevice() ?
                             dev : (HmDevice) dev.getParent().getParent();
-                    h.setup(masterDevice, channelDesc, paramSets);
-                    acceptedDevices.put(address, h.getClass().asSubclass(DeviceHandler.class));
+                    h.setup(toplevelDevice, channelDesc, paramSets);
+                    acceptedDevices.put(address, new ConnectedDevice(toplevelDevice, dev, conn, h));
                     break;
                 }
             }
@@ -256,6 +283,24 @@ public class HomeMaticDriver implements Application {
     @Reference
     public void setEventAdmin(EventAdmin eventAdmin) {
         this.eventAdmin = eventAdmin;
+    }
+
+    @Override
+    public Optional<HomeMaticConnection> getConnection(HmDevice device) {
+        return acceptedDevices.values().stream()
+                .filter(d -> d.device.equals(device))
+                .map(d -> d.connection).findAny();
+    }
+
+    @Override
+    public boolean update(HmDevice device) {
+        Optional<ConnectedDevice> dev = acceptedDevices.values().stream()
+                .filter(d -> d.device.equals(device)).findAny();
+        if (!dev.isPresent()) {
+            dev = acceptedDevices.values().stream()
+                .filter(d -> d.toplevelDevice.equals(device)).findAny();
+        }
+        return dev.map(c -> c.handler.update(device)).orElse(Boolean.FALSE);
     }
 
 }

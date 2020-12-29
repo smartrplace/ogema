@@ -58,7 +58,17 @@ public class DefaultLogger implements OgemaLogger {
      */
     public static final String LOGLEVELS_PROPERTIES = "ogema.logger.levels";
     public static final String LOGLEVELS_PROPERTIES_DEFAULT = "config/loglevels.properties";
+    
+    /**
+     * System property ({@value}) for setting the path to the administrative log
+     * level overrides, default value is {@value #LOGLEVELS_OVERRIDE_PROPERTIES_DEFAULT}.
+     */
+    public static final String LOGLEVELS_OVERRIDE_PROPERTIES = "ogema.logger.overrides";
+    public static final String LOGLEVELS_OVERRIDE_PROPERTIES_DEFAULT = "config/loglevels-override.properties";
+
     static final Properties loglevels = new Properties();
+    static final Properties loglevel_overrides = new Properties();
+    static String overrideFileName;
 
     static {
     	AccessController.doPrivileged(new PrivilegedAction<Void>() {
@@ -70,6 +80,16 @@ public class DefaultLogger implements OgemaLogger {
 		        if (propFile.exists()) {
 		            try (FileInputStream is = new FileInputStream(propFile)) {
 		                loglevels.load(is);
+		            } catch (IOException ioex) {
+		                System.err.println(ioex);
+		            }
+		        }
+                overrideFileName =
+                        System.getProperty(LOGLEVELS_OVERRIDE_PROPERTIES, LOGLEVELS_OVERRIDE_PROPERTIES_DEFAULT);
+				final File overrideFile = new File(overrideFileName);
+		        if (overrideFile.exists()) {
+		            try (FileInputStream is = new FileInputStream(overrideFile)) {
+		                loglevel_overrides.load(is);
 		            } catch (IOException ioex) {
 		                System.err.println(ioex);
 		            }
@@ -128,6 +148,7 @@ public class DefaultLogger implements OgemaLogger {
                 break;
             }
         }
+        configureOverrideLevels();
 
         logger.addAppender(createAppenderDecorator(factory.cacheOutput, cacheFilter));
         logger.addAppender(createAppenderDecorator(factory.fileOutput, fileFilter));
@@ -141,6 +162,48 @@ public class DefaultLogger implements OgemaLogger {
         }
         
         setSlf4jLoggerLevel();
+    }
+    
+    final void configureOverrideLevels() {
+        String override = loglevel_overrides.getProperty(getName());
+        try {
+            if (override != null) {
+                String[] a = override.split(",");
+                for (String ol : a) {
+                    ol = ol.trim();
+                    if (ol.startsWith("CONSOLE:")) {
+                        String level = ol.substring("CONSOLE:".length());
+                        LogLevel ll = parseLevel(level);
+                        if (ll != null) { // calling with null makes no sense here
+                            overrideLogLevel(LogOutput.CONSOLE, ll);
+                        }
+                    } else if (ol.startsWith("CACHE:")) {
+                        String level = ol.substring("CACHE:".length());
+                        LogLevel ll = parseLevel(level);
+                        if (ll != null) {
+                            overrideLogLevel(LogOutput.CACHE, ll);
+                        }
+                    } else if (ol.startsWith("FILE:")) {
+                        String level = ol.substring("FILE:".length());
+                        LogLevel ll = parseLevel(level);
+                        if (ll != null) {
+                            overrideLogLevel(LogOutput.FILE, ll);
+                        }
+                    }
+                }
+            }
+        } catch (RuntimeException re) {
+            System.err.printf("faulty override setting for logger %s: %s (%s)%n",
+                    getName(), override, re.getMessage());
+        }
+    }
+    
+    private LogLevel parseLevel(String level) {
+        level = level.trim();
+        if (level.equalsIgnoreCase("NULL")) {
+            return null;
+        }
+        return LogLevel.valueOf(level.toUpperCase());
     }
 
     private void configureLevels(String levels) {

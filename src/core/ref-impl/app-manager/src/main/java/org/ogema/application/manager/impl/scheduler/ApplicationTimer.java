@@ -89,10 +89,10 @@ public class ApplicationTimer implements Timer, Comparable<ApplicationTimer>,
         this.scheduler = scheduler;
         this.timerRemovedListener = timerRemovedListener;
         long now = scheduler.getExecutionTime();
-        if (period > Long.MAX_VALUE - now) {
-            this.nextRun = Long.MAX_VALUE;
-        } else {
-            this.nextRun = scheduler.getExecutionTime() + period;
+        try {
+            nextRun = Math.addExact(now, period);
+        } catch (ArithmeticException ae) {
+            nextRun = Long.MAX_VALUE;
         }
         scheduler.reschedule(this);
     }
@@ -141,7 +141,11 @@ public class ApplicationTimer implements Timer, Comparable<ApplicationTimer>,
     // move nextRun time forward
     // requires synchronization on scheduler.timers
     protected void forward() {
-        nextRun += period;
+        try {
+            nextRun = Math.addExact(nextRun, period);
+        } catch (ArithmeticException ae) {
+            nextRun = Long.MAX_VALUE;
+        }
     }
 
     @Override

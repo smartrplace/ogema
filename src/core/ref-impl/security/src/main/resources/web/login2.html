@@ -20,7 +20,7 @@
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-        <title>OGEMA Login</title>
+        <title>Login</title>
 
         <!-- prevent caching ... -->
         <meta http-equiv="cache-control" content="max-age=0" />
@@ -38,8 +38,27 @@
 		<script src="https://stackpath.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js" integrity="sha384-oFMgcGzKX7GaHtF4hx14KbxdsGjyfHK6m1comHjI1FH6g4m6qYre+4cnZbwaYbHD" 
 			crossorigin="anonymous" onerror="window.location.search='?usecdn=false'"></script>
         <script type="text/javascript">
+            function loadStrings() {
+                var stringsFile = new XMLHttpRequest();
+                stringsFile.responseType = "json";
+                stringsFile.onreadystatechange = function() {
+                    var strings = {
+                        "title": "OGEMA Login"
+                    };
+                    if (stringsFile.readyState === 4) {
+                        if (stringsFile.status === 200) {
+                            strings = stringsFile.response;
+                        }
+                    }
+                    document.title = strings.title || "OGEMA Login";
+                };
+                stringsFile.open("GET", "/login/login-strings.json", true);
+                stringsFile.send(null);
+            };
+
             $(document).ready(function () {
                 $("#loginform").submit(submitLogin);
+                loadStrings();
             });
 
             function submitLogin() {

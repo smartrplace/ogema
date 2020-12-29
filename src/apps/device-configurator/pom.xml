@@ -6,7 +6,7 @@
 	<parent>
 		<groupId>org.ogema.apps</groupId>
 		<artifactId>ogema-apps</artifactId>
-		<version>2.2.1</version>
+		<version>2.2.2-SNAPSHOT</version>
 	</parent>
 
 	<artifactId>device-configurator</artifactId>
@@ -16,7 +16,7 @@
         Application that visualizes the installed drivers and devices. Additionally it provides a look at the resource tree.
     </description>
 
-	<url>https://www.ogema-source.net/wiki</url>
+	<!-- <url>https://www.ogema-source.net/wiki</url>-->
 
 	<packaging>bundle</packaging>
 

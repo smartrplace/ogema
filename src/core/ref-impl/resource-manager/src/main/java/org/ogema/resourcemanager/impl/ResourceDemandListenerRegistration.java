@@ -138,8 +138,9 @@ public class ResourceDemandListenerRegistration implements RegisteredResourceDem
 
     @Override
     public int hashCode() {
-        int hash = 7;
-        hash = 83 * hash + Objects.hashCode(this.type);
+        int hash = 3;
+        hash = 67 * hash + Objects.hashCode(this.listener);
+        hash = 67 * hash + Objects.hashCode(this.type);
         return hash;
     }
 

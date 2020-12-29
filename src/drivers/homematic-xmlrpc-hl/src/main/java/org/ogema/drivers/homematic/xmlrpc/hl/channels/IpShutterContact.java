@@ -15,6 +15,7 @@
  */
 package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
+import java.io.IOException;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import java.util.List;
 import java.util.Map;
@@ -91,12 +92,13 @@ public class IpShutterContact extends AbstractDeviceHandler implements DeviceHan
 
     @Override
     public boolean accept(DeviceDescription desc) {
-        return "HMIP-SWDO".equals(desc.getParentType()) && "SHUTTER_CONTACT".equalsIgnoreCase(desc.getType());
+        return ("HMIP-SWDO".equalsIgnoreCase(desc.getParentType()) || "HMIP-SWDM".equalsIgnoreCase(desc.getParentType()))
+                && "SHUTTER_CONTACT".equalsIgnoreCase(desc.getType());
     }
 
     @Override
     public void setup(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
-        logger.debug("setup SHUTTER_CONTACT handler for address {}", desc.getAddress());
+        logger.debug("setup HmIP SHUTTER_CONTACT handler for address {}", desc.getAddress());
         String swName = ResourceUtils.getValidResourceName("SHUTTER_CONTACT" + desc.getAddress());
         Map<String, ParameterDescription<?>> values = paramSets.get(ParameterDescription.SET_TYPES.VALUES.name());
         if (values == null) {
@@ -109,6 +111,13 @@ public class IpShutterContact extends AbstractDeviceHandler implements DeviceHan
         sens.battery().chargeSensor().reading().create();
         sens.activate(true);
         conn.addEventListener(new ShutterContactListener(sens, desc.getAddress()));
+        try {
+            Integer v = conn.getValue(desc.getAddress(), PARAMS.STATE.name());
+            sens.reading().setValue(v != 0);
+            logger.debug("shutter contact value on start: {} = {}", desc.getAddress(), v);
+        } catch (IOException | ClassCastException ex) {
+            logger.warn("could not get initial value reading for shutter contact {}", desc.getAddress(), ex);
+        }
     }
 
 }

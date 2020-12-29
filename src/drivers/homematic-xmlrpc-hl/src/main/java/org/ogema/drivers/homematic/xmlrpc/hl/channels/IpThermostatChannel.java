@@ -125,7 +125,7 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
                 try {
                     PARAMS p = PARAMS.valueOf(e.getValueKey());
                     ((FloatResource) res).setValue(p.convertInput(e.getValueFloat()));
-                    logger.debug("resource updated: {} = {}", res.getPath(), e.getValue());
+                    logger.debug("resource updated ({}/{}): {} = {}", p, e, res.getPath(), e.getValue());
                 } catch (IllegalArgumentException ex) {
                     //this block intentionally left blank
                 }

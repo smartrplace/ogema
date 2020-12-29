@@ -18,10 +18,19 @@ package org.ogema.impl.apploader;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedAction;
+import java.security.SecureRandom;
+import java.security.spec.InvalidKeySpecException;
+import java.util.Base64;
 import java.util.Dictionary;
 import java.util.Objects;
+import java.util.logging.Level;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 
 import javax.net.ssl.SSLContext;
 
@@ -29,8 +38,8 @@ import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.Service;
 import org.ogema.core.administration.CredentialStore;
-import org.ogema.core.security.AppPermission;
 import org.osgi.framework.FrameworkUtil;
+import org.osgi.framework.InvalidSyntaxException;
 import org.osgi.service.useradmin.Group;
 import org.osgi.service.useradmin.Role;
 import org.osgi.service.useradmin.User;
@@ -47,12 +56,69 @@ public class CredentialStoreImpl implements CredentialStore {
 	private static final String APPSTORE_USER_NAME = "appstoreUsr";
 	@Reference
 	private UserAdmin userAdmin;
-	private Logger logger = LoggerFactory.getLogger(getClass());
+	private final static Logger logger = LoggerFactory.getLogger(CredentialStoreImpl.class);
+    
+    private final static int PW_ITERATIONS = Integer.getInteger("ogema.apploader.pw_hash_iterations", 100); //very low default for raspi etc.
+    private final static int PW_SEED_LEN = 32;
+    private final static int PW_KEY_LEN = 256;
+    private final static String PW_STORED_PREFIX = "PBKDF2:";
+    
+    static String encodePassword(String password, int iterations) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        byte[] salt = SecureRandom.getInstance("SHA1PRNG").generateSeed(PW_SEED_LEN);
+        String store = "PBKDF2:" + iterations + ":" + Base64.getEncoder().encodeToString(salt) + ":" + hashPassword(password, salt, iterations);
+        return store;
+    }
+    
+    static String hashPassword(String password, byte[] salt, int iterations) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        SecretKeyFactory f = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+        long start = System.currentTimeMillis();
+        SecretKey key = f.generateSecret(new PBEKeySpec(
+            password.toCharArray(), salt, iterations, PW_KEY_LEN));
+        long time = System.currentTimeMillis() - start;
+        logger.debug("password hashed in {}ms", time);
+        return Base64.getEncoder().encodeToString(key.getEncoded());
+    }
+    
+    static boolean checkPassword(Dictionary<String, Object> dict, String password, String stored) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        if (!stored.startsWith(PW_STORED_PREFIX)) {
+            logger.debug("encoding clear text password");
+            stored = encodePassword(stored, PW_ITERATIONS);
+            dict.put(Constants.PASSWORD_NAME, stored);
+        }
+        String[] a = stored.split(":");
+        if (a.length != 4) {
+            logger.error("stored password has incorect format: {}", stored);
+            return false;
+        }
+        String storedHash = a[3];
+        try {
+            int iterations = Integer.parseInt(a[1]);
+            byte[] salt = Base64.getDecoder().decode(a[2]);
+            String givenPasswordHash = hashPassword(password, salt, iterations);
+            return equalsConstantTime(givenPasswordHash, storedHash);
+        } catch (NumberFormatException nfe) {
+            logger.error("stored password has incorect format: {}", stored);
+            return false;
+        }
+    }
+    
+    static boolean equalsConstantTime(String a, String b) {
+        byte[] a1 = a.getBytes(StandardCharsets.US_ASCII);
+        byte[] a2 = b.getBytes(StandardCharsets.US_ASCII);
+        if (a1.length != a2.length) {
+            return false;
+        }
+        int c = 0;
+        for (int i = 0; i < a1.length; i++) {
+            c |= a1[i] ^ a2[i];
+        }
+        return c == 0;
+    }
 
 	public void setGWPassword(String usrName, String oldPwd, final String newPwd) {
 		if (!login(usrName, oldPwd))
 			throw new SecurityException("Wrong old passowrd!");
-		Role role = userAdmin.getRole(usrName);
+		Role role = findRole(usrName);
 		final User usr = (User) role;
 
 		if (role == null) {
@@ -65,8 +131,13 @@ public class CredentialStoreImpl implements CredentialStore {
 				public Boolean run() {
 					@SuppressWarnings("unchecked")
 					Dictionary<String, Object> dict = usr.getCredentials();
-					dict.put(Constants.PASSWORD_NAME, newPwd);
-					return usr.hasCredential(Constants.PASSWORD_NAME, newPwd);
+                    try {
+                        dict.put(Constants.PASSWORD_NAME, encodePassword(newPwd, PW_ITERATIONS));
+                    } catch (NoSuchAlgorithmException | InvalidKeySpecException ex) {
+                        logger.error("cannot use hashed passwords, storing in plain text!", ex);
+                        dict.put(Constants.PASSWORD_NAME, newPwd);
+                    }
+					return true;
 				}
 			});
 
@@ -98,22 +169,61 @@ public class CredentialStoreImpl implements CredentialStore {
 			check = false;
 		if (!check)
 			throw new IllegalArgumentException(); // TODO explain why (move to separate cases above?)
-		// create/update gateway user
-		setCredential(accountGW, Constants.PASSWORD_NAME, passwordGW);
+        try {
+            // create/update gateway user
+            setCredential(accountGW, Constants.PASSWORD_NAME, encodePassword(passwordGW, PW_ITERATIONS));
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException ex) {
+            logger.error("cannot use hashed passwords, storing in plain text!", ex);
+            setCredential(accountGW, Constants.PASSWORD_NAME, passwordGW);
+        }
 		if (accountStore != null)
 			addStoreCredentials(accountGW, accountStore, passwordStore);
 		return true;
 	}
+    
+    /* non case sensitive get role operation */
+    private Role findRole(String username) {
+        Role role = userAdmin.getRole(username);
+        if (role != null) {
+            return role;
+        }
+        role = userAdmin.getRole(username.toLowerCase());
+        if (role != null) {
+            return role;
+        }
+        try {
+            Role[] allRoles = userAdmin.getRoles(null);
+            for (Role r: allRoles) {
+                if (r.getName().equalsIgnoreCase(username)) {
+                    return r;
+                }
+            }
+        } catch (InvalidSyntaxException ex) {
+            // not likely with filter=null
+        }
+        return null;
+    }
 
 	@Override
 	public boolean login(String usrName, final String pwd) {
-		Role role = userAdmin.getRole(usrName);
+		Role role = findRole(usrName);
 		if (role == null)
 			return false;
 		final User admin = (User) role;
 		Boolean hasCred = AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
 			public Boolean run() {
-				return admin.hasCredential(Constants.PASSWORD_NAME, pwd);
+                Object o = admin.getCredentials().get(Constants.PASSWORD_NAME);
+                if (o == null || pwd == null) {
+                    return false;
+                }
+                @SuppressWarnings("unchecked")
+                Dictionary<String, Object> dict = admin.getCredentials();
+                try {
+                    return checkPassword(dict, pwd, String.valueOf(dict.get(Constants.PASSWORD_NAME)));
+                } catch (NoSuchAlgorithmException | InvalidKeySpecException ex) {
+                    logger.error("password check failed", ex);
+                    return admin.hasCredential(Constants.PASSWORD_NAME, pwd);
+                }
 			}
 		});
 		if (!hasCred)
@@ -132,7 +242,7 @@ public class CredentialStoreImpl implements CredentialStore {
 
 	private void setCredential(String user, String credential, String value) {
 		User usr;
-		Role role = userAdmin.getRole(user);
+		Role role = findRole(user);
 		if (role == null) {
 			throw new IllegalArgumentException();
 		}
@@ -146,21 +256,21 @@ public class CredentialStoreImpl implements CredentialStore {
 	}
 
 	Boolean hasAccess(String user) {
-		User thisUser = (User) userAdmin.getRole(user);
+		User thisUser = (User) findRole(user);
 
 		return thisUser.hasCredential(APPSTORE_USER_NAME, user);
 	}
 
 	private Group getAppstoreGroup(String groupName) {
 		// Get or create group for the appstore
-		if (userAdmin.getRole(groupName) == null) {
+		if (findRole(groupName) == null) {
 			return (Group) userAdmin.createRole(groupName, Role.GROUP);
 		}
-		return (Group) userAdmin.getRole(groupName);
+		return (Group) findRole(groupName);
 	}
 
 	private String addStoreCredentials(String gwUser, String storeUser, String storePwd) {
-		User thisUser = (User) userAdmin.getRole(gwUser);
+		User thisUser = (User) findRole(gwUser);
 		Group appstoreAccessRole;
 
 		if (!hasAccess(gwUser)) {

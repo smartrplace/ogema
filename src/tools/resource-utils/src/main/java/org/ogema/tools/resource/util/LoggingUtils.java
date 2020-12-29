@@ -48,6 +48,19 @@ public class LoggingUtils {
 	public static boolean isLoggingEnabled(SingleValueResource resource) {
 		try {
 			RecordedData rd = getHistoricalData(resource);
+			return isLoggingEnabled(rd);
+		} catch (IllegalArgumentException e) {
+			return false;
+		}
+	}
+	
+	/** See {@link #isLoggingEnabled(SingleValueResource)}
+	 * 
+	 * @param rd
+	 * @return
+	 */
+	public static boolean isLoggingEnabled(RecordedData rd) {
+		try {
 			if (rd == null || rd.getConfiguration() == null)
 				return false;
 			else
@@ -71,7 +84,8 @@ public class LoggingUtils {
 	public static void activateLogging(SingleValueResource resource, long updateInterval)
 			throws IllegalArgumentException {
 		RecordedData rd = getHistoricalData(resource);
-		RecordedDataConfiguration rcd = new RecordedDataConfiguration();
+		activateLogging(rd, updateInterval);
+		/*RecordedDataConfiguration rcd = new RecordedDataConfiguration();
 		switch ((int) updateInterval) {
 		case -1:
 			rcd.setStorageType(StorageType.ON_VALUE_CHANGED);
@@ -86,13 +100,30 @@ public class LoggingUtils {
 			rcd.setFixedInterval(updateInterval);
 			break;
 		}
-		rd.setConfiguration(rcd);
-		//write initial value
-		//		if(updateInterval == -2) {
-		//			res.setValue(res.getValue());
-		//		}
+		rd.setConfiguration(rcd);*/
 	}
 
+	/** See {@link #activateLogging(SingleValueResource, long)}
+	 * @param rd
+	 * @param updateInterval
+	 * @throws IllegalArgumentException
+	 */
+	public static void activateLogging(RecordedData rd, long updateInterval)
+			throws IllegalArgumentException {
+		RecordedDataConfiguration rcd = new RecordedDataConfiguration();
+		if(updateInterval == -1)
+			rcd.setStorageType(StorageType.ON_VALUE_CHANGED);
+		else if(updateInterval == -2)
+			rcd.setStorageType(StorageType.ON_VALUE_UPDATE);
+		else {
+			if (updateInterval <= 0)
+				throw new IllegalArgumentException("Logging interval must be positive");
+			rcd.setStorageType(StorageType.FIXED_INTERVAL);
+			rcd.setFixedInterval(updateInterval);
+		}
+		rd.setConfiguration(rcd);
+	}
+	
 	/**
 	 * A convenience method for disabling logging.
 	 * @param resource
@@ -101,6 +132,9 @@ public class LoggingUtils {
 	 */
 	public static void deactivateLogging(SingleValueResource resource) throws IllegalArgumentException {
 		RecordedData rd = getHistoricalData(resource);
+		deactivateLogging(rd);
+	}
+	public static void deactivateLogging(RecordedData rd) throws IllegalArgumentException {
 		rd.setConfiguration(null);
 	}
 

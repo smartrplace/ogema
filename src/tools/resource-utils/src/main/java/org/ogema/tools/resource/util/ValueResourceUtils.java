@@ -90,8 +90,20 @@ public class ValueResourceUtils {
 	 */
 	@SuppressWarnings("unchecked")
 	public static boolean setValue(ValueResource resource, Object value) throws ClassCastException, NumberFormatException {
-		if (resource instanceof SingleValueResource) 
+		if (resource instanceof SingleValueResource) {
+			if(value instanceof Float)
+				return setValue((SingleValueResource) resource, (float)(Float)value);
+			else if(value instanceof Double)
+				return setValue((SingleValueResource) resource, (float)(double)(Double)value);
+			else if(value instanceof Integer)
+				return setValue((SingleValueResource) resource, (float)(Integer)value);
+			else if(value instanceof Long)
+				return setValue((SingleValueResource) resource, (float)(Long)value);
+			else if(value instanceof Boolean)
+				return setValue((SingleValueResource) resource, (Boolean)value?1.0f:0.0f);
+
 			return setValue((SingleValueResource) resource, value.toString());
+		}
 		else if (resource instanceof Schedule) {
 			Collection<SampledValue> values;
 			if (value instanceof ReadOnlyTimeSeries)
@@ -188,23 +200,25 @@ public class ValueResourceUtils {
 	 * canonical conversion method to the primitive (or String) value type of <code>resource</code>. 
 	 * @param resource
 	 * @param value
+	 * @return 
 	 */
-	public static void setValue(SingleValueResource resource, float value) {
+	public static boolean setValue(SingleValueResource resource, float value) {
 		if (resource instanceof StringResource) {
-			((StringResource) resource).setValue(String.valueOf(value));
+			return ((StringResource) resource).setValue(String.valueOf(value));
 		}
 		else if (resource instanceof FloatResource) {
-			((FloatResource) resource).setValue(value);
+			return ((FloatResource) resource).setValue(value);
 		}
 		else if (resource instanceof IntegerResource) {
-			((IntegerResource) resource).setValue((int) value);
+			return ((IntegerResource) resource).setValue((int) value);
 		}
 		else if (resource instanceof BooleanResource) {
-			((BooleanResource) resource).setValue(value == 1 ? true : false);
+			return ((BooleanResource) resource).setValue(value == 1 ? true : false);
 		}
 		else if (resource instanceof TimeResource) {
-			((TimeResource) resource).setValue((long) value);
+			return ((TimeResource) resource).setValue((long) value);
 		}
+		return false;
 	}
 
 	/**
@@ -338,7 +352,10 @@ public class ValueResourceUtils {
 		else
 			return String.format(Locale.ENGLISH,format, resource.getValue());
 	}
-	
+	public static String getValue(float value, int maxDecimals) {
+		final String format = maxDecimals >= 0 ? "%." + maxDecimals + "f" : "%f";
+		return String.format(Locale.ENGLISH,format, value);
+	}
 	
 	/**
 	 * Returns the size of a generic array resource, or -1 if the array is a virtual resource (does not exist)
@@ -396,6 +413,25 @@ public class ValueResourceUtils {
 			throw new IllegalArgumentException(); // cannot occur
 	}
 	
+	public static boolean containsGeneric(ArrayResource array, Object value) throws IndexOutOfBoundsException {
+		if (!array.exists())
+			return false;
+		if (array instanceof IntegerArrayResource)
+			return contains((IntegerArrayResource)array, (Integer)value);
+		else if (array instanceof FloatArrayResource)
+			return contains((FloatArrayResource)array, (Float)value, 0.0f);
+		//else if (array instanceof BooleanArrayResource)
+		//	return contains((BooleanArrayResource)array, (boolean)value);
+		else if (array instanceof TimeArrayResource)
+			return contains((TimeArrayResource)array, (long)value);
+		else if (array instanceof StringArrayResource)
+			return contains((StringArrayResource)array, (String)value);
+		//else if (array instanceof ByteArrayResource)
+		//	return contains((ByteArrayResource)array, value);
+		else 
+			throw new IllegalArgumentException(); // cannot occur
+	}
+	
 	/**
 	 * Check if the array resource contains a String. This returns false if the resource is inactive.
 	 * @param array
@@ -410,7 +446,13 @@ public class ValueResourceUtils {
 			return false;
 		return array.isActive() && Arrays.asList(array.getValues()).contains(string); 
 	}
-	
+	public static boolean containsIngoringActiveStatus(StringArrayResource array, String string) {
+		Objects.requireNonNull(array);
+		if (string == null)
+			return false;
+		return Arrays.asList(array.getValues()).contains(string); 
+	}
+
 	/**
 	 * Check if the array resource contains a float value. This returns false if the resource is inactive.
 	 * @param array
@@ -611,7 +653,27 @@ public class ValueResourceUtils {
 			return false;
 		return setValue(array, sz, object);
 	}
-	
+
+	/**
+	 * Append an element to the array if the element does not exist yet
+	 * @param array
+	 * @param object
+	 * @return
+	 */
+	public static boolean appendValueIfUnique(StringArrayResource array, String object, boolean createAndActivateIfNotExisting) {
+		if (object == null)
+			return false;
+		if(containsIngoringActiveStatus(array, object))
+			return false;
+		if(createAndActivateIfNotExisting && (!array.exists())) {
+			array.create();
+			boolean result = appendValue(array, object);
+			array.activate(false);
+			return result;
+		}
+		return appendValue(array, object);
+	}
+
 	/**
 	 * Remove an element from an ArrayResource, at the specified index.
 	 * @param array
@@ -1250,5 +1312,36 @@ public class ValueResourceUtils {
 		final String val = ((StringResource) r).getValue().trim();
 		return val.isEmpty() ? null: val;
     }
+
+	public static <T extends ValueResource> boolean isEqual(T res1, T res2) {
+		if (res1 instanceof FloatResource) 
+			return ((FloatResource) res1).getValue() == ((FloatResource) res2).getValue();
+		if (res1 instanceof StringResource)
+			return ((StringResource) res1).getValue().equals(((StringResource) res2).getValue());
+		if (res1 instanceof IntegerResource)
+			return ((IntegerResource) res1).getValue() == ((IntegerResource) res2).getValue();
+		if (res1 instanceof TimeResource)
+			return ((TimeResource) res1).getValue() == ((TimeResource) res2).getValue();
+		if (res1 instanceof BooleanResource)
+			return ((BooleanResource) res1).getValue() == ((BooleanResource) res2).getValue();
+		if (res1 instanceof Schedule)
+			return((Schedule) res1).getValues(0).equals(((Schedule) res2).getValues(0));
+		if (res1 instanceof ByteArrayResource)
+			return((ByteArrayResource) res1).getValues().equals(((ByteArrayResource) res2).getValues());
+		if (res1 instanceof IntegerArrayResource)
+			return((IntegerArrayResource) res1).getValues().equals(((IntegerArrayResource) res2).getValues());
+		if (res1 instanceof BooleanArrayResource)
+			return((BooleanArrayResource) res1).getValues().equals(((BooleanArrayResource) res2).getValues());
+		if (res1 instanceof FloatArrayResource)
+			return((FloatArrayResource) res1).getValues().equals(((FloatArrayResource) res2).getValues());
+		if (res1 instanceof TimeArrayResource)
+			return((TimeArrayResource) res1).getValues().equals(((TimeArrayResource) res2).getValues());
+		if (res1 instanceof StringArrayResource) {
+			return((StringArrayResource) res1).getValues().equals(((StringArrayResource) res2).getValues());
+		}
+		if (res1 instanceof org.ogema.core.model.simple.OpaqueResource)
+			return ((org.ogema.core.model.simple.OpaqueResource) res1).getValue().equals(((org.ogema.core.model.simple.OpaqueResource) res2).getValue());
+		throw new IllegalStateException("unknown resource type in "+res1.getLocation()); // should not happen
+	}
 	
 }

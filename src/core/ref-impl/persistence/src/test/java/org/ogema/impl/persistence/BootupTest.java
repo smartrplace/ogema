@@ -82,6 +82,7 @@ public class BootupTest {
 		System.setProperty("org.ogema.persistence", "active");
 		System.setProperty(DBConstants.DB_PATH_PROP, "./src/test/resources/" + path);
 		System.setProperty(DBConstants.PROP_NAME_PERSISTENCE_COMPACTION_START_SIZE, "100");
+		System.setProperty(DBConstants.PROP_NAME_TIMEDPERSISTENCE_PERIOD, Integer.toString(TimedPersistence.DEFAULT_STOREPERIOD));
 		removeFiles(executionOrder, path);
 		copyFiles(executionOrder, path);
 		db = new ResourceDBImpl();
@@ -164,7 +165,7 @@ public class BootupTest {
 				while (count-- > 0) {
 					stringArrRes.getData().setStringArr(strArr);
 					try {
-						Thread.sleep(((TimedPersistence) db.persistence).storePeriod / 5);
+						Thread.sleep(((TimedPersistence) db.persistence).getStorePeriod() / 5);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}

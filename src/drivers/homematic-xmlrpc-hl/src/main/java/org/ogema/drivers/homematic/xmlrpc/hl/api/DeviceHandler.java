@@ -65,4 +65,17 @@ public interface DeviceHandler {
      */
     void setup(HmDevice device, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets);
     
+    /**
+     * Try to request current device readings from HomeMatic, may no be be
+     * available for all handlers. If this method returns {@code true} some
+     * or all value resources associated with the device will have been updated
+     * with the latest available readings.
+     * 
+     * @param device a top level device resource controlled by this handler.
+     * @return true iff device readings have been updated.
+     */
+    default boolean update(HmDevice device) {
+        return false;
+    }
+    
 }
