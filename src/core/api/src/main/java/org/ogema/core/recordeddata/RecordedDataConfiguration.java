@@ -41,7 +41,15 @@ public class RecordedDataConfiguration implements Serializable {
 		ON_VALUE_CHANGED,
 
 		/** write values with a fixed update rate */
-		FIXED_INTERVAL
+		FIXED_INTERVAL,
+		
+		/**
+		 * The framework will not write any values, but log data is made accessible nevertheless. 
+		 * It is assumed that values will be inserted into the RecordedData database by some OGEMA-external mechanism.
+		 * 
+		 * @since 2.3.0
+		 */
+		MANUAL
 	}
 
 	private StorageType storageType;
