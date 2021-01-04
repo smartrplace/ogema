@@ -29,7 +29,7 @@ angular.module('resources',[])
     	$scope.message= '';
     	$scope.activateMsg = '';
     	$scope.loggingInterval=30;
-    	$scope.loggingTypes = ['ON_VALUE_CHANGED','FIXED_INTERVAL','ON_VALUE_UPDATE'];
+    	$scope.loggingTypes = ['ON_VALUE_CHANGED','FIXED_INTERVAL','ON_VALUE_UPDATE', 'MANUAL'];
     	$scope.selectedType = 'ON_VALUE_CHANGED';
 
 
