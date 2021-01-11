@@ -185,6 +185,7 @@ public abstract class AbstractTransport implements Transport {
                         if (next.tryNumber >= messageRetries) {
                             //TODO: notify listener
                             logger.warn("no reply from {} for invoke ID {}", next.destination, next.invokeId);
+                            invokeIds.release(next.invokeId);
                         } else {
                             next.tryNumber++;
                             next.increaseExpiryTime();
@@ -266,6 +267,7 @@ public abstract class AbstractTransport implements Transport {
                         break;
                     }
                 }
+                invokeIds.release(invokeId);
                 pendingReplies.notifyAll();
             }
         } else {
