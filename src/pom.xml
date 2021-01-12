@@ -12,13 +12,13 @@
 		<maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
 		<!-- max versions exclusive -->
 		<guava.version.min>19.0</guava.version.min>
-		<guava.version.max>28.0</guava.version.max>
+		<guava.version.max>31.0</guava.version.max>
 		<felix.service.command.version.min>0.0.0</felix.service.command.version.min>
 		<felix.service.command.version.max>2.0.0</felix.service.command.version.max>
 		<lang3.version.min>3.4</lang3.version.min>
 		<lang3.version.max>4.0</lang3.version.max>
 		<org.json.version.min>20160212</org.json.version.min>
-		<org.json.version.max>20180814</org.json.version.max>
+		<org.json.version.max>20201116</org.json.version.max>
 	</properties>
 
 	<scm>
