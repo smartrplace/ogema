@@ -148,6 +148,7 @@ class CopyHelper {
 						final StorageType type = cfg.getStorageType();
 						final long updateIntv = type == StorageType.ON_VALUE_UPDATE ? -2 :
 							type == StorageType.ON_VALUE_CHANGED ? -1 :
+							type == StorageType.MANUAL ? 0 :
 							cfg.getFixedInterval();
 						LoggingUtils.activateLogging((SingleValueResource) copy, updateIntv);
 					}

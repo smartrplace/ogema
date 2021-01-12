@@ -76,7 +76,7 @@ public class LoggingUtils {
 	 * {@link FloatResource#getHistoricalData()}, and the methods provided by {@link RecordedData}
 	 * and {@link RecordedDataConfiguration}.
 	 * @param resource
-	 * @param updateInterval -1: Update on value changed, -2: Update on value updated, &gt; 0: Fixed update interval,
+	 * @param updateInterval -1: Update on value changed, -2: Update on value updated, 0: manual,  &gt; 0: Fixed update interval,
 	 * 		interval = value in ms
 	 * @throws IllegalArgumentException
 	 * 		if <code>resource</code> is a {@link StringResource}
@@ -111,12 +111,14 @@ public class LoggingUtils {
 	public static void activateLogging(RecordedData rd, long updateInterval)
 			throws IllegalArgumentException {
 		RecordedDataConfiguration rcd = new RecordedDataConfiguration();
-		if(updateInterval == -1)
+		if (updateInterval == -1)
 			rcd.setStorageType(StorageType.ON_VALUE_CHANGED);
-		else if(updateInterval == -2)
+		else if (updateInterval == -2)
 			rcd.setStorageType(StorageType.ON_VALUE_UPDATE);
+		else if (updateInterval == 0)
+			rcd.setStorageType(StorageType.MANUAL);
 		else {
-			if (updateInterval <= 0)
+			if (updateInterval < 0)
 				throw new IllegalArgumentException("Logging interval must be positive");
 			rcd.setStorageType(StorageType.FIXED_INTERVAL);
 			rcd.setFixedInterval(updateInterval);

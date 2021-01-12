@@ -330,6 +330,7 @@ public class DefaultRecordedData implements RecordedData {
 			try {
 				switch (mode) {
 				case FIXED_INTERVAL:
+				case MANUAL:
 					break;
 				case ON_VALUE_CHANGED:
 					if (valueChanged()) {
