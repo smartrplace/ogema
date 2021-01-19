@@ -20,9 +20,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.ogema.core.model.ResourceList;
+import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.SingleValueResource;
-import org.ogema.core.model.units.TemperatureResource;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
@@ -35,6 +35,11 @@ import org.ogema.model.sensors.TemperatureSensor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
+import org.ogema.model.sensors.AngleSensor;
+import org.ogema.model.sensors.GenericBinarySensor;
+import org.ogema.model.sensors.GenericFloatSensor;
+import org.ogema.model.sensors.LightSensor;
+import org.ogema.model.sensors.VelocitySensor;
 import org.ogema.tools.resource.util.ResourceUtils;
 
 /**
@@ -42,6 +47,14 @@ import org.ogema.tools.resource.util.ResourceUtils;
  * @author jlapp
  */
 public class WeatherChannel extends AbstractDeviceHandler {
+    
+    private static final double BRIGHTNESS_LUX_BASE = 1.04618;
+    /**
+     * Name of optional FloatResource decorator on the LightSensor for the raw
+     * measurement to Lux computation (default value {@value #BRIGHTNESS_LUX_BASE}).
+     */
+    public static final String BRIGHTNESS_LUX_BASE_DECORATOR = "brightnessLuxBase";
+    public static final String BRIGHTNESS_RAW_DECORATOR = "rawValue";
 
     Logger logger = LoggerFactory.getLogger(getClass());
 
@@ -50,23 +63,29 @@ public class WeatherChannel extends AbstractDeviceHandler {
     }
 
     enum PARAMS {
-
-        TEMPERATURE() {
-
-                    @Override
-                    public float convertInput(float v) {
-                        return v + 273.15f;
-                    }
-
-                },
+        
+        BRIGHTNESS,
         HUMIDITY {
-
                     @Override
                     public float convertInput(float v) {
                         return v / 100f; // percentage value -> range 0..1
                     }
-
-                };
+        },
+        RAIN_COUNTER,
+        RAINING,
+        TEMPERATURE {
+                    @Override
+                    public float convertInput(float v) {
+                        return v + 273.15f;
+                    }
+                },
+        WIND_DIRECTION,
+        WIND_SPEED {
+                    @Override
+                    public float convertInput(float v) {
+                        return v / 3.6f; // km/h -> m/s
+                    }
+        };
 
         public float convertInput(float v) {
             return v;
@@ -94,11 +113,39 @@ public class WeatherChannel extends AbstractDeviceHandler {
                 if (res == null) {
                     continue;
                 }
+                PARAMS p;
                 try {
-                    PARAMS p = PARAMS.valueOf(e.getValueKey());
-                    ((FloatResource) res).setValue(p.convertInput(e.getValueFloat()));
+                    p = PARAMS.valueOf(e.getValueKey());
                 } catch (IllegalArgumentException ex) {
-                    //this block intentionally left blank
+                    // unsupported parameter
+                    continue;
+                }
+                try {
+                    switch (p) {
+                        case BRIGHTNESS:
+                            FloatResource v = (FloatResource) res;
+                            LightSensor ls = v.getParent();
+                            FloatResource baseDec = ls.getSubResource(BRIGHTNESS_LUX_BASE_DECORATOR, FloatResource.class);
+                            int reading = e.getValueInt();
+                            double base = baseDec.isActive()
+                                    ? baseDec.getValue()
+                                    : BRIGHTNESS_LUX_BASE;
+                            double luxVal = Math.pow(base, reading);
+                            v.setValue((float) luxVal);
+                            FloatResource rawValDec = ls.getSubResource(BRIGHTNESS_RAW_DECORATOR, FloatResource.class);
+                            rawValDec.create();
+                            rawValDec.setValue(reading);
+                            rawValDec.activate(false);
+                            break;
+                        case RAINING:
+                            BooleanResource b = (BooleanResource) res;
+                            b.setValue(e.getValueBoolean());
+                            break;
+                        default:
+                            ((FloatResource) res).setValue(p.convertInput(e.getValueFloat()));
+                    }
+                }  catch (RuntimeException re) {
+                    logger.debug("error in event handler", re);
                 }
             }
         }
@@ -107,7 +154,7 @@ public class WeatherChannel extends AbstractDeviceHandler {
 
     @Override
     public boolean accept(DeviceDescription desc) {
-        return "WEATHER".equalsIgnoreCase(desc.getType()) // WDS40
+        return "WEATHER".equalsIgnoreCase(desc.getType()) // WDS40, WDS100-C6-O-2
                 || "WEATHER_TRANSMIT".equalsIgnoreCase(desc.getType()); // TC-IT-WM-W
     }
     
@@ -132,36 +179,58 @@ public class WeatherChannel extends AbstractDeviceHandler {
         HmDevice weatherChannel = conn.getChannel(parent, desc.getAddress());
         Map<String, SingleValueResource> resources = new HashMap<>();
         for (Map.Entry<String, ParameterDescription<?>> e : values.entrySet()) {
-            switch (e.getKey()) {
-                case "TEMPERATURE": {
-                    ResourceList<Sensor> sensors = getSensorList(parent, swName);
-                    TemperatureResource reading = sensors.addDecorator(e.getKey(), TemperatureSensor.class).reading();
-                    conn.registerControlledResource(weatherChannel, reading.getParent());
-
-                    if (!reading.exists()) {
-                        reading.create();
-                        reading.getParent().activate(true);
-                    }
-                    logger.debug("found supported WEATHER parameter {} on {}", e.getKey(), desc.getAddress());
-                    resources.put(e.getKey(), reading);
+            PARAMS p;
+            try {
+                p = PARAMS.valueOf(e.getKey());
+            } catch (IllegalArgumentException ex) {
+                // unsupported parameter
+                continue;
+            }
+            switch (p) {
+                case BRIGHTNESS: {
+                    addSensorResource(parent, desc, swName, p, LightSensor.class, weatherChannel, resources);
                     break;
                 }
-                case "HUMIDITY": {
-                    ResourceList<Sensor> sensors = getSensorList(parent, swName);
-                    FloatResource reading = sensors.addDecorator(e.getKey(), HumiditySensor.class).reading();
-                    conn.registerControlledResource(weatherChannel, reading.getParent());
-
-                    if (!reading.exists()) {
-                        reading.create();
-                        reading.getParent().activate(true);
-                    }
-                    logger.debug("found supported WEATHER parameter {} on {}", e.getKey(), desc.getAddress());
-                    resources.put(e.getKey(), reading);
+                case HUMIDITY: {
+                    addSensorResource(parent, desc, swName, p, HumiditySensor.class, weatherChannel, resources);
+                    break;
+                }
+                case RAIN_COUNTER: {
+                    addSensorResource(parent, desc, swName, p, GenericFloatSensor.class, weatherChannel, resources);
+                    break;
+                }
+                case RAINING: {
+                    addSensorResource(parent, desc, swName, p, GenericBinarySensor.class, weatherChannel, resources);
+                    break;
+                }
+                case TEMPERATURE: {
+                    addSensorResource(parent, desc, swName, p, TemperatureSensor.class, weatherChannel, resources);
+                    break;
+                }
+                case WIND_DIRECTION: {
+                    addSensorResource(parent, desc, swName, p, AngleSensor.class, weatherChannel, resources);
+                    break;
+                }
+                case WIND_SPEED: {
+                    addSensorResource(parent, desc, swName, p, VelocitySensor.class, weatherChannel, resources);
                     break;
                 }
             }
         }
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
+    }
+    
+    <T extends Sensor> void addSensorResource(HmDevice parent, DeviceDescription desc, String swName, PARAMS p,
+            Class<T> type, HmDevice weatherChannel, Map<String, SingleValueResource> resources) {
+        ResourceList<Sensor> sensors = getSensorList(parent, swName);
+                    SingleValueResource reading = (SingleValueResource) sensors.addDecorator(p.name(), type).reading();
+                    conn.registerControlledResource(weatherChannel, reading.getParent());
+                    if (!reading.exists()) {
+                        reading.create();
+                        reading.getParent().activate(true);
+                    }
+                    logger.debug("found supported WEATHER parameter {} on {}", p.name(), desc.getAddress());
+                    resources.put(p.name(), reading);
     }
 
 }
