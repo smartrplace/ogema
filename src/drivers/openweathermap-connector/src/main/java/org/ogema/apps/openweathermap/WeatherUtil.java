@@ -204,6 +204,14 @@ public class WeatherUtil {
 		long day = 24 * 60 * 60 * 1000l;
 		return millis % day;
 	}
+    
+    public double calculateCurrentIrradiance(ForecastData fd, CurrentData data) {
+        return calculateIrradiation(
+                fd.getCity().getCoord().getLat(),
+                fd.getCity().getCoord().getLon(),
+                data.getClouds().getAll(),
+                data.getDt() * 1000L);
+    }
 
 	private Double calculateIrradiation(final Double latidute, final Double longitude, final Integer cloudPercent,
 			final long LT) {
