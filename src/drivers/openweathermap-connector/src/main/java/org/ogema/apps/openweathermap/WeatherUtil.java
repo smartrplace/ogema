@@ -205,10 +205,10 @@ public class WeatherUtil {
 		return millis % day;
 	}
     
-    public double calculateCurrentIrradiance(ForecastData fd, CurrentData data) {
+    public double calculateCurrentIrradiance(CurrentData data) {
         return calculateIrradiation(
-                fd.getCity().getCoord().getLat(),
-                fd.getCity().getCoord().getLon(),
+                data.getCoord().getLat(),
+                data.getCoord().getLon(),
                 data.getClouds().getAll(),
                 data.getDt() * 1000L);
     }

@@ -22,6 +22,7 @@ import org.ogema.apps.openweathermap.dao.ForecastData;
 import org.ogema.apps.openweathermap.dao.OpenWeatherMapREST;
 
 import org.ogema.core.application.ApplicationManager;
+import org.ogema.core.model.Resource;
 
 /**
  * 
@@ -29,14 +30,14 @@ import org.ogema.core.application.ApplicationManager;
  * 
  * @author brequardt
  */
-public class RoomController {
+public class WeatherDataController {
 
 	private final ApplicationManager appMan;
-	private final RoomRad device;
+	private final WeatherDataModel device;
 	private final long scheduleUpdateTime;
 	private TimerTask task;
 
-	public RoomController(ApplicationManager appMan, RoomRad rad) {
+	public WeatherDataController(ApplicationManager appMan, WeatherDataModel rad) {
 		scheduleUpdateTime = Long.getLong(OpenWeatherMapApplication.UPDATE_INTERVAL,
 				OpenWeatherMapApplication.UPDATE_INTERVAL_DEFAULT);
 		this.appMan = appMan;
@@ -45,8 +46,8 @@ public class RoomController {
 
 	public void start() {
 
-		if (device.irradSensor.reading() != null || device.tempSens.reading() != null || device.country != null
-				|| device.city != null) {
+		if (device.getIrradSensor().reading() != null || device.getTempSens().reading() != null || device.getCountry() != null
+				|| device.getCity() != null) {
 
 			final ResourceUtil util = new ResourceUtil(appMan, device);
 
@@ -57,21 +58,21 @@ public class RoomController {
 					if(Boolean.getBoolean("org.ogema.apps.openweathermap.testwithoutconnection"))
 						return;
 					appMan.getLogger().info(
-							"update weather info for location " + device.model.getName() + " next update in "
+							"update weather info for location " + device.getModel().getName() + " next update in "
 									+ scheduleUpdateTime + "ms");
 
                     OpenWeatherMapREST owmremote = OpenWeatherMapREST.getInstance();
                     ForecastData data;
                     CurrentData current;
-                    if (device.latitude.isActive()) {
-                        data = owmremote.getWeatherForcastCoord(device.latitude.getValue(), device.longitude.getValue());
-                        current = owmremote.getWeatherCurrentCoord(device.latitude.getValue(), device.longitude.getValue());
-                    } else if (device.postalCode.isActive()) {
-                        data = owmremote.getWeatherForcastZip(device.postalCode.getValue(), device.country.getValue());
-                        current = owmremote.getWeatherCurrentZip(device.postalCode.getValue(), device.country.getValue());
+                    if (device.getLatitude().isActive()) {
+                        data = owmremote.getWeatherForcastCoord(device.getLatitude().getValue(), device.getLongitude().getValue());
+                        current = owmremote.getWeatherCurrentCoord(device.getLatitude().getValue(), device.getLongitude().getValue());
+                    } else if (device.getPostalCode().isActive()) {
+                        data = owmremote.getWeatherForcastZip(device.getPostalCode().getValue(), device.getCountry().getValue());
+                        current = owmremote.getWeatherCurrentZip(device.getPostalCode().getValue(), device.getCountry().getValue());
                     } else {
-                        data = owmremote.getWeatherForcast(device.city.getValue(), device.country.getValue());
-                        current = owmremote.getWeatherCurrent(device.city.getValue(), device.country.getValue());
+                        data = owmremote.getWeatherForcast(device.getCity().getValue(), device.getCountry().getValue());
+                        current = owmremote.getWeatherCurrent(device.getCity().getValue(), device.getCountry().getValue());
                     }
                     if(data == null) {
     					appMan.getLogger().warn("No OPEN_WEATHERMAP Data !! Will not start !!");
@@ -87,8 +88,8 @@ public class RoomController {
 		}
 	}
 
-	public boolean isControllingDevice(RoomRad rad) {
-		return device.model.equalsLocation(rad.model);
+	public boolean isControllingDevice(Resource model) {
+		return device.getModel().equalsLocation(model);
 	}
 
 	public void stop() {

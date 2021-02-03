@@ -77,6 +77,12 @@ public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
 
         @AttributeDefinition(name = "%lon", description = "%lon_desc")
         double longitude() default Double.NaN;
+        
+        @AttributeDefinition(name = "%resourceName", description = "%resourceName_desc")
+        String resourceName() default "OpenWeatherMapData";
+        
+        @AttributeDefinition(name = "%useSensorDevice", description = "%useSensorDevice_desc")
+        boolean useSensorDevice() default false;
 
     }
 
@@ -98,7 +104,7 @@ public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
     // private ConfigurationAdmin configurationAdmin;
     public static OpenWeatherMapApplication instance;
     EnvironmentCreater envCreater;
-    private List<RoomController> roomControllers = new ArrayList<>();
+    private List<WeatherDataController> roomControllers = new ArrayList<>();
     private ResourcePatternAccess advAcc;
     private Config config;
 
@@ -137,7 +143,9 @@ public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
         }
         if (config != null) {
             logger.debug("using configuration from OSGi ConfigAdmin");
-            RoomRad r = envCreater.createResource("OpenWeatherMapData", "", "");
+            WeatherDataModel r = config.useSensorDevice()
+                    ? envCreater.createSensorDeviceModel(config.resourceName(), "", "")
+                    : envCreater.createResource(config.resourceName(), "", "");
             storeConfig(config, r);
             if (config.apikey() != null) {
                 OpenWeatherMapREST.getInstance().setAPI_KEY(config.apikey());
@@ -145,41 +153,43 @@ public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
         }
         advAcc = appManager.getResourcePatternAccess();
         advAcc.addPatternDemand(RoomRad.class, roomListener, AccessPriority.PRIO_DEVICEGROUPMAN);
+        advAcc.addPatternDemand(WeatherSensorDeviceRad.class, sensorDeviceListener, AccessPriority.PRIO_DEVICEGROUPMAN);
     }
 
     @Override
     public void stop(AppStopReason reason) {
-        for (RoomController controller : roomControllers) {
+        for (WeatherDataController controller : roomControllers) {
             controller.stop();
         }
         roomControllers.clear();
         advAcc.removePatternDemand(RoomRad.class, roomListener);
+        advAcc.removePatternDemand(WeatherSensorDeviceRad.class, sensorDeviceListener);
     }
 
-    void storeConfig(Config cfg, RoomRad room) {
+    void storeConfig(Config cfg, WeatherDataModel model) {
         if (Double.isNaN(cfg.latitude())) {
-            room.latitude.delete();
-            room.longitude.delete();
+            model.getLatitude().delete();
+            model.getLongitude().delete();
         } else {
-            room.latitude.<FloatResource>create().setValue((float) cfg.latitude());
-            room.longitude.<FloatResource>create().setValue((float) cfg.longitude());
+            model.getLatitude().<FloatResource>create().setValue((float) cfg.latitude());
+            model.getLongitude().<FloatResource>create().setValue((float) cfg.longitude());
         }
         if (cfg.city() != null && !cfg.city().isEmpty()) {
-            room.city.<StringResource>create().setValue(cfg.city());
+            model.getCity().<StringResource>create().setValue(cfg.city());
         } else {
-            room.city.delete();
+            model.getCity().delete();
         }
         if (cfg.country() != null && !cfg.country().isEmpty()) {
-            room.country.<StringResource>create().setValue(cfg.country());
+            model.getCountry().<StringResource>create().setValue(cfg.country());
         } else {
-            room.country.delete();
+            model.getCountry().delete();
         }
         if (cfg.postalCode() != null && !cfg.postalCode().isEmpty()) {
-            room.postalCode.<StringResource>create().setValue(cfg.postalCode());
+            model.getPostalCode().<StringResource>create().setValue(cfg.postalCode());
         } else {
-            room.postalCode.delete();
+            model.getPostalCode().delete();
         }
-        room.model.activate(true);
+        model.getModel().activate(true);
     }
 
     /**
@@ -199,16 +209,44 @@ public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
 
         @Override
         public void patternAvailable(RoomRad rad) {
-            final RoomController newController = new RoomController(appMan, rad);
+            final WeatherDataController newController = new WeatherDataController(appMan, rad);
             roomControllers.add(newController);
             newController.start();
         }
 
         @Override
         public void patternUnavailable(RoomRad rad) {
-            RoomController controller = null;
-            for (RoomController existingController : roomControllers) {
-                if (existingController.isControllingDevice(rad)) {
+            WeatherDataController controller = null;
+            for (WeatherDataController existingController : roomControllers) {
+                if (existingController.isControllingDevice(rad.model)) {
+                    controller = existingController;
+                    break;
+                }
+            }
+            if (controller == null) {
+                logger.warn("Got a resource unavailable callback for a RAD that has no controller.");
+                return;
+            }
+            controller.stop();
+            roomControllers.remove(controller);
+        }
+    };
+    
+    final PatternListener<WeatherSensorDeviceRad> sensorDeviceListener = new PatternListener<WeatherSensorDeviceRad>() {
+
+        @Override
+        public void patternAvailable(WeatherSensorDeviceRad rad) {
+            final WeatherDataController newController = new WeatherDataController(appMan, rad);
+            roomControllers.add(newController);
+            newController.start();
+            logger.info("started new WeatherDataController for model {}", rad.model.getPath());
+        }
+
+        @Override
+        public void patternUnavailable(WeatherSensorDeviceRad rad) {
+            WeatherDataController controller = null;
+            for (WeatherDataController existingController : roomControllers) {
+                if (existingController.isControllingDevice(rad.model)) {
                     controller = existingController;
                     break;
                 }

@@ -21,36 +21,36 @@ import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.resourcemanager.pattern.ResourcePattern;
 import org.ogema.core.resourcemanager.pattern.ResourcePattern.CreateMode;
 import org.ogema.core.resourcemanager.pattern.ResourcePattern.Existence;
+import org.ogema.model.devices.sensoractordevices.SensorDevice;
 import org.ogema.model.devices.sensoractordevices.WindSensor;
 import org.ogema.model.locations.GeographicLocation;
-import org.ogema.model.locations.Room;
 import org.ogema.model.sensors.HumiditySensor;
 import org.ogema.model.sensors.SolarIrradiationSensor;
 import org.ogema.model.sensors.TemperatureSensor;
 
 /**
- * OGEMA rad for outside room.
+ * OGEMA rad for weather data stored on a SensorDevice.
  * 
- * @author brequardt
+ * @author jlapp
  * 
  */
-// TODO add identifier for OpenWeatherMap connector - do not use every room in the system with matching subresources
-public class RoomRad extends ResourcePattern<Room> implements WeatherDataModel {
+public class WeatherSensorDeviceRad extends ResourcePattern<SensorDevice> implements WeatherDataModel {
     
     @Existence(required = CreateMode.MUST_EXIST)
     protected GeographicLocation location = model.location().geographicLocation();
     @Existence(required = CreateMode.MUST_EXIST)
-    protected TemperatureSensor tempSens = model.temperatureSensor();
+    protected TemperatureSensor tempSens = model.sensors().getSubResource("temperature", TemperatureSensor.class);
     @Existence(required = CreateMode.MUST_EXIST)
-    protected HumiditySensor humiditySens = model.humiditySensor();
-    @Existence(required = CreateMode.OPTIONAL)
-    protected WindSensor windSens = model.getSubResource("windSensor", WindSensor.class);
+    protected HumiditySensor humiditySens = model.sensors().getSubResource("humidity", HumiditySensor.class);
+    @Existence(required = CreateMode.MUST_EXIST)
+    protected WindSensor windSens = model.sensors().getSubResource("wind", WindSensor.class);
+    @Existence(required = CreateMode.MUST_EXIST)
+    protected SolarIrradiationSensor irradSensor = model.sensors().getSubResource("solarIrradiation", SolarIrradiationSensor.class);
+
     @Existence(required = CreateMode.OPTIONAL)
     protected StringResource city = model.location().geographicLocation().getSubResource("city", StringResource.class);
     @Existence(required = CreateMode.OPTIONAL)
     protected StringResource country = model.location().geographicLocation().getSubResource("country", StringResource.class);
-    @Existence(required = CreateMode.OPTIONAL)
-    protected SolarIrradiationSensor irradSensor = model.getSubResource("solarIrradiationSensor", SolarIrradiationSensor.class);
     @Existence(required = CreateMode.OPTIONAL)
     protected StringResource postalCode = model.location().getSubResource("postalCode", StringResource.class);
     @Existence(required = CreateMode.OPTIONAL)
@@ -58,12 +58,12 @@ public class RoomRad extends ResourcePattern<Room> implements WeatherDataModel {
     @Existence(required = CreateMode.OPTIONAL)
     protected FloatResource latitude = model.location().getSubResource("latitude", FloatResource.class);
     
-	public RoomRad(Resource match) {
+	public WeatherSensorDeviceRad(Resource match) {
 		super(match);
 	}
 
     @Override
-    public Room getModel() {
+    public Resource getModel() {
         return model;
     }
 

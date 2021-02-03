@@ -43,13 +43,13 @@ public class ResourceUtil {
 	private Schedule windSpeedForecast = null;
 	private Schedule windDirectionForecast = null;
 	private final ApplicationManager appMan;
-    private final RoomRad pattern;
+    private final WeatherDataModel pattern;
 
-	public ResourceUtil(ApplicationManager appMan, RoomRad pattern) {
+	public ResourceUtil(ApplicationManager appMan, WeatherDataModel pattern) {
         this.pattern = pattern;
-		temperatureForecast = pattern.tempSens.reading().forecast().create();
-		humidityForecast = pattern.humiditySens.reading().forecast().create();
-		irradiationForecast = pattern.irradSensor.reading().forecast().create();
+		temperatureForecast = pattern.getTempSens().reading().forecast().create();
+		humidityForecast = pattern.getHumiditySens().reading().forecast().create();
+		irradiationForecast = pattern.getIrradSensor().reading().forecast().create();
 		temperatureForecast.setInterpolationMode(InterpolationMode.LINEAR);
 		humidityForecast.setInterpolationMode(InterpolationMode.LINEAR);
 		irradiationForecast.setInterpolationMode(InterpolationMode.LINEAR);
@@ -57,53 +57,53 @@ public class ResourceUtil {
 		humidityForecast.activate(true);
 		irradiationForecast.activate(true);
 		
-		if(pattern.windSens.isActive()) {
-			windSpeedForecast = pattern.windSens.speed().reading().forecast().create();
-			windDirectionForecast = pattern.windSens.direction().reading().forecast().create();
+		if(pattern.getWindSens().isActive()) {
+			windSpeedForecast = pattern.getWindSens().speed().reading().forecast().create();
+			windDirectionForecast = pattern.getWindSens().direction().reading().forecast().create();
 			windSpeedForecast.setInterpolationMode(InterpolationMode.LINEAR);
 			windDirectionForecast.setInterpolationMode(InterpolationMode.LINEAR);
-			pattern.windSens.altitude().<LengthResource> create().setValue(0);
-			pattern.windSens.activate(true);
+			pattern.getWindSens().altitude().<LengthResource> create().setValue(0);
+			pattern.getWindSens().activate(true);
 		}
 		
 		this.appMan = appMan;
 	}
     
-    private void storeCurrent(ForecastData data, CurrentData current) {
-        pattern.tempSens.reading().create();
-        pattern.tempSens.reading().setKelvin(current.getMain().getTemp().floatValue());
-        pattern.tempSens.reading().activate(false);
-        pattern.tempSens.activate(false);
+    private void storeCurrent(CurrentData current) {
+        pattern.getTempSens().reading().create();
+        pattern.getTempSens().reading().setKelvin(current.getMain().getTemp().floatValue());
+        pattern.getTempSens().reading().activate(false);
+        pattern.getTempSens().activate(false);
         
-        pattern.humiditySens.reading().create();
-        pattern.humiditySens.reading().setValue(current.getMain().getHumidity() / 100f);
-        pattern.humiditySens.reading().activate(false);
-        pattern.humiditySens.activate(false);
+        pattern.getHumiditySens().reading().create();
+        pattern.getHumiditySens().reading().setValue(current.getMain().getHumidity() / 100f);
+        pattern.getHumiditySens().reading().activate(false);
+        pattern.getHumiditySens().activate(false);
         
-        float irrad = (float) WeatherUtil.getInstance().calculateCurrentIrradiance(data, current);
-        pattern.irradSensor.reading().create();
-        pattern.irradSensor.reading().setValue(irrad);
-        pattern.irradSensor.reading().activate(false);
-        pattern.irradSensor.activate(false);
+        float irrad = (float) WeatherUtil.getInstance().calculateCurrentIrradiance(current);
+        pattern.getIrradSensor().reading().create();
+        pattern.getIrradSensor().reading().setValue(irrad);
+        pattern.getIrradSensor().reading().activate(false);
+        pattern.getIrradSensor().activate(false);
         
-        if(pattern.windSens.isActive()) {
-            pattern.windSens.speed().reading().create();
-            pattern.windSens.speed().reading().setValue(current.getWind().getSpeed());
-            pattern.windSens.speed().reading().activate(false);
-            pattern.windSens.speed().activate(false);
+        if(pattern.getWindSens().isActive()) {
+            pattern.getWindSens().speed().reading().create();
+            pattern.getWindSens().speed().reading().setValue(current.getWind().getSpeed());
+            pattern.getWindSens().speed().reading().activate(false);
+            pattern.getWindSens().speed().activate(false);
             
-            pattern.windSens.direction().reading().create();
-            pattern.windSens.direction().reading().setValue(current.getWind().getDeg());
-            pattern.windSens.direction().reading().activate(false);
-            pattern.windSens.direction().activate(false);
+            pattern.getWindSens().direction().reading().create();
+            pattern.getWindSens().direction().reading().setValue(current.getWind().getDeg());
+            pattern.getWindSens().direction().reading().activate(false);
+            pattern.getWindSens().direction().activate(false);
             
-            pattern.windSens.activate(false);
+            pattern.getWindSens().activate(false);
         }
     }
     
     public void store(ForecastData data, CurrentData current) {
         WeatherUtil.getInstance().calculateIrradiation(data, current);
-        storeCurrent(data, current);
+        storeCurrent(current);
 		boolean ignoreWind = (windDirectionForecast == null || windSpeedForecast == null);
 
 		List<SampledValue> tempList = new ArrayList<>();
