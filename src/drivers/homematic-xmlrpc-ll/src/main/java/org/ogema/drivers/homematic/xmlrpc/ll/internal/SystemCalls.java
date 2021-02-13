@@ -23,6 +23,6 @@ public interface SystemCalls {
 
     Object multicall(Object[] calls);
 
-    Object listMethods();
+    Object listMethods(String s);
     
 }

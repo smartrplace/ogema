@@ -210,8 +210,8 @@ public class HomeMaticService {
         }
 
         @Override
-        public Object listMethods() {
-            return Arrays.asList("listDevices", "newDevices", "deleteDevices", "event");
+        public Object listMethods(String s) {
+            return new String[]{"listDevices", "newDevices"};
         }
 
     };
