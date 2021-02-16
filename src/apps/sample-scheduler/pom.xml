@@ -8,6 +8,7 @@
   </parent>
 
     <artifactId>sample-scheduler</artifactId>
+    <version>2.1.1</version>
     <name>OGEMA Applications :: Sample scheduler</name>
     <description>Scheduler sample app</description>
 

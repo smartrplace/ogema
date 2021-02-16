@@ -9,7 +9,7 @@
     </parent>
 	
     <artifactId>modbus-tcp-resource</artifactId>
-  <version>2.2.2-SNAPSHOT</version>
+    <version>2.2.2-SNAPSHOT</version>
     <name>OGEMA Drivers :: Modbus TCP driver (Resource based)</name>
     <description>An alternative Modbus driver listening to configuration resources instead of channels.</description>
     <packaging>bundle</packaging>

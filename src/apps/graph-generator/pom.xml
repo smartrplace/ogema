@@ -7,7 +7,8 @@
 		<version>2.2.2-SNAPSHOT</version>
 	</parent>
 
-	<artifactId>graph-generator</artifactId>                    
+	<artifactId>graph-generator</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
         <name>Graph Generator</name>
         <description>
             Application that writes out the current state of the resource graph.

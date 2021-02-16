@@ -10,6 +10,7 @@
 	</parent>
 
 	<artifactId>regression-tests</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 	<name>OGEMA Test Applications :: Regression Tests</name>
 
 	<description>

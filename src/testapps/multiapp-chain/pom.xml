@@ -9,6 +9,7 @@
     
     <groupId>org.ogema.apps</groupId>
     <artifactId>multiapp-chain</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <name>OGEMA Tests :: Multiapp-Chain</name>
     <description>Starts multiple apps that will perform an endless chain of
         resource modifications inside resourceChanged callbacks.

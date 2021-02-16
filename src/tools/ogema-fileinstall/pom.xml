@@ -23,6 +23,7 @@
     </description>
 	<name>OGEMA Tools :: OGEMA Fileinstall</name>
 	<artifactId>ogema-fileinstall</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 
 	<packaging>bundle</packaging>
 

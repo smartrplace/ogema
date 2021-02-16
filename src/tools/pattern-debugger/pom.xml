@@ -8,6 +8,7 @@
   </parent>
     
     <artifactId>pattern-debugger</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <name>OGEMA Tools :: Pattern debugger</name>
     <description>Displays resource pattern registrations per app, and the corresponding complete and incomplete pattern matches.</description>
 

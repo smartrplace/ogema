@@ -8,6 +8,7 @@
 	</parent>
 
 	<artifactId>one-time-pw-test</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 	<packaging>bundle</packaging>
 
 	<name>OGEMA Applications :: OTP-Test</name>

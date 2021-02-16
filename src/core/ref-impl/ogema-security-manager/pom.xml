@@ -8,6 +8,7 @@
 	</parent>
 
 	<artifactId>ogema-security-manager</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 	<packaging>bundle</packaging>
 
 

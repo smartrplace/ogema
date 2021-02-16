@@ -7,8 +7,9 @@
         <version>2.2.2-SNAPSHOT</version>
     </parent>
     
-	<groupId>org.ogema.tests</groupId>
+    <groupId>org.ogema.tests</groupId>
     <artifactId>framework-apps-tests</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <name>OGEMA tests :: tests for framework apps</name>
 
     <packaging>bundle</packaging>

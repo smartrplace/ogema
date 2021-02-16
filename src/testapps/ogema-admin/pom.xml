@@ -8,6 +8,7 @@
 	</parent>
 
 	<artifactId>ogema-admin</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 	<packaging>bundle</packaging>
 
 	<name>OGEMA Applications :: ogema-admin</name>

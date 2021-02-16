@@ -10,6 +10,7 @@
 	</parent>
 
 	<artifactId>access-consumer</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 	<name>OGEMA Applications :: Access consumer</name>
 
 	<description>

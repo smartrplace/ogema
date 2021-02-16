@@ -9,8 +9,8 @@
     </parent>
     
     <artifactId>resource-access-advanced</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <name>OGEMA ref-impl :: resource-access-advanced</name>
-
 
     <packaging>bundle</packaging>
 

@@ -8,11 +8,10 @@
     </parent>
 
     <artifactId>remote-rest-connector</artifactId>
-  <version>2.2.2-SNAPSHOT</version>
-	<name>Remote REST connector</name>
-	<description>Connect to another OGEMA gateway via its REST interface</description>
+    <version>2.2.2-SNAPSHOT</version>
+    <name>Remote REST connector</name>
+    <description>Connect to another OGEMA gateway via its REST interface</description>
     <packaging>bundle</packaging>
-
 
     <build>
         <plugins>

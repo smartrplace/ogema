@@ -10,6 +10,7 @@
     </parent>
 
     <artifactId>timeseries-api</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <name>OGEMA Core :: timeseries api</name>
 
     <description>

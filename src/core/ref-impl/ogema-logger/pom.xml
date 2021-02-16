@@ -8,6 +8,7 @@
     </parent>
 
     <artifactId>ogema-logger</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <name>OGEMA ref-impl :: ogema-logger</name>
 
     <description>

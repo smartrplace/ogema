@@ -7,8 +7,9 @@
 	</parent>
 
 	<artifactId>ogema-app-pattern</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 	<packaging>maven-archetype</packaging>
-    <name>OGEMA Archetypes :: ogema-app-pattern</name>
-    <description>Create a new OGEMA application that uses ResourcePatterns to access resources</description>
+	<name>OGEMA Archetypes :: ogema-app-pattern</name>
+	<description>Create a new OGEMA application that uses ResourcePatterns to access resources</description>
 
 </project>

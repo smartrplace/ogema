@@ -8,6 +8,7 @@
 	</parent>
 
 	<artifactId>access-provider-restricted</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 	<packaging>bundle</packaging>
 
 	<name>OGEMA Applications :: Access provider restricted</name>

@@ -10,12 +10,12 @@
 	</parent>
 
 	<artifactId>hm-hl</artifactId>
-  <version>2.2.2-SNAPSHOT</version>
+	<version>2.2.2-SNAPSHOT</version>
 	<name>OGEMA Drivers :: Homematic HL Driver</name>
 
 	<description>
-        Generic high level driver for Homematic devices.
-    </description>
+		Generic high level driver for Homematic devices.
+	</description>
 
 	<url>https://www.ogema-source.net/wiki</url>
 

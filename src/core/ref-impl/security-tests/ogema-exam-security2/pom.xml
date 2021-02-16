@@ -10,6 +10,7 @@
 
 	<groupId>org.ogema.tests</groupId>
 	<artifactId>ogema-exam-security2</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 	<packaging>bundle</packaging>
 
 	<name>OGEMA ref-impl :: ogema-exam-security2</name>

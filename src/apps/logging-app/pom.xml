@@ -9,6 +9,7 @@
     
     <artifactId>logging-app</artifactId>
     <name>Tools: logging configuration</name>
+    <version>2.2.2-SNAPSHOT</version>
     <description>Configure resources for automatic logging.</description>
 
     <packaging>bundle</packaging>

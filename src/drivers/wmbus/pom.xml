@@ -10,7 +10,7 @@
 	</parent>
 
 	<artifactId>wmbus</artifactId>
-  <version>2.2.2-SNAPSHOT</version>
+	<version>2.2.2-SNAPSHOT</version>
 	<name>OGEMA Drivers :: Wireless MBus Driver</name>
 
 	<description>

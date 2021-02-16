@@ -10,6 +10,7 @@
 
 	<groupId>org.ogema.dummy</groupId>
 	<artifactId>javadoc-dummy</artifactId>
+	<version>2.0.2-SNAPSHOT</version>
 	<name>OGEMA</name>
 
 	<packaging>pom</packaging>

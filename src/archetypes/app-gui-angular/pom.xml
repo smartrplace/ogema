@@ -8,6 +8,7 @@
   </parent>
   
   <artifactId>ogema-app-gui-angular</artifactId>
+  <version>2.2.2-SNAPSHOT</version>
   <packaging>maven-archetype</packaging>
   <name>OGEMA Archetypes :: ogema-app-gui-angular</name>
   <description>Archetype for an OGEMA application based on the angular.js framework</description>

@@ -9,6 +9,7 @@
     </parent>
 
     <artifactId>wicket-gui-impl</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <packaging>bundle</packaging>
     <name>Wicket GUI</name>
     <description>Wicket for OGEMA environment.</description>

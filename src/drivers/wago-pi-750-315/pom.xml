@@ -10,6 +10,7 @@
 	</parent>
 
 	<artifactId>wago-pi-750-315</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 	<name>OGEMA Drivers :: WAGO Modbus Adapter 750-315 Driver</name>
 
 	<description>Device driver for the MODBUS field bus coupler of WAGO 750-315</description>

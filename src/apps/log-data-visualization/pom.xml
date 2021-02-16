@@ -8,6 +8,7 @@
   </parent>
     
     <artifactId>log-data-visualization</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <packaging>bundle</packaging>
     <name>OGEMA Applications :: Logdata Visualization</name>
 	

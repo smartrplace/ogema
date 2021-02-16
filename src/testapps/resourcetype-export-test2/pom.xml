@@ -9,6 +9,7 @@
     
     <groupId>org.ogema.tests</groupId>
     <artifactId>resourcetype-export-test2</artifactId>
+    <version>2.1.1</version>
     <name>OGEMA Tests :: Resource type export</name>
     <description>A test app that is used in automated framework tests.
     </description>

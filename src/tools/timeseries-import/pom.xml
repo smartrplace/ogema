@@ -8,6 +8,7 @@
     </parent>
 
     <artifactId>timeseries-import</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <name>OGEMA tools :: CSV timeseries import</name>
 	
     <packaging>bundle</packaging>

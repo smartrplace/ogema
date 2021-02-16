@@ -7,7 +7,8 @@
 	</parent>
 
 	<artifactId>ogema-app</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 	<packaging>maven-archetype</packaging>
-    <name>OGEMA Archetypes :: ogema-app</name>
+	<name>OGEMA Archetypes :: ogema-app</name>
 
 </project>

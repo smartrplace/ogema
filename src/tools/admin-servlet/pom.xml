@@ -8,6 +8,7 @@
     </parent>
 
     <artifactId>admin-servlet</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <name>OGEMA tools :: REST admin servlet</name>
     <description>
         OGEMA tools :: REST admin servlet

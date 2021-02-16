@@ -8,6 +8,7 @@
     </parent>
 
     <artifactId>schedule-import</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <name>OGEMA tools :: CSV schedule import</name>
 	<description>Imports CSV files and writes values to a schedule</description>
     <packaging>bundle</packaging>

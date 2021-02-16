@@ -9,8 +9,8 @@
             <version>2.2.2-SNAPSHOT</version>
         </parent>
 
-
 	<artifactId>recordeddata-slotsdb</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 	<name>OGEMA ref-impl :: recordeddata-slotsdb</name>
 
 	<description>        

@@ -8,6 +8,7 @@
     </parent>
     
     <artifactId>sensor-logging</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <packaging>bundle</packaging>
 
     <name>OGEMA Applications :: Log data visualization for Sensors and Actors</name>

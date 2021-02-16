@@ -26,7 +26,8 @@
     </parent>
 
     <artifactId>org.ops4j.pax.wicket.service</artifactId>
-	<groupId>org.ogema.external</groupId>
+    <groupId>org.ogema.external</groupId>
+    <version>3.0.4</version>
     <packaging>bundle</packaging>
     <name>OPS4J Pax Wicket :: Service</name>
 

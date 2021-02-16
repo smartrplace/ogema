@@ -10,7 +10,7 @@
 	<groupId>de.iwes.ogema</groupId>
 	<artifactId>udp-response-test</artifactId>
 	<version>2.2.2-SNAPSHOT</version>
-    <description>OGEMA Test Apps :: udp response test</description>
+	<description>OGEMA Test Apps :: udp response test</description>
 
 	<packaging>bundle</packaging>
 

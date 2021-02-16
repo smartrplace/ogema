@@ -9,6 +9,7 @@
     
     <groupId>org.ogema.sim</groupId>
     <artifactId>simulated-weather-v2</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <description>Simulated outside weather data incl. forecasts: temperature, wind and solar irradiation.</description>
 
     <packaging>bundle</packaging>

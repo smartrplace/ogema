@@ -8,6 +8,7 @@
   </parent>
   
   <artifactId>ogema-app-gui</artifactId>
+  <version>2.2.2-SNAPSHOT</version>
   <packaging>maven-archetype</packaging>
   <name>OGEMA Archetypes :: ogema-app-gui</name>
 

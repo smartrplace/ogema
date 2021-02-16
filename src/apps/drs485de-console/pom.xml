@@ -10,6 +10,7 @@
 	</parent>
 
 	<artifactId>drs485de-console</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 
 	<name>OGEMA Applications :: drs485de-console</name>
 

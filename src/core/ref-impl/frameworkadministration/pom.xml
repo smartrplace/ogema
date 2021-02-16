@@ -8,6 +8,7 @@
     </parent>
     
     <artifactId>framework-administration</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <name>OGEMA framework administration</name>
 	<description>Manage applications, users and resources</description>    
 

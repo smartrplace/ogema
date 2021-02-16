@@ -8,6 +8,7 @@
   </parent>
     
     <artifactId>grafana-schedule-viewer</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <packaging>bundle</packaging>
 
     <name>Schedule viewer</name>

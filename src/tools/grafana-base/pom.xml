@@ -8,6 +8,7 @@
     </parent>
     
     <artifactId>grafana-base</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <packaging>bundle</packaging>
     <name>OGEMA Tools :: Grafana base bundle</name>
     <description>Grafana base bundle</description>

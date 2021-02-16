@@ -10,6 +10,7 @@
 	</parent>
 
 	<artifactId>acudc243-driver</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 	<name>OGEMA Drivers :: AcuDC243 Driver</name>
 
 	<description>High level driver based on MODBUS supports the communication to electricity meter of model AcuDC243.</description>

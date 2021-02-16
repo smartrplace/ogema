@@ -7,6 +7,7 @@
     </parent>
 
     <artifactId>timeseries-utils</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <name>OGEMA Tools :: Timeseries Utils</name>
     <description>Collections of tools for timeseries</description>
     <packaging>bundle</packaging>

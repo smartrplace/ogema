@@ -3,6 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<artifactId>osm-recursion-test</artifactId>
+	<version>2.2.2-SNAPSHOT</version>
 	<packaging>bundle</packaging>
 
 	<name>OGEMA testapps :: osm-recursion-test</name>

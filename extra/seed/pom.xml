@@ -8,6 +8,7 @@
     </parent>
     
     <artifactId>ogema-seed</artifactId>
+    <version>2.1.0</version>
     <packaging>pom</packaging>
 
     <name>OGEMA Utils :: project seed</name>

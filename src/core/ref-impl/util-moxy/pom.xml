@@ -3,6 +3,7 @@
 
     <groupId>org.ogema.tools</groupId>
     <artifactId>util-moxy</artifactId>
+    <version>2.2.2-SNAPSHOT</version>
     <packaging>bundle</packaging>
     
     <parent>

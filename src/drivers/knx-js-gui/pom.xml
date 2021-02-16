@@ -6,7 +6,7 @@
 		<version>2.2.2-SNAPSHOT</version>
 	</parent>
 	<artifactId>knx-js-gui</artifactId>
-  <version>2.2.2-SNAPSHOT</version>
+	<version>2.2.2-SNAPSHOT</version>
 	<packaging>bundle</packaging>
 
 	<name>OGEMA Drivers :: KNX GUI JS</name>
