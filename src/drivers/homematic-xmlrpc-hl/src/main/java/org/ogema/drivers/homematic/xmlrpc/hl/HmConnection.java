@@ -45,7 +45,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.xmlrpc.XmlRpcException;
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.core.model.Resource;
-import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.resourcemanager.ResourceDemandListener;
@@ -338,6 +337,11 @@ public class HmConnection implements HomeMaticConnection {
     
 	@Override
 	public void performAddLink(String sender, String receiver, String name, String description) {
+        if (sender.equals(receiver)) {
+            IllegalArgumentException iae = new IllegalArgumentException("cannot create link: sender == receiver == " + sender);
+            logger.warn("cowardly refusing to link {} to itself, check your code.", sender, iae);
+            return;
+        }
 		WriteAction writeAction = WriteAction.createAddLink(client, sender, receiver, name, description);
 		writer.addWriteAction(writeAction);
 	}
@@ -368,20 +372,14 @@ public class HmConnection implements HomeMaticConnection {
 	@SuppressWarnings("rawtypes")
 	@Override
 	public HmDevice findControllingDevice(Resource ogemaDevice) {
-		// XXX: review this mess
-		for (ResourceList l : ogemaDevice.getReferencingResources(ResourceList.class)) {
-			if (l.getParent() != null && l.getParent() instanceof HmDevice) {
-				return l.getParent();
-			}
-		}
 		for (Resource ref : ogemaDevice.getLocationResource().getReferencingNodes(true)) {
 			if (ref.getParent() != null && ref.getParent().getParent() instanceof HmDevice) {
-				return ref.getParent().getParent();
-			}
-			for (ResourceList l : ref.getReferencingResources(ResourceList.class)) {
-				if (l.getParent() != null && l.getParent() instanceof HmDevice) {
-					return l.getParent();
-				}
+                HmDevice channel = ref.getParent().getParent();
+                for (Resource controlledElement : channel.controlledResources().getAllElements()) {
+                    if (controlledElement.equalsLocation(ref)) {
+                        return channel;
+                    }
+                }
 			}
 		}
 		return null;

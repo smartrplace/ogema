@@ -23,7 +23,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.SortedSet;
+import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.xmlrpc.XmlRpcException;
 import org.ogema.core.application.Application;
@@ -47,9 +52,11 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.osgi.framework.Constants;
+import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.component.annotations.ReferencePolicyOption;
@@ -61,7 +68,8 @@ import org.slf4j.LoggerFactory;
  *
  * @author jlapp
  */
-@Component(service = { Application.class, HomeMaticDeviceAccess.class })
+@Component(service = { Application.class },
+        property = {"osgi.command.scope=hmhl", "osgi.command.function=listDevices"})
 public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 
     private ApplicationManager appman;
@@ -69,11 +77,14 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
     private ComponentContext ctx;
     private Logger logger = LoggerFactory.getLogger(getClass());
     private final Map<HmLogicInterface, HmConnection> connections = new HashMap<>();
+    
+    private ScheduledFuture<?> serviceRegistrationAction;
+    private volatile ServiceRegistration<HomeMaticDeviceAccess> serviceRegistration;
 
     private final SortedSet<HandlerRegistration> handlerFactories = new TreeSet<>();
    
     // store accepted devices (by address) so they are not offered again on a different connection
-    private final Map<String, ConnectedDevice> acceptedDevices = new HashMap<>();
+    private final Map<String, ConnectedDevice> acceptedDevices = new TreeMap<>();
     
     private static class ConnectedDevice {
         
@@ -141,7 +152,7 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
         if (serviceProperties.containsKey(Constants.SERVICE_RANKING)) {
             ranking = (int) serviceProperties.get(Constants.SERVICE_RANKING);
         }
-        logger.info("adding handler factory {}, rank {}", fac, ranking);
+        logger.debug("adding handler factory {}, rank {}", fac, ranking);
         synchronized (handlerFactories) {
             handlerFactories.add(new HandlerRegistration(fac, ranking));
         }
@@ -154,6 +165,25 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
     @Activate
     protected void activate(ComponentContext ctx) {
         this.ctx = ctx;
+        /*
+        delay registration until set of DeviceHandlerFactories is stable,
+        this is to protect apps which use this service but do not deal with
+        service dynamics properly.
+        */
+        ScheduledExecutorService ses = Executors.newSingleThreadScheduledExecutor();
+        serviceRegistrationAction = ses.schedule(() -> {
+            serviceRegistration = ctx.getBundleContext().registerService(HomeMaticDeviceAccess.class, this, null);
+            logger.debug("registered HomeMaticDeviceAccess, available handlers: {}", handlerFactories);
+        }, 3, TimeUnit.SECONDS);
+        ses.shutdown();
+    }
+    
+    @Deactivate
+    protected void deactivate(ComponentContext ctx) {
+        serviceRegistrationAction.cancel(true);
+        if (serviceRegistration != null) {
+            serviceRegistration.unregister();
+        }
     }
 
     final ResourceDemandListener<HmLogicInterface> configListener = new ResourceDemandListener<HmLogicInterface>() {
@@ -288,8 +318,20 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
     @Override
     public Optional<HomeMaticConnection> getConnection(HmDevice device) {
         return acceptedDevices.values().stream()
-                .filter(d -> d.device.equals(device))
-                .map(d -> d.connection).findAny();
+                .filter(cd -> cd.device.equalsLocation(device))
+                .map(cd -> cd.connection).findAny();
+    }
+    
+    static <T extends Resource> Optional<T> getHighestAncestorOrSelf(Resource start, Class<T> type) {
+        T rval = null;
+        Resource p = start;
+        while (p != null) {
+            if (p.getResourceType().isAssignableFrom(type)) {
+                rval = type.cast(p);
+            }
+            p = p.getParent();
+        }
+        return Optional.ofNullable(rval);
     }
 
     @Override
@@ -301,6 +343,16 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
                 .filter(d -> d.toplevelDevice.equals(device)).findAny();
         }
         return dev.map(c -> c.handler.update(device)).orElse(Boolean.FALSE);
+    }
+    
+    public void listDevices() {
+        acceptedDevices.forEach((addr, cd) -> {
+            System.out.printf("%s => %s, %s, %s%n",
+                    addr,
+                    cd.toplevelDevice.getName(),
+                    cd.handler.getClass().getSimpleName(),
+                    cd.device.getPath());
+        });
     }
 
 }

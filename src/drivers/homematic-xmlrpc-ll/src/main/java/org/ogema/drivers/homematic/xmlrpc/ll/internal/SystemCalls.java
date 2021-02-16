@@ -23,6 +23,12 @@ public interface SystemCalls {
 
     Object multicall(Object[] calls);
 
+    /*
+    FIXME: listMethods takes no parameters and is actually called by homegear,
+    which will then refuse to work if the return value is not to its liking.
+    Unable to figure out the right return value so far. Not implementing the
+    method will cause an exception on startup, but things will then work just fine.
+    */
     Object listMethods(String s);
     
 }
