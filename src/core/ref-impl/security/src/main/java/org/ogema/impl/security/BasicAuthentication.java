@@ -38,6 +38,11 @@ public class BasicAuthentication implements Authenticator {
 	
 	@Override
 	public String authenticate(HttpServletRequest req) {
+		return authenticate(req, null);
+	}
+
+	@Override
+	public String authenticate(HttpServletRequest req, UserTypeChecker userTypeChecker) {
 		final String header = req.getHeader("Authorization");
 		if (header == null || !header.startsWith("Basic "))
 			return null;
@@ -46,13 +51,24 @@ public class BasicAuthentication implements Authenticator {
 		final String[] split = decoded.split(":");
 		if (split.length != 2)
 			return null;
-		final boolean success = credentials.login(split[0], split[1]);
+		final boolean success;
+		String userName = split[0];
+		if(userTypeChecker != null) {
+			boolean success1 = credentials.login(userName, split[1]);
+			if((!success1) || (!userTypeChecker.isExpectedUserType(userName))) {
+				success = credentials.login(userName+"_rest", split[1]);
+				if(success)
+					userName = userName+"_rest";
+			} else
+				success = success1;
+		} else
+			success = credentials.login(userName, split[1]);
 		// do not log pw (split[1])
 		RestAccessImpl.loggerBasicAuth.debug("Authentication for user {} successful: {}", split[0], success);
 		if (RestAccessImpl.loggerBasicAuth.isTraceEnabled())
 			RestAccessImpl.loggerBasicAuth.trace("Request {} to {}", req.getMethod(), req.getPathInfo());
 		if (success)
-			return split[0];
+			return userName;
 		else
 			return null;
 	}

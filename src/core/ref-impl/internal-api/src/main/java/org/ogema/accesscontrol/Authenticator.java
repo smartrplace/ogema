@@ -44,4 +44,20 @@ public interface Authenticator {
      */
      String authenticate(HttpServletRequest req);
      
+     public interface UserTypeChecker {
+    	 boolean isExpectedUserType(String userName);
+     }
+     /**
+     * Validate the login credentials associated to a servlet request, and determine the
+     * associated user.
+     * 
+     * @param req
+     * @param userTypeChecker if not null the initial result will be tested via isExpectedUserType. If
+     * 		the caller does not confirm, then also the user "_rest" is tested
+     * @return
+     *     null if the request could not be authenticated, the user name otherwise
+     */
+     default String authenticate(HttpServletRequest req, UserTypeChecker userTypeChecker) {
+    	return authenticate(req);
+     }     
 }

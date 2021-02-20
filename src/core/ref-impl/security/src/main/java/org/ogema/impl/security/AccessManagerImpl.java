@@ -906,7 +906,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 	
 	@Override
 	public String authenticate(HttpServletRequest req) {
-		return authenticate(req, null);
+		return authenticate(req, (UserTypeChecker)null);
 	}
 	
 	@Override
@@ -936,7 +936,23 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 			Authenticator auth = null;
 			try {
 				auth = osgi.getService(entry.getValue());
-				final String usr = auth.authenticate(req);
+				final String usr;
+				if(Boolean.getBoolean("org.ogema.impl.security.enablerestusernamecompletion") &&
+						isNatural != null && (!isNatural)) {
+					usr = auth.authenticate(req, new UserTypeChecker() {
+						
+						@Override
+						public boolean isExpectedUserType(String userName) {
+							final Role r = findRole(userName);
+							if (!(r instanceof User)) {
+								return false;
+							}
+							final Object prop = r.getProperties().get(OGEMA_ROLE_NAME);
+							return OGEMA_MACHINE_USER.equals(prop);
+						}
+					});
+				} else
+					usr = auth.authenticate(req);
 				if (usr != null) {
 					if (isAuthenticatorAdmitted(usr, entry.getKey())) {
 						final Role r = findRole(usr);
