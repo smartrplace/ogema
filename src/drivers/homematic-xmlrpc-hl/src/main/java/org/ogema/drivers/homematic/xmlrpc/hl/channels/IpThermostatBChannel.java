@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmMaintenance;
 import org.ogema.drivers.homematic.xmlrpc.ll.xmlrpc.MapXmlRpcStruct;
+import org.ogema.model.sensors.HumiditySensor;
 import org.ogema.tools.resource.util.ResourceUtils;
 
 /**
@@ -146,10 +147,14 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
         }
 
     }
-
+    
+    /*
+      tested with HMIP-eTRV-B and HMIP-eTRV-2
+    */
     @Override
     public boolean accept(DeviceDescription desc) {
-        return "HMIP-eTRV-B".equalsIgnoreCase(desc.getParentType()) && "HEATING_CLIMATECONTROL_TRANSCEIVER".equalsIgnoreCase(desc.getType());
+        return desc.getParentType().toLowerCase().startsWith("hmip-etrv-")
+                && "HEATING_CLIMATECONTROL_TRANSCEIVER".equalsIgnoreCase(desc.getType());
     }
 
     @Override
@@ -167,37 +172,41 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
         conn.registerControlledResource(conn.getChannel(parent, deviceAddress), thermos);
         Map<String, SingleValueResource> resources = new HashMap<>();
         for (Map.Entry<String, ParameterDescription<?>> e : values.entrySet()) {
-            switch (e.getKey()) {
-                case "SET_POINT_TEMPERATURE": {
-                    TemperatureResource reading = thermos.temperatureSensor().deviceFeedback().setpoint();
-                    if (!reading.exists()) {
-                        reading.create();
-                        thermos.activate(true);
+            try {
+                switch (PARAMS.valueOf(e.getKey())) {
+                    case SET_POINT_TEMPERATURE: {
+                        TemperatureResource reading = thermos.temperatureSensor().deviceFeedback().setpoint();
+                        if (!reading.exists()) {
+                            reading.create();
+                            thermos.activate(true);
+                        }
+                        logger.debug("found supported thermostat parameter {} on {}", e.getKey(), desc.getAddress());
+                        resources.put(e.getKey(), reading);
+                        break;
                     }
-                    logger.debug("found supported thermostat parameter {} on {}", e.getKey(), desc.getAddress());
-                    resources.put(e.getKey(), reading);
-                    break;
-                }
-                case "ACTUAL_TEMPERATURE": {
-                    TemperatureResource reading = thermos.temperatureSensor().reading();
-                    if (!reading.exists()) {
-                        reading.create();
-                        thermos.activate(true);
+                    case ACTUAL_TEMPERATURE: {
+                        TemperatureResource reading = thermos.temperatureSensor().reading();
+                        if (!reading.exists()) {
+                            reading.create();
+                            thermos.activate(true);
+                        }
+                        logger.debug("found supported thermostat parameter {} on {}", e.getKey(), desc.getAddress());
+                        resources.put(e.getKey(), reading);
+                        break;
                     }
-                    logger.debug("found supported thermostat parameter {} on {}", e.getKey(), desc.getAddress());
-                    resources.put(e.getKey(), reading);
-                    break;
-                }
-                case "LEVEL": {
-                    FloatResource reading = thermos.valve().setting().stateFeedback();
-                    if (!reading.exists()) {
-                        reading.create();
-                        thermos.activate(true);
+                    case LEVEL: {
+                        FloatResource reading = thermos.valve().setting().stateFeedback();
+                        if (!reading.exists()) {
+                            reading.create();
+                            thermos.activate(true);
+                        }
+                        logger.debug("found supported thermostat parameter {} on {}", e.getKey(), desc.getAddress());
+                        resources.put(e.getKey(), reading);
+                        break;
                     }
-                    logger.debug("found supported thermostat parameter {} on {}", e.getKey(), desc.getAddress());
-                    resources.put(e.getKey(), reading);
-                    break;
                 }
+            } catch (IllegalArgumentException iae) {
+                // unsupported event type
             }
         }
         
