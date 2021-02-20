@@ -21,6 +21,7 @@ import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
 
+import org.ogema.accesscontrol.RestAccess.LoginViaNaturalUserChecker;
 import org.ogema.core.application.AppID;
 import org.ogema.core.security.AppPermission;
 import org.osgi.service.useradmin.Group;
@@ -238,6 +239,11 @@ public interface AccessManager extends Authenticator {
 	 */
 	public String authenticate(HttpServletRequest req, boolean naturalUser);
 	
+	default public String authenticate(HttpServletRequest req, boolean naturalUser,
+			LoginViaNaturalUserChecker natUserLoginChecker) {
+		return authenticate(req, naturalUser);
+	}
+
 	/**
 	 * Get the natural user associated with a servlet request, or null if no user 
 	 * is logged in.

@@ -45,6 +45,7 @@ import org.ogema.accesscontrol.AppPermissionFilter;
 import org.ogema.accesscontrol.Authenticator;
 import org.ogema.accesscontrol.Constants;
 import org.ogema.accesscontrol.PermissionManager;
+import org.ogema.accesscontrol.RestAccess.LoginViaNaturalUserChecker;
 import org.ogema.accesscontrol.SessionAuth;
 import org.ogema.accesscontrol.UserRightsProxy;
 import org.ogema.accesscontrol.WebAccessPermission;
@@ -906,15 +907,24 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 	
 	@Override
 	public String authenticate(HttpServletRequest req) {
-		return authenticate(req, (UserTypeChecker)null);
+		return authenticate(req, (Boolean)null, null);
 	}
 	
 	@Override
 	public String authenticate(HttpServletRequest req, boolean naturalUser) {
-		return authenticate(req, Boolean.valueOf(naturalUser));
+		return authenticate(req, Boolean.valueOf(naturalUser), null);
+	}
+
+	@Override
+	public String authenticate(HttpServletRequest req, boolean naturalUser, LoginViaNaturalUserChecker natUserLoginChecker) {
+		return authenticate(req, Boolean.valueOf(naturalUser), natUserLoginChecker);
 	}
 
 	private String authenticate(HttpServletRequest req, Boolean isNatural) {
+		return authenticate(req, isNatural, null);
+	}
+	private String authenticate(HttpServletRequest req, Boolean isNatural,
+			LoginViaNaturalUserChecker natUserLoginChecker) {
 		long time = System.currentTimeMillis();
 		// check if user/pw login is admissible for the user group (machine/natural)
 		if (isNatural == null || 
@@ -943,6 +953,10 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 						
 						@Override
 						public boolean isExpectedUserType(String userName) {
+							if(natUserLoginChecker != null) {
+								if(natUserLoginChecker.isLoginViaNaturalUserAllowed(userName))
+									return true;
+							}
 							final Role r = findRole(userName);
 							if (!(r instanceof User)) {
 								return false;
@@ -959,6 +973,10 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 						if (!(r instanceof User)) {
 							logger.warn("Invalid user authenticated by {}", entry.getKey());
 							continue;
+						}
+						if(natUserLoginChecker != null && natUserLoginChecker.isLoginViaNaturalUserAllowed(usr)) {
+							//we do not check for account type in this case
+							return usr;
 						}
 						if (isNatural != null) {
 							final Object prop = r.getProperties().get(OGEMA_ROLE_NAME);

@@ -78,7 +78,8 @@ public class RestAccessImpl implements RestAccess, Application {
 		ApplicationManager appManInternal;
 		String userName;
 	}
-	private AppManagerInternalResult getAppManagerInternal(final HttpServletRequest req, final String resourcePath) {
+	private AppManagerInternalResult getAppManagerInternal(final HttpServletRequest req, final String resourcePath,
+			LoginViaNaturalUserChecker natUserLoginChecker) {
 		//final ApplicationManager appManInternal = this.appMan;
 		final AppManagerInternalResult result = new AppManagerInternalResult();
 		result.appManInternal = this.appMan;
@@ -111,7 +112,7 @@ public class RestAccessImpl implements RestAccess, Application {
 				return result;
 			}
 		}
-		final String user = accMan.authenticate(req, false);
+		final String user = accMan.authenticate(req, false, natUserLoginChecker);
 		if (user != null) {
 			UserRightsProxy urp = accMan.getUrp(user);
 			if (urp == null) {
@@ -156,7 +157,7 @@ public class RestAccessImpl implements RestAccess, Application {
 
 	@Override
 	public ApplicationManager authenticate(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		final AppManagerInternalResult fullRes = getAppManagerInternal(req, req.getPathInfo());
+		final AppManagerInternalResult fullRes = getAppManagerInternal(req, req.getPathInfo(), null);
 		if (fullRes == null || fullRes.appManInternal == null) {
 			resp.sendError(HttpServletResponse.SC_FORBIDDEN);
 			return null;
@@ -173,7 +174,14 @@ public class RestAccessImpl implements RestAccess, Application {
 	public String authenticateToUser(HttpServletRequest req, HttpServletResponse resp,
 			boolean sendErrorResponseIfLoginFailed)
 			throws ServletException, IOException {
-		final AppManagerInternalResult fullRes = getAppManagerInternal(req, req.getPathInfo());
+		return authenticateToUser(req, resp, sendErrorResponseIfLoginFailed, null);
+	}
+	@Override
+	public String authenticateToUser(HttpServletRequest req, HttpServletResponse resp,
+			boolean sendErrorResponseIfLoginFailed, LoginViaNaturalUserChecker natUserLoginChecker)
+			throws ServletException, IOException {
+		final AppManagerInternalResult fullRes = getAppManagerInternal(req, req.getPathInfo(),
+				natUserLoginChecker);
 		if (fullRes == null || fullRes.appManInternal == null) {
 			if(sendErrorResponseIfLoginFailed)
 				resp.sendError(HttpServletResponse.SC_FORBIDDEN);

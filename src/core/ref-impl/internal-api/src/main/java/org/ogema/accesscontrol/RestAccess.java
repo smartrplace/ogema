@@ -17,8 +17,6 @@ package org.ogema.accesscontrol;
 
 import java.io.IOException;
 import java.security.AccessControlContext;
-import java.security.Permission;
-import java.security.ProtectionDomain;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -75,6 +73,26 @@ public interface RestAccess {
 	 */
 	String authenticateToUser(HttpServletRequest req, HttpServletResponse resp,
 			boolean sendErrorResponseIfLoginFailed) throws ServletException, IOException;
+	
+    public interface LoginViaNaturalUserChecker {
+    	boolean isLoginViaNaturalUserAllowed(String userName);
+    }
+	/** Like {@link #authenticateToUser(HttpServletRequest, HttpServletResponse, boolean)}, but allows to
+	 * login also with natural user login credentials
+	 * 
+	 * @param req
+	 * @param resp
+	 * @param sendErrorResponseIfLoginFailed default is true
+	 * @param natUserLoginChecker if null no login as natural user is supported
+	 * @return null if authentication fails
+	 * @throws ServletException
+	 * @throws IOException
+	 */
+	default String authenticateToUser(HttpServletRequest req, HttpServletResponse resp,
+			boolean sendErrorResponseIfLoginFailed,
+			LoginViaNaturalUserChecker natUserLoginChecker) throws ServletException, IOException {
+		return authenticateToUser(req, resp, sendErrorResponseIfLoginFailed);
+	}
 	
 	/**
 	 * Like {@link #authenticate(HttpServletRequest, HttpServletResponse)}, but returns the {@link AccessControlContext}

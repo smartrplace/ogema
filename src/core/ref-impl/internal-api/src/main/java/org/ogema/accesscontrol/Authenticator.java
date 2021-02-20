@@ -17,6 +17,8 @@ package org.ogema.accesscontrol;
 
 import javax.servlet.http.HttpServletRequest;
 
+import org.ogema.accesscontrol.RestAccess.LoginViaNaturalUserChecker;
+
 /**
 * Register as OSGi service with property {@link #AUTHENTICATOR_ID} set.
 */
@@ -59,5 +61,5 @@ public interface Authenticator {
      */
      default String authenticate(HttpServletRequest req, UserTypeChecker userTypeChecker) {
     	return authenticate(req);
-     }     
+     }
 }
