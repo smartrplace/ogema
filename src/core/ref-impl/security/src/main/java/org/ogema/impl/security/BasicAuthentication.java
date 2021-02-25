@@ -52,7 +52,7 @@ public class BasicAuthentication implements Authenticator {
 		if (split.length != 2)
 			return null;
 		final boolean success;
-		String userName = split[0];
+		String userName = split[0].toLowerCase();
 		if(userTypeChecker != null) {
 			boolean success1 = credentials.login(userName, split[1]);
 			if((!success1) || (!userTypeChecker.isExpectedUserType(userName))) {
