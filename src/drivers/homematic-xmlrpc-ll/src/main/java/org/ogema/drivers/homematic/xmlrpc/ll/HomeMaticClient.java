@@ -294,6 +294,17 @@ public class HomeMaticClient implements HomeMatic {
     public XmlRpcStruct rssiInfo() throws XmlRpcException {
         return new MapXmlRpcStruct((Map<String, Object>)client.execute("rssiInfo", new Object[]{}));
     }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> listBidcosInterfaces() throws XmlRpcException {
+        Object[] rval = (Object[]) client.execute("listBidcosInterfaces", new Object[]{});
+        List<Map<String, Object>> l = new ArrayList<>();
+        for (Object o: rval) {
+            l.add((Map<String, Object>)o);
+        }
+        return l;
+    }
  
     @Override
     public URL getServerUrl() {

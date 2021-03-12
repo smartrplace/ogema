@@ -49,7 +49,7 @@ public class HomeMaticClientCli {
         Dictionary<String, Object> props = new Hashtable<>();
         props.put("osgi.command.scope", commandScope);
         props.put("osgi.command.function", new String[]{
-            "list", "params", "tim", "read", "readValue", "readParams", "putParams", "valueUsage", "set",
+            "list", "listBidcosInterfaces", "params", "tim", "read", "readValue", "readParams", "putParams", "valueUsage", "set",
         "addLink", "removeLink", "getLinkInfo", "getLinks",
         "deleteDevice", "abortDeleteDevice", "getServiceMessages", "client", "ping"});
         return ctx.registerService(HomeMaticClientCli.class, this, props);
@@ -112,6 +112,11 @@ public class HomeMaticClientCli {
             }
         }
         out.append("}");
+    }
+    
+    @Descriptor("List Bidcos interface information on a CCU.")
+    public void listBidcosInterfaces() throws Exception {
+        System.out.println(client.listBidcosInterfaces());
     }
     
     @Descriptor("Read and print all available parameter sets from a device.")

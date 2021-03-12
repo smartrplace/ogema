@@ -93,6 +93,8 @@ public interface HomeMatic {
     
     void abortDeleteDevice(String address) throws XmlRpcException;
     
+    List<Map<String, Object>> listBidcosInterfaces() throws XmlRpcException;
+    
     XmlRpcStruct rssiInfo() throws XmlRpcException;
     
 }

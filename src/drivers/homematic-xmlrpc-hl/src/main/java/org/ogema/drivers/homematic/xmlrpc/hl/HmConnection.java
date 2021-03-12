@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -102,9 +103,10 @@ public class HmConnection implements HomeMaticConnection {
 	// quasi-final: not changed after init() call
 	ServiceRegistration<HomeMaticClientCli> commandLine;
 
-	private final ScheduledExecutorService t = Executors.newSingleThreadScheduledExecutor();
+	private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 	ScheduledFuture<?> installModePoller;
 	ScheduledFuture<?> pingCheck;
+    ScheduledFuture<?> bidcosInfoUpdate;
 
 	final WriteScheduler writer;
 	/*
@@ -190,18 +192,24 @@ public class HmConnection implements HomeMaticConnection {
 		}
 		appman.getResourceAccess().addResourceDemand(HmDevice.class, devResourceListener);
 		if (installModePoller == null) {
-			installModePoller = t.scheduleWithFixedDelay(installModePolling, 0, 60, TimeUnit.SECONDS);
+			installModePoller = executor.scheduleWithFixedDelay(installModePolling, 0, 60, TimeUnit.SECONDS);
 		}
                 baseResource.disablePingCheck().create();
                 baseResource.disablePingCheck().activate(false);
 		if ((!baseResource.disablePingCheck().getValue()) && pingCheck == null) {
-			pingCheck = t.scheduleWithFixedDelay(new Runnable() {
+			pingCheck = executor.scheduleWithFixedDelay(new Runnable() {
 				@Override
 				public void run() {
 					checkPing();
 				}
 			}, 10, 60, TimeUnit.SECONDS);
 		}
+        bidcosInfoUpdate = executor.scheduleWithFixedDelay(new Runnable() {
+            @Override
+            public void run() {
+                updateBidcosInfo();
+            }
+        }, 30, 60, TimeUnit.SECONDS);
 		logger.info("HomeMatic driver configured and registered according to config {}", baseResource.getPath());
 	}
 
@@ -214,6 +222,67 @@ public class HmConnection implements HomeMaticConnection {
 	public void removeEventListener(HmEventListener l) {
 		hm.removeEventListener(l);
 	}
+    
+    void updateBidcosInfo() {
+        try {
+            List<Map<String, Object>> ifs = client.listBidcosInterfaces();
+            if (ifs.isEmpty()) {
+                logger.debug("listBidcosInterfaces returned empty list for {}", baseResource.getPath());
+                return;
+            }
+            Optional<Map<String, Object>> defaultIf = ifs.stream()
+                    .filter(m -> Boolean.valueOf(m.getOrDefault("DEFAULT", "false").toString()))
+                    .findAny();
+            Map<String, Object> interfaceInfo = defaultIf.orElse(ifs.get(0));
+            if (interfaceInfo.containsKey("ADDRESS")) {
+                String v = String.valueOf(interfaceInfo.get("ADDRESS"));
+                baseResource.interfaceInfo().address().create();
+                baseResource.interfaceInfo().address().setValue(v);
+                baseResource.interfaceInfo().address().activate(false);
+            }
+            if (interfaceInfo.containsKey("CONNECTED")) {
+                boolean conn = Boolean.valueOf(interfaceInfo.get("CONNECTED").toString());
+                baseResource.interfaceInfo().connected().reading().create();
+                baseResource.interfaceInfo().connected().reading().setValue(conn);
+                baseResource.interfaceInfo().connected().reading().activate(false);
+                baseResource.interfaceInfo().connected().activate(false);
+            }
+            if (interfaceInfo.containsKey("DESCRIPTION")) {
+                String v = String.valueOf(interfaceInfo.get("DESCRIPTION"));
+                baseResource.interfaceInfo().description().create();
+                baseResource.interfaceInfo().description().setValue(v);
+                baseResource.interfaceInfo().description().activate(false);
+            }
+            if (interfaceInfo.containsKey("DUTY_CYCLE")) {
+                float dc = Float.valueOf(interfaceInfo.get("DUTY_CYCLE").toString());
+                baseResource.interfaceInfo().dutyCycle().reading().create();
+                baseResource.interfaceInfo().dutyCycle().reading().setValue(dc);
+                baseResource.interfaceInfo().dutyCycle().reading().activate(false);
+                baseResource.interfaceInfo().dutyCycle().activate(false);
+            }
+            if (interfaceInfo.containsKey("FIRMWARE_VERSION")) {
+                String v = String.valueOf(interfaceInfo.get("FIRMWARE_VERSION"));
+                baseResource.interfaceInfo().firmwareVersion().create();
+                baseResource.interfaceInfo().firmwareVersion().setValue(v);
+                baseResource.interfaceInfo().firmwareVersion().activate(false);
+            }
+            if (interfaceInfo.containsKey("TYPE")) {
+                String v = String.valueOf(interfaceInfo.get("TYPE"));
+                baseResource.interfaceInfo().type().create();
+                baseResource.interfaceInfo().type().setValue(v);
+                baseResource.interfaceInfo().type().activate(false);
+            }
+            if (baseResource.interfaceInfo().exists()) {
+                baseResource.interfaceInfo().activate(false);
+            }
+        } catch (XmlRpcException ex) {
+            logger.warn("could not update Bidcos interface information for {}: {}",
+                    baseResource.getPath(), ex.getMessage());
+        } catch (RuntimeException rex) {
+            logger.debug("update of Bidcos interface information failed for {}",
+                    baseResource.getPath(), rex);
+        }
+    }
 
 	final ResourceValueListener<BooleanResource> installModeListener = new ResourceValueListener<BooleanResource>() {
 
@@ -274,7 +343,7 @@ public class HmConnection implements HomeMaticConnection {
 		};
 		addEventListener(pong);
 
-		return t.submit(new Callable<Boolean>() {
+		return executor.submit(new Callable<Boolean>() {
 			@Override
 			public Boolean call() throws Exception {
 				try {
@@ -506,12 +575,19 @@ public class HmConnection implements HomeMaticConnection {
 		if (interfaces.isEmpty()) {
 			if (config.networkInterface().isActive()) {
 				final NetworkInterface nif = NetworkInterface.getByName(iface);
-				if (nif != null)
+				if (nif != null) {
 					interfaces.add(nif);
+                } else {
+                    logger.warn("network interface not found: {}", iface);
+                }
 			} else if (config.baseUrl().isActive()) {
-				final NetworkInterface nif = NetworkInterface.getByInetAddress(Inet4Address.getByName(new URL(config.baseUrl().getValue()).getHost()));
-				if (nif != null)
+				final NetworkInterface nif = NetworkInterface.getByInetAddress(
+                        Inet4Address.getByName(new URL(config.baseUrl().getValue()).getHost()));
+				if (nif != null) {
 					interfaces.add(nif);
+                } else {
+                    logger.debug("unable to determine network interface from url: {}", config.baseUrl().getValue());
+                }
 			} else {
 				interfaces.addAll(getBestMatchingInterfaces(clientUrl == null ? null : clientUrl.toLowerCase()));
 			}
@@ -634,7 +710,7 @@ public class HmConnection implements HomeMaticConnection {
 	protected void retryConnect() {
 		logger.info("Will retry init for config {} after " + (reInitTryTime / 1000) + " seconds.",
 				baseResource.getPath());
-		t.schedule(new Runnable() {
+		executor.schedule(new Runnable() {
 			@Override
 			public void run() {
 				performConnect();
@@ -665,7 +741,7 @@ public class HmConnection implements HomeMaticConnection {
 	protected void close() {
 		HmLogicInterface config = baseResource;
 		try {
-			t.shutdownNow();
+			executor.shutdownNow();
 			if (appman != null) {
 				appman.getResourceAccess().removeResourceDemand(HmDevice.class, devResourceListener);
 			}
@@ -749,9 +825,9 @@ public class HmConnection implements HomeMaticConnection {
 				ifs.add(n);
 			}
 		}
-		final Logger logger = LoggerFactory.getLogger(HomeMaticDriver.class);
 		if (matches.isEmpty()) {
-			logger.error("No network interfaces found, cannot start driver");
+			LoggerFactory.getLogger(HomeMaticDriver.class)
+                    .error("No network interfaces found, cannot start driver");
 			return null;
 		}
 		final Iterator<List<NetworkInterface>> it = matches.descendingMap().values().iterator();

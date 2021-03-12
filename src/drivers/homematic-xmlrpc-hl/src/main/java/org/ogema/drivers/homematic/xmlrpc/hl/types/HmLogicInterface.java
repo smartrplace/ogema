@@ -91,9 +91,29 @@ public interface HmLogicInterface extends Resource {
      */
     OnOffSwitch installationMode();
     
+    /**
+     * @return User name for authentication to the CCU's XMLRPC interface.
+     */
     StringResource ccuUser();
+    
+    /**
+     * @return Password for authentication to the CCU's XMLRPC interface.
+     */
     StringResource ccuPw();
     
+    /**
+     * Set to true to disable the periodical check of the XMLRPC connection with
+     * the ping() method.
+     * 
+     * @return disable ping check?
+     */
     BooleanResource disablePingCheck();
+    
+    /**
+     * Interface information for the connection's default Bidcos interface.
+     * 
+     * @return Bidcos interface information.
+     */
+    HmInterfaceInfo interfaceInfo();
     
 }
