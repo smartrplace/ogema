@@ -52,6 +52,7 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
      * of the internal temperature sensor.
      */
     public static final String LINKED_TEMP_SENS_DECORATOR = "linkedTempSens";
+    public static final String CONTROL_MODE_DECORATOR = "controlMode";
 
     Logger logger = LoggerFactory.getLogger(getClass());
     
@@ -213,6 +214,7 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
         
         }, true);
         
+        setupControlModeResource(thermos, deviceAddress);
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
         setupHmParameterValues(thermos, parent.address().getValue());
         setupTempSensLinking(thermos);
@@ -338,6 +340,21 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
          HmDevice thermostatDevice = conn.getToplevelDevice(thermostatChannel);
          //XXX: address mangling (find HEATING_ROOM_TH_RECEIVER channel instead?)
          return thermostatDevice.address().getValue() + ":6";
+    }
+    
+    private void setupControlModeResource(Thermostat thermos, final String deviceAddress) {
+        IntegerResource controlMode = thermos.addDecorator(CONTROL_MODE_DECORATOR, IntegerResource.class);
+        controlMode.create().activate(false);
+        controlMode.addValueListener(new ResourceValueListener<IntegerResource>() {
+            @Override
+            public void resourceChanged(IntegerResource resource) {
+                Map<String, Object> params = new HashMap<>();
+                // 0: automatic, 1: manual
+                // cannot be read, but will be available as VALUES/SET_POINT_MODE
+                params.put("CONTROL_MODE", resource.getValue());
+                conn.performPutParamset(deviceAddress, "VALUES", params);
+            }
+        }, true);
     }
 
 }
