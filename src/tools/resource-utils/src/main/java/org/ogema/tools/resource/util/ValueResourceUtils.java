@@ -452,6 +452,12 @@ public class ValueResourceUtils {
 			return false;
 		return Arrays.asList(array.getValues()).contains(string); 
 	}
+	public static int getIndexIngoringActiveStatus(StringArrayResource array, String string) {
+		Objects.requireNonNull(array);
+		if (string == null)
+			return -1;
+		return Arrays.asList(array.getValues()).indexOf(string); 
+	}
 
 	/**
 	 * Check if the array resource contains a float value. This returns false if the resource is inactive.
@@ -658,7 +664,7 @@ public class ValueResourceUtils {
 	 * Append an element to the array if the element does not exist yet
 	 * @param array
 	 * @param object
-	 * @return
+	 * @return true if new element was created
 	 */
 	public static boolean appendValueIfUnique(StringArrayResource array, String object, boolean createAndActivateIfNotExisting) {
 		if (object == null)
@@ -672,6 +678,25 @@ public class ValueResourceUtils {
 			return result;
 		}
 		return appendValue(array, object);
+	}
+	/** Append an element to the array if the element does not exist yet
+	 * @return index of the element in the array or -1 if element could be found and created (e.g. as it is null or
+	 * createAndActivateIfNotExisting is false)
+	 */
+	public static int appendValueIfUniqueIndex(StringArrayResource array, String object, boolean createAndActivateIfNotExisting) {
+		if (object == null)
+			return -1;
+		int idx = getIndexIngoringActiveStatus(array, object);
+		if(idx >= 0)
+			return idx;
+		if(createAndActivateIfNotExisting && (!array.exists())) {
+			array.create();
+			boolean result = appendValue(array, object);
+			array.activate(false);
+			return result?0:-1;
+		}
+		boolean result = appendValue(array, object);
+		return result?(array.size()-1):-1;
 	}
 
 	/**

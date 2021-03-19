@@ -48,7 +48,7 @@ import org.ogema.drivers.modbus.util.ModbusDriverUtil;
  */
 public class ModbusReadTask extends ModbusTask {
 
-	private static long defaultPollingInterval = 2000;
+	private static long defaultPollingInterval = Long.getLong("org.ogema.drivers.modbus.tasks.defaultPollInterval", 2000);
 	private long pollingInterval;
 	// private Timer timerTask;
 	private final ModbusDriverUtil util;
