@@ -15,8 +15,8 @@
  */
 package org.ogema.drivers.homematic.xmlrpc.hl.types;
 
-import org.ogema.core.model.Resource;
 import org.ogema.core.model.simple.StringResource;
+import org.ogema.model.prototypes.PhysicalElement;
 import org.ogema.model.sensors.GenericBinarySensor;
 import org.ogema.model.sensors.GenericFloatSensor;
 
@@ -26,7 +26,7 @@ import org.ogema.model.sensors.GenericFloatSensor;
  * 
  * @author jlapp
  */
-public interface HmInterfaceInfo extends Resource {
+public interface HmInterfaceInfo extends PhysicalElement {
     
     GenericFloatSensor dutyCycle();
     
