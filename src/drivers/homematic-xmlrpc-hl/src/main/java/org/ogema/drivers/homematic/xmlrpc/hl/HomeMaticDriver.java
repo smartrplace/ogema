@@ -322,18 +322,6 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
                 .map(cd -> cd.connection).findAny();
     }
     
-    static <T extends Resource> Optional<T> getHighestAncestorOrSelf(Resource start, Class<T> type) {
-        T rval = null;
-        Resource p = start;
-        while (p != null) {
-            if (p.getResourceType().isAssignableFrom(type)) {
-                rval = type.cast(p);
-            }
-            p = p.getParent();
-        }
-        return Optional.ofNullable(rval);
-    }
-
     @Override
     public boolean update(HmDevice device) {
         Optional<ConnectedDevice> dev = acceptedDevices.values().stream()

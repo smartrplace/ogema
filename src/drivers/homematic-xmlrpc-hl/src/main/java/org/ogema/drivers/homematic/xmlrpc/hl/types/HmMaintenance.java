@@ -20,6 +20,8 @@ import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.model.communication.CommunicationStatus;
 import org.ogema.model.devices.storage.ElectricityStorage;
+import org.ogema.model.sensors.GenericBinarySensor;
+import org.ogema.model.sensors.GenericFloatSensor;
 
 /**
  * Stores information from the channel 'Maintenance' that is available on
@@ -51,5 +53,19 @@ public interface HmMaintenance extends Resource {
      * @return device communication status.
      */
     CommunicationStatus communicationStatus();
+    
+    /**
+     * Duty cycle as reported by HomematicIP HAP.
+     * 
+     * @return Current duty cycle level 0...1.0
+     */
+    GenericFloatSensor dutyCycleLevel();
+    
+    /**
+     * Duty cycle exhausted?
+     * 
+     * @return Current duty cycle state.
+     */
+    GenericBinarySensor dutyCycle();
     
 }

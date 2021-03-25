@@ -15,6 +15,7 @@
  */
 package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
+import java.util.Collections;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import java.util.List;
 import java.util.Map;
@@ -73,12 +74,13 @@ public class SwitchChannel extends AbstractDeviceHandler {
                 boolean value = ((BooleanResource) res).getValue();
                 conn.performSetValue(address, valueKey, value);
             } else {
-                LoggerFactory.getLogger(SwitchChannel.class).warn("HomeMatic parameter resource is of unsupported type: {}", res.getResourceType());
+                LoggerFactory.getLogger(SwitchChannel.class)
+                        .warn("HomeMatic parameter resource is of unsupported type: {}", res.getResourceType());
             }
         }
     }
     
-    class SwitchEventListener implements HmEventListener {
+    static class SwitchEventListener implements HmEventListener {
         
         final OnOffSwitch sw;
         final String address;
@@ -91,12 +93,6 @@ public class SwitchChannel extends AbstractDeviceHandler {
         @Override
         public void event(List<HmEvent> events) {
             for (HmEvent e: events) {
-                /*
-                if (isDeviceUnreach(e, address)) {
-                    handleUnreach(e);
-                    continue;
-                } else 
-                 */
                 if (!address.equals(e.getAddress())) {
                     continue;
                 }
@@ -106,43 +102,29 @@ public class SwitchChannel extends AbstractDeviceHandler {
             }
         }
         
-        private boolean isDeviceUnreach(HmEvent event, String channel) {
-            if ("UNREACH".equals(event.getValueKey())) {
-                int baseAddressEnd = channel.indexOf(':');
-                String baseAddress = baseAddressEnd == -1 ? channel : channel.substring(0, baseAddressEnd);
-                return event.getAddress().startsWith(baseAddress);
-            }
-            return false;
-        }
-        
-        private void handleUnreach(HmEvent e) {
-            if (!e.getValueBoolean()) {
-                logger.debug("device {} is reachable again, resending state control {}={}",
-                        address, sw.stateControl().getPath(), sw.stateControl().getValue());
-                conn.performSetValue(address, "STATE", sw.stateControl().getValue());
-            } else {
-                logger.debug("device {} unreachable", address);
-            }
-        }
-        
-        
     }
-            
     
     @Override
     public boolean accept(DeviceDescription desc) {
-        return "SWITCH".equalsIgnoreCase(desc.getType())||
-        		"SWITCH_TRANSMITTER".equalsIgnoreCase(desc.getType());
+        return "SWITCH".equalsIgnoreCase(desc.getType())
+                || "SWITCH_TRANSMITTER".equalsIgnoreCase(desc.getType())
+                || "SWITCH_VIRTUAL_RECEIVER".equalsIgnoreCase(desc.getType());
     }
     
     @Override
     public void setup(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
         LoggerFactory.getLogger(getClass()).debug("setup SWITCH handler for address {}", desc.getAddress());
-        String swName = ResourceUtils.getValidResourceName("SWITCH_" + desc.getAddress());
+        String swName = "SWITCH_VIRTUAL_RECEIVER".equalsIgnoreCase(desc.getType())
+                ? ResourceUtils.getValidResourceName("SWITCH_VIRTUAL_RECEIVER_" + desc.getAddress())
+                : ResourceUtils.getValidResourceName("SWITCH_" + desc.getAddress());
         OnOffSwitch sw = parent.addDecorator(swName, OnOffSwitch.class);
-        sw.stateControl().create();
         sw.stateFeedback().create();
-        sw.stateControl().addValueListener(new SingleChangeUpdater(desc.getAddress(), "STATE"));
+        ParameterDescription<?> stateDesc = paramSets.getOrDefault("VALUES", Collections.emptyMap()).get("STATE");
+        if (stateDesc != null && stateDesc.isWritable()) { // not writable on SWITCH_TRANSMITTER
+            sw.stateControl().create();
+            logger.debug("adding STATE listener to {}", sw.stateControl().getPath());
+            sw.stateControl().addValueListener(new SingleChangeUpdater(desc.getAddress(), "STATE"));
+        }
         conn.addEventListener(new SwitchEventListener(sw, desc.getAddress()));
         sw.activate(true);
     }

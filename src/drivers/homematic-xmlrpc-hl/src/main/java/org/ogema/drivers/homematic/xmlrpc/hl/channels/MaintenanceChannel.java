@@ -42,6 +42,8 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
     Logger logger = LoggerFactory.getLogger(getClass());
     public enum PARAMS {
 
+        DUTY_CYCLE,
+        DUTY_CYCLE_LEVEL,
         ERROR_CODE,
         LOWBAT,
         OPERATING_VOLTAGE,
@@ -73,7 +75,19 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                 if (!address.equals(e.getAddress())) {
                     continue;
                 }
-                if (PARAMS.ERROR_CODE.name().equals(e.getValueKey())) {
+                if (PARAMS.DUTY_CYCLE.name().equals(e.getValueKey())) {
+                    if (!mnt.dutyCycle().isActive()) {
+                        mnt.dutyCycle().reading().create().activate(false);
+                        mnt.dutyCycle().activate(false);
+                    }
+                    mnt.dutyCycle().reading().setValue(e.getValueBoolean());
+                } else if (PARAMS.DUTY_CYCLE_LEVEL.name().equals(e.getValueKey())) {
+                    if (!mnt.dutyCycleLevel().isActive()) {
+                        mnt.dutyCycleLevel().reading().create().activate(false);
+                        mnt.dutyCycleLevel().activate(false);
+                    }
+                    mnt.dutyCycleLevel().reading().setValue(e.getValueFloat()/100f);
+                } else if (PARAMS.ERROR_CODE.name().equals(e.getValueKey())) {
                     if (!mnt.errorCode().isActive()) {
                         mnt.errorCode().create().activate(false);
                     }
