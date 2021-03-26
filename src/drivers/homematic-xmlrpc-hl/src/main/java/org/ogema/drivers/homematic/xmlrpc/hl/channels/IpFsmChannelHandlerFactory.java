@@ -115,7 +115,7 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
         private void setupSwitchTransmitter(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
             logger.debug("setup SWITCH handler for address {}", desc.getAddress());
             String swName = ResourceUtils.getValidResourceName("SWITCH_" + desc.getAddress());
-            String base = baseAddress(swName);
+            String base = baseAddress(desc.getAddress());
             OnOffSwitch sw = parent.addDecorator(swName, OnOffSwitch.class);
             sw.stateControl().create();
             sw.stateFeedback().create();
@@ -124,9 +124,10 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
             sw.stateControl().addValueListener((BooleanResource br) -> {
                 boolean isOn = br.getValue();
                 logger.trace("FSM virtual receivers: {}", fsmVirtualReceivers);
+                logger.trace("FSM virtual receivers for {}: {}", base, fsmVirtualReceivers.get(base));
                 if (isOn) {
                     //turn on the first virtual receiver channel
-                    fsmVirtualReceivers.get(base).entrySet().stream().findFirst()
+                    fsmVirtualReceivers.getOrDefault(base, Collections.emptyMap()).entrySet().stream().findFirst()
                             .ifPresent(e -> {
                                 logger.debug("{} STATE:={}", e.getKey(), true);
                                 conn.performSetValue(e.getKey(), "STATE", true);
@@ -142,7 +143,7 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
                             });
                 }
             });
-            conn.addEventListener(new StateEventListener(sw.stateFeedback(), base));
+            conn.addEventListener(new StateEventListener(sw.stateFeedback(), desc.getAddress()));
             sw.stateControl().activate(false);
             sw.stateFeedback().activate(false);
             sw.activate(false);
