@@ -144,6 +144,18 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
             logger.warn("received no VALUES parameters for device {}", desc.getAddress());
             return;
         }
+        if (values.containsKey(PARAMS.DUTY_CYCLE.name())) {
+            logger.debug("adding separate sensor for maintenance channel reading {}", PARAMS.DUTY_CYCLE);
+            maintenanceSensorReading(parent, PARAMS.DUTY_CYCLE, null);
+        }
+        if (values.containsKey(PARAMS.CARRIER_SENSE_LEVEL.name())) {
+            logger.debug("adding separate sensor for maintenance channel reading {}", PARAMS.CARRIER_SENSE_LEVEL);
+            maintenanceSensorReading(parent, PARAMS.CARRIER_SENSE_LEVEL, null);
+        }
+        if (values.containsKey(PARAMS.DUTY_CYCLE_LEVEL.name())) {
+            logger.debug("adding separate sensor for maintenance channel reading {}", PARAMS.DUTY_CYCLE_LEVEL);
+            maintenanceSensorReading(parent, PARAMS.DUTY_CYCLE_LEVEL, null);
+        }
         HmMaintenance mnt = parent.addDecorator(swName, HmMaintenance.class);
         // create the battery field as it will be probably be linked into higher level models
         mnt.batteryLow().create();
@@ -175,7 +187,9 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                     sens.reading().activate(false);
                     sens.activate(false);
                 }
-                sens.reading().setValue(e.getValueFloat() / 100f);
+                if (e != null) {
+                    sens.reading().setValue(e.getValueFloat() / 100f);
+                }
                 break;
             }
             case DUTY_CYCLE : {
@@ -185,7 +199,9 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                     sens.reading().activate(false);
                     sens.activate(false);
                 }
-                sens.reading().setValue(e.getValueBoolean());
+                if (e != null) {
+                    sens.reading().setValue(e.getValueBoolean());
+                }
                 break;
             }
             case DUTY_CYCLE_LEVEL : {
@@ -195,7 +211,9 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                     sens.reading().activate(false);
                     sens.activate(false);
                 }
-                sens.reading().setValue(e.getValueFloat() / 100f);
+                if (e != null) {
+                    sens.reading().setValue(e.getValueFloat() / 100f);
+                }
                 break;
             }
         }

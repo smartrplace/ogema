@@ -38,6 +38,7 @@ import org.ogema.model.sensors.TemperatureSensor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
+import org.ogema.model.sensors.HumiditySensor;
 import org.ogema.tools.resource.util.ResourceUtils;
 
 /**
@@ -45,53 +46,62 @@ import org.ogema.tools.resource.util.ResourceUtils;
  * @author jlapp
  */
 public class IpThermostatChannel extends AbstractDeviceHandler {
-    
+
     public static final String PARAM_TEMPERATUREFALL_MODUS = "TEMPERATUREFALL_MODUS";
     /**
-     * Name ({@value}) of the decorator linking to the TempSens which shall be used instead
-     * of the internal temperature sensor.
+     * Name ({@value}) of the decorator linking to the TempSens which shall be
+     * used instead of the internal temperature sensor.
      */
     public static final String LINKED_TEMP_SENS_DECORATOR = "linkedTempSens";
     public static final String CONTROL_MODE_DECORATOR = "controlMode";
 
     Logger logger = LoggerFactory.getLogger(getClass());
-    
+
     public IpThermostatChannel(HomeMaticConnection conn) {
         super(conn);
     }
-    
+
     enum PARAMS {
 
         SET_POINT_TEMPERATURE() {
 
-                    @Override
-                    public float convertInput(float v) {
-                        return v + 273.15f;
-                    }
+            @Override
+            public float convertInput(float v) {
+                return v + 273.15f;
+            }
 
-                    @Override
-                    public float convertOutput(float v) {
-                        return v - 273.15f;
-                    }
+            @Override
+            public float convertOutput(float v) {
+                return v - 273.15f;
+            }
 
-                },
+        },
         ACTUAL_TEMPERATURE() {
 
-                    @Override
-                    public float convertInput(float v) {
-                        return v + 273.15f;
-                    }
+            @Override
+            public float convertInput(float v) {
+                return v + 273.15f;
+            }
 
-                },
+        },
         VALVE_STATE() {
 
-                    @Override
-                    public float convertInput(float v) {
-                        return v / 100f;
-                    }
+            @Override
+            public float convertInput(float v) {
+                return v / 100f;
+            }
 
-                },
-        BATTERY_STATE;
+        },
+        BATTERY_STATE,
+        
+        HUMIDITY() {
+
+            @Override
+            public float convertInput(float v) {
+                return v / 100f;
+            }
+
+        };
 
         public float convertInput(float v) {
             return v;
@@ -138,8 +148,10 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
     @Override
     public boolean accept(DeviceDescription desc) {
         //System.out.println("parent type = " + desc.getParentType());
-        return ("HMIP-eTRV".equalsIgnoreCase(desc.getParentType()) && "HEATING_CLIMATECONTROL_TRANSCEIVER".equalsIgnoreCase(desc.getType())) ||
-        		("HmIP-WTH-2".equalsIgnoreCase(desc.getParentType()) && "HEATING_CLIMATECONTROL_TRANSCEIVER".equalsIgnoreCase(desc.getType()));
+        return ("HMIP-eTRV".equalsIgnoreCase(desc.getParentType())
+                && "HEATING_CLIMATECONTROL_TRANSCEIVER".equalsIgnoreCase(desc.getType()))
+                || ("HmIP-WTH-2".equalsIgnoreCase(desc.getParentType())
+                && "HEATING_CLIMATECONTROL_TRANSCEIVER".equalsIgnoreCase(desc.getType()));
     }
 
     @Override
@@ -198,55 +210,66 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
                     resources.put(e.getKey(), reading);
                     break;
                 }
+                case "HUMIDITY": {
+                    HumiditySensor humSens = thermos.getSubResource("humiditySensor", HumiditySensor.class);
+                    if (!humSens.reading().isActive()) {
+                        humSens.reading().create();
+                        humSens.reading().activate(false);
+                        humSens.activate(false);
+                    }
+                    logger.debug("found supported thermostat parameter {} on {}", e.getKey(), desc.getAddress());
+                    resources.put(e.getKey(), humSens.reading());
+                    break;
+                }
             }
         }
-        
+
         TemperatureResource setpoint = thermos.temperatureSensor().settings().setpoint();
         setpoint.create();
         thermos.activate(true);
-        
+
         setpoint.addValueListener(new ResourceValueListener<TemperatureResource>() {
             @Override
             public void resourceChanged(TemperatureResource t) {
                 //XXX fails without the Double conversion...
                 conn.performSetValue(deviceAddress, "SET_POINT_TEMPERATURE", Double.valueOf(t.getCelsius()));
             }
-        
+
         }, true);
-        
+
         setupControlModeResource(thermos, deviceAddress);
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
         setupHmParameterValues(thermos, parent.address().getValue());
         setupTempSensLinking(thermos);
     }
-    
+
     class ParameterListener implements ResourceValueListener<SingleValueResource> {
-        
+
         final String address;
 
         public ParameterListener(String address) {
             this.address = address;
-        }        
+        }
 
         @Override
         public void resourceChanged(SingleValueResource resource) {
             String paramName = resource.getName();
-            
+
             Object resourceValue = null;
             if (resource instanceof IntegerResource) {
                 resourceValue = ((IntegerResource) resource).getValue();
             } else {
                 logger.warn("unsupported parameter type: " + resource);
             }
-            
+
             Map<String, Object> parameterSet = new HashMap<>();
             parameterSet.put(paramName, resourceValue);
             conn.performPutParamset(address, "MASTER", parameterSet);
             logger.info("Parameter set 'MASTER' updated for {}: {}", address, parameterSet);
         }
-        
+
     };
-    
+
     private void setupHmParameterValues(Thermostat thermos, String address) {
         //XXX address mangling (parameters are set on device, not channel)
         if (address.lastIndexOf(":") != -1) {
@@ -265,9 +288,9 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
         }
         tf_modus.addValueListener(l, true);
     }
-    
+
     private void linkTempSens(Thermostat thermos, TemperatureSensor tempSens, boolean removeLink) {
-    	final String thermosAddress = getWeatherReceiverChannelAddress(thermos);
+        final String thermosAddress = getWeatherReceiverChannelAddress(thermos);
         if (thermosAddress == null) {
             return;
         }
@@ -284,17 +307,17 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
         }
         //XXX: address mangling (find HEATING_ROOM_TH_RECEIVER channel instead?)
         String weatherAddress = tempSensChannel.address().getValue();
-        if(removeLink) {
+        if (removeLink) {
             conn.performRemoveLink(weatherAddress, thermosAddress);
             return;
         }
         logger.info("HomeMatic weather channel for TempSens {}: {}", tempSens, weatherAddress);
         conn.performAddLink(weatherAddress, thermosAddress, "TempSens", "external temperature sensor");
     }
-    
+
     private void setupTempSensLinking(final Thermostat thermos) {
         TemperatureSensor tempSens = thermos.getSubResource(LINKED_TEMP_SENS_DECORATOR, TemperatureSensor.class);
-        
+
         ResourceStructureListener l = new ResourceStructureListener() {
 
             @Override
@@ -305,22 +328,25 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
                         linkTempSens(thermos, (TemperatureSensor) added, false);
                     }
                 } else if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_REMOVED
-                		&& added.getName().equals(LINKED_TEMP_SENS_DECORATOR)) {
-                	// since we do not know which resource the link referenced before it got deleted
-                	// we need to use the low level API to find out all links for the weather receiver channel
+                        && added.getName().equals(LINKED_TEMP_SENS_DECORATOR)) {
+                    // since we do not know which resource the link referenced before it got deleted
+                    // we need to use the low level API to find out all links for the weather receiver channel
                     final String weatherChannelAddress = getWeatherReceiverChannelAddress(thermos);
-                    if (weatherChannelAddress == null)
-                    	return;
-                	for (Map<String, Object> link : getConnection().performGetLinks(weatherChannelAddress, 0)) {
-                		if (!weatherChannelAddress.equals(link.get("RECEIVER")))
-                			continue;
-                		final Object sender = link.get("SENDER");
-                		if (!(sender instanceof String))
-                			continue;
-                		getConnection().performRemoveLink((String) sender, weatherChannelAddress);
-                		logger.info("Thermostat-temperature sensor connection removed. Thermostat channel {}, temperature sensor {}",
-                				weatherChannelAddress, sender);
-                	}
+                    if (weatherChannelAddress == null) {
+                        return;
+                    }
+                    for (Map<String, Object> link : getConnection().performGetLinks(weatherChannelAddress, 0)) {
+                        if (!weatherChannelAddress.equals(link.get("RECEIVER"))) {
+                            continue;
+                        }
+                        final Object sender = link.get("SENDER");
+                        if (!(sender instanceof String)) {
+                            continue;
+                        }
+                        getConnection().performRemoveLink((String) sender, weatherChannelAddress);
+                        logger.info("Thermostat-temperature sensor connection removed. Thermostat channel {}, temperature sensor {}",
+                                weatherChannelAddress, sender);
+                    }
                 }
             }
         };
@@ -328,20 +354,20 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
         if (tempSens.isActive()) {
             linkTempSens(thermos, tempSens, false);
         }
-        
+
     }
-    
+
     private String getWeatherReceiverChannelAddress(final Thermostat thermos) {
-    	 HmDevice thermostatChannel = conn.findControllingDevice(thermos);
-         if (thermostatChannel == null) {
-             logger.error("cannot find HomeMatic channel for Thermostat {}", thermos);
-             return null;
-         }
-         HmDevice thermostatDevice = conn.getToplevelDevice(thermostatChannel);
-         //XXX: address mangling (find HEATING_ROOM_TH_RECEIVER channel instead?)
-         return thermostatDevice.address().getValue() + ":6";
+        HmDevice thermostatChannel = conn.findControllingDevice(thermos);
+        if (thermostatChannel == null) {
+            logger.error("cannot find HomeMatic channel for Thermostat {}", thermos);
+            return null;
+        }
+        HmDevice thermostatDevice = conn.getToplevelDevice(thermostatChannel);
+        //XXX: address mangling (find HEATING_ROOM_TH_RECEIVER channel instead?)
+        return thermostatDevice.address().getValue() + ":6";
     }
-    
+
     private void setupControlModeResource(Thermostat thermos, final String deviceAddress) {
         IntegerResource controlMode = thermos.addDecorator(CONTROL_MODE_DECORATOR, IntegerResource.class);
         controlMode.create().activate(false);
