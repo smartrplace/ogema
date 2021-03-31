@@ -29,6 +29,9 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
+import org.ogema.model.devices.sensoractordevices.SensorDevice;
+import org.ogema.model.sensors.GenericBinarySensor;
+import org.ogema.model.sensors.GenericFloatSensor;
 import org.ogema.tools.resource.util.ResourceUtils;
 
 /**
@@ -42,8 +45,9 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
     Logger logger = LoggerFactory.getLogger(getClass());
     public enum PARAMS {
 
-        DUTY_CYCLE,
-        DUTY_CYCLE_LEVEL,
+        CARRIER_SENSE_LEVEL, // 0..100% (HAP)
+        DUTY_CYCLE, // boolean (HAP)
+        DUTY_CYCLE_LEVEL, // 0..100% (HAP)
         ERROR_CODE,
         LOWBAT,
         OPERATING_VOLTAGE,
@@ -75,18 +79,22 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                 if (!address.equals(e.getAddress())) {
                     continue;
                 }
-                if (PARAMS.DUTY_CYCLE.name().equals(e.getValueKey())) {
+                if (PARAMS.CARRIER_SENSE_LEVEL.name().equals(e.getValueKey())) {
+                    maintenanceSensorReading(parent, PARAMS.CARRIER_SENSE_LEVEL, e);
+                } else if (PARAMS.DUTY_CYCLE.name().equals(e.getValueKey())) {
                     if (!mnt.dutyCycle().isActive()) {
                         mnt.dutyCycle().reading().create().activate(false);
                         mnt.dutyCycle().activate(false);
                     }
                     mnt.dutyCycle().reading().setValue(e.getValueBoolean());
+                    maintenanceSensorReading(parent, PARAMS.DUTY_CYCLE, e);
                 } else if (PARAMS.DUTY_CYCLE_LEVEL.name().equals(e.getValueKey())) {
                     if (!mnt.dutyCycleLevel().isActive()) {
                         mnt.dutyCycleLevel().reading().create().activate(false);
                         mnt.dutyCycleLevel().activate(false);
                     }
                     mnt.dutyCycleLevel().reading().setValue(e.getValueFloat()/100f);
+                    maintenanceSensorReading(parent, PARAMS.DUTY_CYCLE_LEVEL, e);
                 } else if (PARAMS.ERROR_CODE.name().equals(e.getValueKey())) {
                     if (!mnt.errorCode().isActive()) {
                         mnt.errorCode().create().activate(false);
@@ -150,6 +158,47 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
         mnt.communicationStatus().activate(true);
         
         conn.addEventListener(new MaintenanceEventListener(parent, mnt, desc.getAddress()));
+    }
+    
+    private void maintenanceSensorReading(HmDevice parent, PARAMS param, HmEvent e) {
+        SensorDevice sd = parent.getSubResource("maintenanceChannelReadings", SensorDevice.class);
+        if (!sd.isActive()) {
+            sd.sensors().create();
+            sd.sensors().activate(false);
+            sd.activate(false);
+        }
+        switch (param) {
+            case CARRIER_SENSE_LEVEL : {
+                GenericFloatSensor sens = sd.getSubResource("carrierSensLevel", GenericFloatSensor.class);
+                if (!sens.isActive()) {
+                    sens.reading().create();
+                    sens.reading().activate(false);
+                    sens.activate(false);
+                }
+                sens.reading().setValue(e.getValueFloat() / 100f);
+                break;
+            }
+            case DUTY_CYCLE : {
+                GenericBinarySensor sens = sd.getSubResource("dutyCycleLevel", GenericBinarySensor.class);
+                if (!sens.isActive()) {
+                    sens.reading().create();
+                    sens.reading().activate(false);
+                    sens.activate(false);
+                }
+                sens.reading().setValue(e.getValueBoolean());
+                break;
+            }
+            case DUTY_CYCLE_LEVEL : {
+                GenericFloatSensor sens = sd.getSubResource("dutyCycleLevel", GenericFloatSensor.class);
+                if (!sens.isActive()) {
+                    sens.reading().create();
+                    sens.reading().activate(false);
+                    sens.activate(false);
+                }
+                sens.reading().setValue(e.getValueFloat() / 100f);
+                break;
+            }
+        }
     }
     
 }
