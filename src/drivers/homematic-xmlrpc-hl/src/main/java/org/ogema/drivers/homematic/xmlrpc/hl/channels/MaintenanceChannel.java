@@ -181,7 +181,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
         }
         switch (param) {
             case CARRIER_SENSE_LEVEL : {
-                GenericFloatSensor sens = sd.getSubResource("carrierSensLevel", GenericFloatSensor.class);
+                GenericFloatSensor sens = sd.sensors().getSubResource("carrierSensLevel", GenericFloatSensor.class);
                 if (!sens.isActive()) {
                     sens.reading().create();
                     sens.reading().activate(false);
@@ -193,7 +193,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                 break;
             }
             case DUTY_CYCLE : {
-                GenericBinarySensor sens = sd.getSubResource("dutyCycle", GenericBinarySensor.class);
+                GenericBinarySensor sens = sd.sensors().getSubResource("dutyCycle", GenericBinarySensor.class);
                 if (!sens.isActive()) {
                     sens.reading().create();
                     sens.reading().activate(false);
@@ -205,7 +205,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                 break;
             }
             case DUTY_CYCLE_LEVEL : {
-                GenericFloatSensor sens = sd.getSubResource("dutyCycleLevel", GenericFloatSensor.class);
+                GenericFloatSensor sens = sd.sensors().getSubResource("dutyCycleLevel", GenericFloatSensor.class);
                 if (!sens.isActive()) {
                     sens.reading().create();
                     sens.reading().activate(false);
