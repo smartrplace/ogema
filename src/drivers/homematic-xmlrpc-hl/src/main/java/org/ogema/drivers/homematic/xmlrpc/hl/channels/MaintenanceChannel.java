@@ -87,7 +87,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                         mnt.dutyCycle().activate(false);
                     }
                     mnt.dutyCycle().reading().setValue(e.getValueBoolean());
-                    maintenanceSensorReading(parent, PARAMS.DUTY_CYCLE, e);
+                    //maintenanceSensorReading(parent, PARAMS.DUTY_CYCLE, e);
                 } else if (PARAMS.DUTY_CYCLE_LEVEL.name().equals(e.getValueKey())) {
                     if (!mnt.dutyCycleLevel().isActive()) {
                         mnt.dutyCycleLevel().reading().create().activate(false);
@@ -144,10 +144,12 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
             logger.warn("received no VALUES parameters for device {}", desc.getAddress());
             return;
         }
+        /*
         if (values.containsKey(PARAMS.DUTY_CYCLE.name())) {
             logger.debug("adding separate sensor for maintenance channel reading {}", PARAMS.DUTY_CYCLE);
             maintenanceSensorReading(parent, PARAMS.DUTY_CYCLE, null);
         }
+        */
         if (values.containsKey(PARAMS.CARRIER_SENSE_LEVEL.name())) {
             logger.debug("adding separate sensor for maintenance channel reading {}", PARAMS.CARRIER_SENSE_LEVEL);
             maintenanceSensorReading(parent, PARAMS.CARRIER_SENSE_LEVEL, null);
