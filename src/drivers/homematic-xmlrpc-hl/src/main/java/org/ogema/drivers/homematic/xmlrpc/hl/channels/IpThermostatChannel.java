@@ -239,7 +239,7 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
 
         setupControlModeResource(thermos, deviceAddress);
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
-        setupHmParameterValues(thermos, parent.address().getValue());
+        setupHmParameterValues(thermos, desc.getAddress());
         setupTempSensLinking(thermos);
     }
 
@@ -271,10 +271,6 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
     };
 
     private void setupHmParameterValues(Thermostat thermos, String address) {
-        //XXX address mangling (parameters are set on device, not channel)
-        if (address.lastIndexOf(":") != -1) {
-            address = address.substring(0, address.lastIndexOf(":"));
-        }
         @SuppressWarnings("unchecked")
         ResourceList<SingleValueResource> masterParameters = thermos.addDecorator("HmParametersMaster", ResourceList.class);
         if (!masterParameters.exists()) {

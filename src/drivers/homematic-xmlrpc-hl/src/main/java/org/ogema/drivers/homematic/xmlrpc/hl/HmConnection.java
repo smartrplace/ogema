@@ -383,6 +383,7 @@ public class HmConnection implements HomeMaticConnection {
 
 	@Override
 	public void performPutParamset(String address, String set, Map<String, Object> values) {
+        logger.debug("adding putParamset action: {} {} {}", address, set, values);
 		writer.addWriteAction(WriteAction.createPutParamset(client, address, set, values));
 	}
 
