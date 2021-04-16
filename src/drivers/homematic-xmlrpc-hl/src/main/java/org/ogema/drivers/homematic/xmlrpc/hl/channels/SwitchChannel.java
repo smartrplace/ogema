@@ -123,7 +123,7 @@ public class SwitchChannel extends AbstractDeviceHandler {
         if (stateDesc != null && stateDesc.isWritable()) { // not writable on SWITCH_TRANSMITTER
             sw.stateControl().create();
             logger.debug("adding STATE listener to {}", sw.stateControl().getPath());
-            sw.stateControl().addValueListener(new SingleChangeUpdater(desc.getAddress(), "STATE"));
+            sw.stateControl().addValueListener(new SingleChangeUpdater(desc.getAddress(), "STATE"), true);
         }
         conn.addEventListener(new SwitchEventListener(sw, desc.getAddress()));
         sw.activate(true);
