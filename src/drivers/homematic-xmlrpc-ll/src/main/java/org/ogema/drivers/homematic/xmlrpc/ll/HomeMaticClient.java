@@ -137,17 +137,20 @@ public class HomeMaticClient implements HomeMatic {
 
     @Override
     public void init(String url, String interfaceId) throws XmlRpcException {
+        logger.trace("init {} {}", url, interfaceId);
         client.execute("init", new Object[]{url, interfaceId});
     }
 
     @Override
     public void ping(String callerId) throws XmlRpcException {
+        logger.trace("ping {}", callerId);
         client.execute("ping", new Object[]{callerId});
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public DeviceDescription getDeviceDescription(String address) throws XmlRpcException {
+        logger.trace("getDeviceDescription {}", address);
         Object o = client.execute("getDeviceDescription", new Object[]{address});
         return new DeviceDescriptionXmlRpc((Map<String, Object>) o);
     }
@@ -155,6 +158,7 @@ public class HomeMaticClient implements HomeMatic {
     @Override
     @SuppressWarnings("unchecked")
     public List<DeviceDescription> listDevices() throws XmlRpcException {
+        logger.trace("listDevices");
         Object[] a = (Object[]) client.execute("listDevices", new Object[]{});
         List<DeviceDescription> rval = new ArrayList<>(a.length);
         for (Object o: a) {
@@ -166,6 +170,7 @@ public class HomeMaticClient implements HomeMatic {
     @Override
     @SuppressWarnings("unchecked")
     public Map<String, ParameterDescription<?>> getParamsetDescription(String address, String type) throws XmlRpcException {
+        logger.trace("getParamsetDescription {} {}", address, type);
         Map<String, Object> rawMap = (Map<String, Object>) client.execute("getParamsetDescription", new Object[]{address, type});
         Map<String, ParameterDescription<?>> rval = new LinkedHashMap<>();
         for (Map.Entry<String, Object> e: rawMap.entrySet()) {
@@ -177,40 +182,49 @@ public class HomeMaticClient implements HomeMatic {
     @Override
     @SuppressWarnings("unchecked")
     public XmlRpcStruct getParamset(String address, String paramset_key) throws XmlRpcException {
+        logger.trace("getParamset {} {}", address, paramset_key);
         return new MapXmlRpcStruct((Map<String, Object>)client.execute("getParamset", new Object[]{address, paramset_key}));
     }
 
     @Override
     public String getParamsetId(String address, String type) throws XmlRpcException {
+        logger.trace("getParamsetId {} {}", address, type);
         return (String) client.execute("getParamsetId", new Object[]{address, type});
     }
 
     @Override
     public void putParamset(String address, String paramset_key, XmlRpcStruct set) throws XmlRpcException {
+        logger.trace("putParamset {} {} {}", address, paramset_key, set);
         client.execute("putParamset", new Object[]{address, paramset_key, set.toMap()});
     }
     
     @Override
     public int getInstallMode() throws XmlRpcException {
+        logger.trace("getInstallMode");
         return ((Number) client.execute("getInstallMode", new Object[]{})).intValue();
     }
 
     @Override
     public void setInstallMode(boolean on, int time, int mode) throws XmlRpcException {
-    	if (type == HomematicType.Ip)
+    	if (type == HomematicType.Ip) {
+            logger.trace("setInstallMode (HmIP) {} {}", on, time);
     		client.execute("setInstallMode", new Object[]{on, time});
-    	else
+        } else {
+            logger.trace("setInstallMode {} {} {}", on, time, mode);
     		client.execute("setInstallMode", new Object[]{on, time, mode});
+        }
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public <T extends Object> T getValue(String address, String value_key) throws XmlRpcException {
+        logger.trace("getValue {} {}", address, value_key);
         return (T) client.execute("getValue", new Object[]{address, value_key});
     }
 
     @Override
     public void setValue(String address, String value_key, Object value) throws XmlRpcException {
+        logger.trace("setValue {} {} {}", address, value_key, value);
         Object obj = client.execute("setValue", new Object[]{address, value_key, value});
         if(obj != null)
             logger.debug("setValue returned object of type: {}, value: {}", obj.getClass().getName(), obj.toString());
@@ -221,21 +235,25 @@ public class HomeMaticClient implements HomeMatic {
     
     @Override
     public boolean reportValueUsage(String address, String valueId, int refCounter) throws XmlRpcException {
+        logger.trace("reportValueUsage {} {} {}", address, valueId, refCounter);
         return (boolean) client.execute("reportValueUsage", new Object[]{address, valueId, refCounter});
     }
     
     @Override
     public void addLink(String sender, String receiver, String name, String description) throws XmlRpcException {
+        logger.trace("addLink {} {} {} {}", sender, receiver, name, description);
         client.execute("addLink", new Object[]{sender, receiver, name, description});
     }
     
     @Override
     public void removeLink(String sender, String receiver) throws XmlRpcException {
+        logger.trace("removeLink {} {}", sender, receiver);
         client.execute("removeLink", new Object[]{sender, receiver});
     }
 
     @Override
     public List<String> getLinkPeers(String address) throws XmlRpcException {
+        logger.trace("getLinkPeers {}", address);
         Object[] rval = (Object[]) client.execute("getLinkPeers", new Object[]{address});
         List<String> peers = new ArrayList<>(rval.length);
         for (Object o: rval) {
@@ -247,12 +265,14 @@ public class HomeMaticClient implements HomeMatic {
     @Override
     @SuppressWarnings("unchecked")
     public Map<String, Object> getLinkInfo(String sender, String receiver) throws XmlRpcException {
+        logger.trace("getLinkInfo {} {}", sender, receiver);
         return (Map<String, Object>) client.execute("getLinkInfo", new Object[]{sender, receiver});
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getLinks(String address, int flags) throws XmlRpcException {
+        logger.trace("getLinks {} {}", address, flags);
         Object[] rval = (Object[]) client.execute("getLinks", new Object[]{address, flags});
         List<Map<String, Object>> l = new ArrayList<>();
         for (Object o: rval) {
@@ -263,6 +283,7 @@ public class HomeMaticClient implements HomeMatic {
 
     @Override
     public List<ServiceMessage> getServiceMessages() throws XmlRpcException {
+        logger.trace("getServiceMessages");
         Object o = client.execute("getServiceMessages", new Object[]{});
         if (o != null && !(o instanceof Object[])) {
             System.err.printf("getServiceMessages strange return value: '%s'%n", o);
@@ -281,23 +302,27 @@ public class HomeMaticClient implements HomeMatic {
     
     @Override
     public void deleteDevice(String address, int flags) throws XmlRpcException {
+        logger.trace("deleteDevice {} {}", address, flags);
         client.execute("deleteDevice", new Object[]{address, flags});
     }
 
     @Override
     public void abortDeleteDevice(String address) throws XmlRpcException {
+        logger.trace("abortDeleteDevice {}", address);
         client.execute("abortDeleteDevice", new Object[]{address});
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public XmlRpcStruct rssiInfo() throws XmlRpcException {
+        logger.trace("rssiInfo");
         return new MapXmlRpcStruct((Map<String, Object>)client.execute("rssiInfo", new Object[]{}));
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> listBidcosInterfaces() throws XmlRpcException {
+        logger.trace("listBidcosInterfaces");
         Object[] rval = (Object[]) client.execute("listBidcosInterfaces", new Object[]{});
         List<Map<String, Object>> l = new ArrayList<>();
         for (Object o: rval) {
