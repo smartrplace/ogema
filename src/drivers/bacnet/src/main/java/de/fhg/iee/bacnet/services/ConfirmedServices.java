@@ -38,7 +38,19 @@ public abstract class ConfirmedServices {
     public static ByteBuffer buildReadPropertyApdu(ObjectIdentifierTag object, int propertyId) {
     	return buildReadPropertyApdu(object.getObjectType(),  object.getInstanceNumber(), propertyId);
     }
+    
     public static ByteBuffer buildReadPropertyApdu(int objectType, int instanceNumber, int propertyId) {
+        return buildReadPropertyApdu(objectType, instanceNumber, propertyId, -1);
+    }
+    
+    /**
+     * @param objectType Type of requested object
+     * @param instanceNumber Instance number of requested object
+     * @param propertyId Id of requested property
+     * @param index Requested index for array properties or -1.
+     * @return ReadProperty service request APDU with the given parameters
+     */
+    public static ByteBuffer buildReadPropertyApdu(int objectType, int instanceNumber, int propertyId, int index) {
         ByteBuffer buf = ByteBuffer.allocate(100);
         ProtocolControlInformation pciRequestProperty
                 = new ProtocolControlInformation(ApduConstants.APDU_TYPES.CONFIRMED_REQUEST, BACnetConfirmedServiceChoice.readProperty.getBACnetEnumValue());
@@ -47,6 +59,9 @@ public abstract class ConfirmedServices {
 
         new ObjectIdentifierTag(0, Tag.TagClass.Context, objectType, instanceNumber).write(buf);
         new UnsignedIntTag(1, Tag.TagClass.Context, propertyId).write(buf);
+        if (index > -1) {
+            new UnsignedIntTag(2, Tag.TagClass.Context, index).write(buf);
+        }
         buf.flip();
         return buf;
     }
@@ -69,7 +84,8 @@ public abstract class ConfirmedServices {
         buf.flip();
         return buf;
     }
-    public static ByteBuffer buildWritePropertyApdu(int objectType, int instanceNumber, int propertyId, List<Tag> valueTags) {
+    
+    public static ByteBuffer buildWritePropertyApdu(int objectType, int instanceNumber, int propertyId, int index, List<Tag> valueTags) {
         ByteBuffer buf = ByteBuffer.allocate(100);
         ProtocolControlInformation pciRequestProperty
                 = new ProtocolControlInformation(ApduConstants.APDU_TYPES.CONFIRMED_REQUEST, BACnetConfirmedServiceChoice.writeProperty.getBACnetEnumValue());
@@ -78,12 +94,19 @@ public abstract class ConfirmedServices {
 
         new ObjectIdentifierTag(0, Tag.TagClass.Context, objectType, instanceNumber).write(buf);
         new UnsignedIntTag(1, Tag.TagClass.Context, propertyId).write(buf);
+        if (index > -1) {
+            new UnsignedIntTag(2, Tag.TagClass.Context, index).write(buf);
+        }
         Tag.createOpeningTag(3).write(buf);
  		for(Tag value: valueTags)
         	value.write(buf);
         Tag.createClosingTag(3).write(buf);
         buf.flip();
         return buf;
+    }
+    
+    public static ByteBuffer buildWritePropertyApdu(int objectType, int instanceNumber, int propertyId, List<Tag> valueTags) {
+        return buildWritePropertyApdu(objectType, instanceNumber, propertyId, -1, valueTags);
     }
     
 }
