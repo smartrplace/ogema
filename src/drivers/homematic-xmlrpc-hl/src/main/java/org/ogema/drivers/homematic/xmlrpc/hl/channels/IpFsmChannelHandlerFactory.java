@@ -142,7 +142,7 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
                                 }
                             });
                 }
-            });
+            }, true);
             conn.addEventListener(new StateEventListener(sw.stateFeedback(), desc.getAddress()));
             BooleanResource ledDisable = sw.getSubResource("LED_DISABLE_CHANNELSTATE", BooleanResource.class);
             ledDisable.create().activate(false);
