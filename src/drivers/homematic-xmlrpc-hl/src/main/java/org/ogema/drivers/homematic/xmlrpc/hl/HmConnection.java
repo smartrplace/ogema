@@ -775,6 +775,7 @@ public class HmConnection implements HomeMaticConnection {
 				logger.error("HomeMatic XmlRpc driver shutdown failed", e);
 			}
 		}
+        handlers.forEach(DeviceHandler::close);
 	}
 
 	private static Inet4Address getAddressFromInterface(final NetworkInterface nif) {

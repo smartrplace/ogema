@@ -77,5 +77,11 @@ public interface DeviceHandler {
     default boolean update(HmDevice device) {
         return false;
     }
+
+    /**
+     * Release aquired resources not already handled by OGEMA, e.g. threads.
+     */
+    default void close() {
+    }
     
 }

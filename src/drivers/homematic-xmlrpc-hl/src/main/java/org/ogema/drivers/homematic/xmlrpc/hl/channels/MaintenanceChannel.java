@@ -16,9 +16,16 @@
 package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmMaintenance;
@@ -35,15 +42,15 @@ import org.ogema.model.sensors.GenericFloatSensor;
 import org.ogema.tools.resource.util.ResourceUtils;
 
 /**
- * Handler for {@code MAINTENANCE} channels on BidCos and HmIP devices.
- * See {@link PARAMS} for supported parameters.
+ * Handler for {@code MAINTENANCE} channels on BidCos and HmIP devices. See
+ * {@link PARAMS} for supported parameters.
  *
  * @author jlapp
  */
 public class MaintenanceChannel extends AbstractDeviceHandler {
 
-    Logger logger = LoggerFactory.getLogger(getClass());
-    public enum PARAMS {
+    static final long RSSI_MAX_AGE = 15 * 60 * 1000L;
+    public static enum PARAMS {
 
         CARRIER_SENSE_LEVEL, // 0..100% (HAP)
         DUTY_CYCLE, // boolean (HAP)
@@ -57,10 +64,53 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
 
     }
 
+    Logger logger = LoggerFactory.getLogger(getClass());
+    Collection<KnownDevice> knownDevices = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    ScheduledExecutorService exec;
+
+    private class KnownDevice {
+
+        final HmMaintenance resource;
+        final DeviceDescription desc;
+        final Map<String, ParameterDescription<?>> values;
+
+        public KnownDevice(HmMaintenance resource, DeviceDescription desc, Map<String, ParameterDescription<?>> values) {
+            this.resource = resource;
+            this.desc = desc;
+            this.values = values;
+        }
+
+        void checkRssiUpdate(long maxAge) {
+            //XXX system vs framework time.
+            long now = System.currentTimeMillis();
+            boolean updateRequired = false;
+            updateRequired |=
+                resource.rssiDevice().exists() && resource.rssiDevice().getLastUpdateTime() + maxAge < now;
+            updateRequired |=
+                resource.rssiPeer().exists() && resource.rssiPeer().getLastUpdateTime() + maxAge < now;
+            if (updateRequired) {
+                update(resource, desc.getAddress());
+            }
+        }
+
+    }
+
     public MaintenanceChannel(HomeMaticConnection conn) {
         super(conn);
+        exec = Executors.newSingleThreadScheduledExecutor();
+        exec.scheduleAtFixedRate(this::updateRssi, 60, 60, TimeUnit.SECONDS);
     }
     
+    void updateRssi() {
+        knownDevices.forEach(d -> {
+            try {
+                d.checkRssiUpdate(RSSI_MAX_AGE);
+            } catch (RuntimeException re) {
+                logger.debug("bug!", re);
+            }
+        });
+    }
+
     class MaintenanceEventListener implements HmEventListener {
 
         final HmMaintenance mnt;
@@ -93,7 +143,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                         mnt.dutyCycleLevel().reading().create().activate(false);
                         mnt.dutyCycleLevel().activate(false);
                     }
-                    mnt.dutyCycleLevel().reading().setValue(e.getValueFloat()/100f);
+                    mnt.dutyCycleLevel().reading().setValue(e.getValueFloat() / 100f);
                     maintenanceSensorReading(parent, PARAMS.DUTY_CYCLE_LEVEL, e);
                 } else if (PARAMS.ERROR_CODE.name().equals(e.getValueKey())) {
                     if (!mnt.errorCode().isActive()) {
@@ -127,7 +177,6 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                 }
             }
         }
-
     }
 
     @Override
@@ -149,7 +198,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
             logger.debug("adding separate sensor for maintenance channel reading {}", PARAMS.DUTY_CYCLE);
             maintenanceSensorReading(parent, PARAMS.DUTY_CYCLE, null);
         }
-        */
+         */
         if (values.containsKey(PARAMS.CARRIER_SENSE_LEVEL.name())) {
             logger.debug("adding separate sensor for maintenance channel reading {}", PARAMS.CARRIER_SENSE_LEVEL);
             maintenanceSensorReading(parent, PARAMS.CARRIER_SENSE_LEVEL, null);
@@ -162,7 +211,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
         // create the battery field as it will be probably be linked into higher level models
         mnt.batteryLow().create();
         mnt.activate(true);
-        
+
         mnt.communicationStatus().communicationDisturbed().create();
         try {
             mnt.communicationStatus().communicationDisturbed().setValue(conn.<Boolean>getValue(desc.getAddress(), PARAMS.UNREACH.name()));
@@ -170,10 +219,18 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
             logger.warn("could not read UNREACH state of device {}: {}", desc.getAddress(), ioex.getMessage());
         }
         mnt.communicationStatus().activate(true);
-        
+
+        if (values.containsKey(PARAMS.RSSI_DEVICE.name())) {
+            mnt.rssiDevice().create();
+        }
+        if (values.containsKey(PARAMS.RSSI_PEER.name())) {
+            mnt.rssiPeer().create();
+        }
         conn.addEventListener(new MaintenanceEventListener(parent, mnt, desc.getAddress()));
+        knownDevices.add(new KnownDevice(mnt, desc, values));
+        update(mnt, desc.getAddress());
     }
-    
+
     private void maintenanceSensorReading(HmDevice parent, PARAMS param, HmEvent e) {
         SensorDevice sd = parent.getSubResource("maintenanceChannelReadings", SensorDevice.class);
         if (!sd.isActive()) {
@@ -182,7 +239,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
             sd.activate(false);
         }
         switch (param) {
-            case CARRIER_SENSE_LEVEL : {
+            case CARRIER_SENSE_LEVEL: {
                 GenericFloatSensor sens = sd.sensors().getSubResource("carrierSensLevel", GenericFloatSensor.class);
                 if (!sens.isActive()) {
                     sens.reading().create();
@@ -194,7 +251,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                 }
                 break;
             }
-            case DUTY_CYCLE : {
+            case DUTY_CYCLE: {
                 GenericBinarySensor sens = sd.sensors().getSubResource("dutyCycle", GenericBinarySensor.class);
                 if (!sens.isActive()) {
                     sens.reading().create();
@@ -206,7 +263,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                 }
                 break;
             }
-            case DUTY_CYCLE_LEVEL : {
+            case DUTY_CYCLE_LEVEL: {
                 GenericFloatSensor sens = sd.sensors().getSubResource("dutyCycleLevel", GenericFloatSensor.class);
                 if (!sens.isActive()) {
                     sens.reading().create();
@@ -220,5 +277,56 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
             }
         }
     }
-    
+
+    @Override
+    public boolean update(HmDevice device) {
+        HmDevice top = conn.getToplevelDevice(device);
+        return findChannels(top, "MAINTENANCE").findAny()
+                .map(d -> update(top, d.address().getValue())).orElse(Boolean.FALSE);
+    }
+
+    private boolean update(HmDevice toplevel, String channelAddress) {
+        List<HmMaintenance> mnt = toplevel.getSubResources(HmMaintenance.class, false);
+        if (!mnt.isEmpty()) {
+            logger.debug("trying to update RSSI for {}", mnt.get(0));
+            return update(mnt.get(0), channelAddress);
+        }
+        return false;
+    }
+
+    private boolean update(HmMaintenance m, String channelAddress) {
+        boolean updated = false;
+        try {
+            if (m.rssiDevice().exists()) { // available resources should be created in setup()
+                logger.trace("reading RSSI_DEVICE for {} / {}", m, channelAddress);
+                int rssiDevice = conn.getValue(channelAddress, PARAMS.RSSI_DEVICE.name());
+                m.rssiDevice().setValue(rssiDevice);
+                m.rssiDevice().activate(false);
+                updated = true;
+            }
+            if (m.rssiPeer().exists()) {
+                logger.trace("reading RSSI_PEER for {} / {}", m, channelAddress);
+                int rssiPeer = conn.getValue(channelAddress, PARAMS.RSSI_PEER.name());
+                m.rssiPeer().setValue(rssiPeer);
+                m.rssiPeer().activate(false);
+                updated = true;
+            }
+            return updated;
+        } catch (IOException ex) {
+            String msg = ex.getMessage();
+            if (msg.startsWith("Unknown Parameter value")) {
+                // happens for RSSI_DEVICE on a HM_HmIP_SWDM even though it's listed as supported parameter
+                logger.debug("read mysteriously failed for {}: {}", m, msg);
+            } else {
+                logger.warn("read failed for {}", m, ex);
+            }
+        }
+        return updated;
+    }
+
+    static Stream<HmDevice> findChannels(HmDevice toplevelDevice, String type) {
+        return toplevelDevice.channels().getAllElements().stream()
+                .filter(d -> type.equalsIgnoreCase(d.type().getValue()));
+    }
+
 }
