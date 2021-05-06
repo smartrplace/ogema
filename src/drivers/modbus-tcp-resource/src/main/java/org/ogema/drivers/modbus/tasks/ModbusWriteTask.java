@@ -163,10 +163,10 @@ System.out.println("Modbus: resourceChanged:"+resource.getLocation());
 						logger.info("Success:Writing value:"+v.getFloatValue()+" to:"+getStartAddress());
 					} catch (Exception e) {
 						if(ModbusDriver.debugMode) {
-							logger.error("Write task to "+getHost()+"-"+getStartAddress()+" failed... " + e.getMessage(),
+							logger.warn("Write task to "+getHost()+"-"+getStartAddress()+" failed... " + e.getMessage(),
 									e);
 						} else {
-							logger.error("Write task to "+getHost()+"-"+getStartAddress()+" failed... " + e.getMessage());
+							logger.warn("Write task to "+getHost()+"-"+getStartAddress()+" failed... " + e.getMessage());
 						}
 					} finally {
 						con.close();
