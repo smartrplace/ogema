@@ -50,6 +50,7 @@
                         <!-- need dynamic import to resolve input data classes during deserialization -->
                         <DynamicImport-Package>*</DynamicImport-Package>
                     </instructions>
+                    <unpackBundle>true</unpackBundle>
                 </configuration>
             </plugin>
         </plugins>

@@ -19,7 +19,7 @@
     <div class="row">
         <div class="col-md-12">
             <h3>
-                Ressource View
+                Resource View
             </h3>
         </div>
     </div>
@@ -29,6 +29,8 @@
                 <h4> Accessinformations for the OGEMA REST-Interface</h4>
             </div>
         </div>
+        <!-- this is a form so that we can maybe get the browser to store the password -->
+        <form onsubmit="return false;" ng-submit="getAllResources()">
         <div class="row">
             <div class="col-md-6">
                 <label> Username</label>
@@ -36,9 +38,11 @@
             </div>
             <div class="col-md-6">
                 <label> Password</label>
-                <input type="text" class="form-control" ng-model="restPwd">
+                <input type="password" class="form-control" ng-model="restPwd">
             </div>
+            <input type="submit" style="display:none"/>
         </div>
+        </form>
         <div class="row">            
             <div class="col-md-12">
                 <label>REST-Url</label>
