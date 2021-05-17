@@ -256,7 +256,7 @@ public class HmConnection implements HomeMaticConnection {
             if (interfaceInfo.containsKey("DUTY_CYCLE")) {
                 float dc = Float.valueOf(interfaceInfo.get("DUTY_CYCLE").toString());
                 baseResource.interfaceInfo().dutyCycle().reading().create();
-                baseResource.interfaceInfo().dutyCycle().reading().setValue(dc);
+                baseResource.interfaceInfo().dutyCycle().reading().setValue(dc / 100);
                 baseResource.interfaceInfo().dutyCycle().reading().activate(false);
                 baseResource.interfaceInfo().dutyCycle().activate(false);
             }
