@@ -52,6 +52,14 @@ import org.slf4j.LoggerFactory;
  */
 public class MinimalDeviceService implements IndicationListener<Void> {
     
+    /**
+     * System property to modify the size of buffers to allocate when
+     * writing replies, default {@value #BUFFER_SIZE_DEFAULT}.
+     */
+    public static final String BUFFER_SIZE_PROP = "de.fhg.iee.bacnet.MinimalDeviceService.buffer_size";
+    private static final int BUFFER_SIZE_DEFAULT = 32768;
+    private static final int BUFFER_SIZE = Integer.getInteger(BUFFER_SIZE_PROP, BUFFER_SIZE_DEFAULT);
+    
     /*
     22.1.5  Minimum Device Requirements
     A device that conforms to the BACnet protocol and contains an application layer shall:
@@ -222,7 +230,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
     private void serviceReadPropertyMultipleRequest(Indication ind) {
         ByteBuffer data = ind.getData();
         //XXX allocating fixed buffer...
-        ByteBuffer output = ByteBuffer.allocate(8192);
+        ByteBuffer output = ByteBuffer.allocate(BUFFER_SIZE);
         ProtocolControlInformation pci = new ProtocolControlInformation(ApduConstants.APDU_TYPES.COMPLEX_ACK, BACnetConfirmedServiceChoice.readPropertyMultiple);
         pci = pci.withInvokeId(ind.getProtocolControlInfo().getInvokeId());
         pci.write(output);
@@ -419,7 +427,7 @@ public class MinimalDeviceService implements IndicationListener<Void> {
             return;
         }
         //FIXME huge allocation that may still be insufficient, maybe switch to netty ByteBuf?
-        ByteBuffer buf = ByteBuffer.allocate(8192);
+        ByteBuffer buf = ByteBuffer.allocate(BUFFER_SIZE);
         ProtocolControlInformation pci = new ProtocolControlInformation(ApduConstants.APDU_TYPES.COMPLEX_ACK, BACnetConfirmedServiceChoice.readProperty);
         pci = pci.withInvokeId(i.getProtocolControlInfo().getInvokeId());
         pci.write(buf);
