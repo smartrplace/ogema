@@ -16,6 +16,7 @@
 package org.ogema.impl.persistence;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import org.ogema.persistence.PersistencePolicy;
 import org.ogema.persistence.PersistencePolicy.ChangeInfo;
 import org.ogema.resourcetree.SimpleResourceData;
 import org.ogema.resourcetree.TreeElement;
+import org.slf4j.LoggerFactory;
 
 public class TreeElementImpl implements TreeElement {
 
@@ -624,8 +626,14 @@ public class TreeElementImpl implements TreeElement {
 	@Override
 	public List<TreeElement> getChildren() {
 		// check if the resource exists
-		if (!db.hasResource0(this))
-			throw new ResourceNotFoundException(this.toString());
+		if (!db.hasResource0(this)) {
+			//throw new ResourceNotFoundException(this.toString());
+			// probably a bug in ResourceManager
+			LoggerFactory.getLogger(getClass())
+				.warn("getChildren called on non existent element '{}': {}",
+					this.toString(), Arrays.asList(Thread.currentThread().getStackTrace()));
+			return Collections.emptyList();
+		}
 
 		// if this is a reference than addChild to the reference
 		TreeElementImpl node = this;
@@ -648,6 +656,7 @@ public class TreeElementImpl implements TreeElement {
 		return node;
 	}
 
+	@SuppressWarnings("fallthrough")
 	void initDataContainer() {
 		// For complex and complex array resources is nothing todo
 		if (typeKey == DBConstants.TYPE_KEY_COMPLEX || typeKey == DBConstants.TYPE_KEY_COMPLEX_ARR)

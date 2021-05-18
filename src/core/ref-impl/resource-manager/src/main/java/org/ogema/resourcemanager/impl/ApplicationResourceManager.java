@@ -109,10 +109,10 @@ public class ApplicationResourceManager implements ResourceManagement, ResourceA
 	 * we better remove all existing references, as far as possible
 	 */
 	public void close() {
+		dbMan.lockRead();
 		unregisterListeners();
 		// unregister all access demands
 		// must be closed before dbMan is invalidated
-		dbMan.lockRead();
 		try {
 			synchronized (accessedResources) {
 				for (AccessModeRequest amr : accessedResources.toArray(new AccessModeRequest[accessedResources.size()])) {
@@ -123,14 +123,6 @@ public class ApplicationResourceManager implements ResourceManagement, ResourceA
 		} finally {
 			dbMan.unlockRead();
 		}
-//		registeredListeners.clear();
-//		registeredValueListeners.clear();
-//		synchronized (structureListeners) {
-//			structureListeners.clear();
-//		}
-//		synchronized (resourceDemands) {
-//			resourceDemands.clear();
-//		}
 		synchronized (accessRights) {
 			accessRights.invalidateAll();
 		}
