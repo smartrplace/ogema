@@ -42,11 +42,27 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 		return getEl().getData().getFloat();
 	}
 
+	private static long lastMinInterval = -1;
+	
 	@Override
 	public boolean setValue(float value) {
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
+			String resToTest = System.getProperty("org.ogema.resourcemanager.impl.model.simple.testForNaN");
+			if(resToTest != null && Float.isNaN(value) && el.getLocation().contains(resToTest))
+				System.out.println("Writing NaN to "+el.getLocation());
+			String resToTest2 = System.getProperty("org.ogema.resourcemanager.impl.model.simple.writeToConsole");
+			if(resToTest2 != null && el.getLocation().contains(resToTest2))
+				System.out.println("Writing "+value+" to "+el.getLocation());
+			Long minIntreval = Long.getLong("org.ogema.resourcemanager.impl.model.simple.minWriteInterval");
+			if(minIntreval != null && resToTest != null && el.getLocation().contains(resToTest)) {
+				long now = System.currentTimeMillis();
+				if((now - lastMinInterval) < minIntreval) {
+					new IllegalStateException("Written too quickly:"+resToTest+":"+value+" after "+(now - lastMinInterval)+" msec").printStackTrace();
+				}
+				lastMinInterval = now;
+			}
 			if (el.isVirtual() || getAccessModeInternal() == AccessMode.READ_ONLY) {
 				return false;
 			}
