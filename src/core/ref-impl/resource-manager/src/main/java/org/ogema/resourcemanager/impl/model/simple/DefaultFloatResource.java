@@ -49,6 +49,7 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
+            /*
 			String resToTest = System.getProperty("org.ogema.resourcemanager.impl.model.simple.testForNaN");
 			if(resToTest != null && Float.isNaN(value) && el.getLocation().contains(resToTest))
 				System.out.println("Writing NaN to "+el.getLocation());
@@ -63,6 +64,7 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 				}
 				lastMinInterval = now;
 			}
+            */
 			if (el.isVirtual() || getAccessModeInternal() == AccessMode.READ_ONLY) {
 				return false;
 			}
