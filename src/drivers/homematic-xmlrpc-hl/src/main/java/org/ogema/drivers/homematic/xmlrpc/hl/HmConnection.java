@@ -204,12 +204,14 @@ public class HmConnection implements HomeMaticConnection {
 				}
 			}, 10, 60, TimeUnit.SECONDS);
 		}
-        bidcosInfoUpdate = executor.scheduleWithFixedDelay(new Runnable() {
-            @Override
-            public void run() {
-                updateBidcosInfo();
-            }
-        }, 30, 60, TimeUnit.SECONDS);
+		if (bidcosInfoUpdate == null) {
+			bidcosInfoUpdate = executor.scheduleWithFixedDelay(new Runnable() {
+				@Override
+				public void run() {
+					updateBidcosInfo();
+				}
+			}, 30, 60, TimeUnit.SECONDS);
+		}
 		logger.info("HomeMatic driver configured and registered according to config {}", baseResource.getPath());
 	}
 
@@ -234,6 +236,7 @@ public class HmConnection implements HomeMaticConnection {
                     .filter(m -> Boolean.valueOf(m.getOrDefault("DEFAULT", "false").toString()))
                     .findAny();
             Map<String, Object> interfaceInfo = defaultIf.orElse(ifs.get(0));
+            logger.debug("read Bidcos interface information: {}", interfaceInfo);
             if (interfaceInfo.containsKey("ADDRESS")) {
                 String v = String.valueOf(interfaceInfo.get("ADDRESS"));
                 baseResource.interfaceInfo().address().create();
