@@ -64,6 +64,12 @@ public class WeatherChannel extends AbstractDeviceHandler {
 
     enum PARAMS {
         
+        ACTUAL_TEMPERATURE {
+                    @Override
+                    public float convertInput(float v) {
+                        return v + 273.15f;
+                    }
+                },
         BRIGHTNESS,
         HUMIDITY {
                     @Override
@@ -155,6 +161,7 @@ public class WeatherChannel extends AbstractDeviceHandler {
     @Override
     public boolean accept(DeviceDescription desc) {
         return "WEATHER".equalsIgnoreCase(desc.getType()) // WDS40, WDS100-C6-O-2
+                || "CLIMATE_TRANSCEIVER".equalsIgnoreCase(desc.getType()) // HmIP-SCTH230
                 || "WEATHER_TRANSMIT".equalsIgnoreCase(desc.getType()); // TC-IT-WM-W
     }
     
@@ -203,6 +210,7 @@ public class WeatherChannel extends AbstractDeviceHandler {
                     addSensorResource(parent, desc, swName, p, GenericBinarySensor.class, weatherChannel, resources);
                     break;
                 }
+                case ACTUAL_TEMPERATURE:
                 case TEMPERATURE: {
                     addSensorResource(parent, desc, swName, p, TemperatureSensor.class, weatherChannel, resources);
                     break;
