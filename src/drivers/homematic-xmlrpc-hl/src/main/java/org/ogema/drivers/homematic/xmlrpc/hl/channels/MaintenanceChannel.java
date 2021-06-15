@@ -98,7 +98,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
     public MaintenanceChannel(HomeMaticConnection conn) {
         super(conn);
         exec = Executors.newSingleThreadScheduledExecutor();
-        exec.scheduleAtFixedRate(this::updateRssi, 60, 60, TimeUnit.SECONDS);
+        exec.scheduleWithFixedDelay(this::updateRssi, 60, 60, TimeUnit.SECONDS);
     }
     
     void updateRssi() {
