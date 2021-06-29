@@ -27,6 +27,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.Dictionary;
 import java.util.HashMap;
@@ -238,13 +240,24 @@ public class RoleRepositoryFileStore extends RoleRepositoryMemoryStore
 		OutputStream os = null;
 
 		try {
-			os = new BufferedOutputStream(new FileOutputStream(m_file));
-
+			//File bak = new File(m_file.getPath() + ".bak");
+			File newFile = new File(m_file.getPath() + ".new_tmp");
+			os = new BufferedOutputStream(new FileOutputStream(newFile));
 			new RoleRepositorySerializer().serialize(roleRepository, os);
+            os.close();
+			move(newFile, m_file);
 		} finally {
 			closeSafely(os);
 		}
 	}
+    
+	protected void move(File a, File b) throws IOException {
+		try {
+			Files.move(a.toPath(), b.toPath(), StandardCopyOption.ATOMIC_MOVE);
+		} catch (IOException ex) {
+			Files.move(a.toPath(), b.toPath(), StandardCopyOption.REPLACE_EXISTING);
+		}
+    }
 
 	/**
 	 * Closes a given resource, ignoring any exceptions that may come out of this.
