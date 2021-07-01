@@ -89,7 +89,7 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
 
         @Override
         public boolean accept(DeviceDescription desc) {
-            return "HmIP-FSM".equalsIgnoreCase(desc.getParentType())
+            return ("HmIP-FSM".equalsIgnoreCase(desc.getParentType()) || "HmIP-SCTH230".equalsIgnoreCase(desc.getParentType()))
                     && (SWITCH_TRANSMITTER_TYPE.equalsIgnoreCase(desc.getType())
                     || SWITCH_VIRTUAL_RECEIVER_TYPE.equalsIgnoreCase(desc.getType()));
         }
@@ -144,13 +144,16 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
                 }
             }, true);
             conn.addEventListener(new StateEventListener(sw.stateFeedback(), desc.getAddress()));
-            BooleanResource ledDisable = sw.getSubResource("LED_DISABLE_CHANNELSTATE", BooleanResource.class);
-            ledDisable.create().activate(false);
-            ledDisable.addValueListener((BooleanResource br) -> {
-                logger.debug("setting LED_DISABLE_CHANNELSTATE on {} to {}", desc.getAddress(), br.getValue());
-                conn.performPutParamset(desc.getAddress(), "MASTER",
-                        Collections.singletonMap("LED_DISABLE_CHANNELSTATE", br.getValue()));
-            }, true);
+            if (paramSets.getOrDefault("MASTER", Collections.emptyMap()).containsKey("LED_DISABLE_CHANNELSTATE")) {
+                logger.debug("setup LED_DISABLE_CHANNELSTATE handler for address {}", desc.getAddress());
+                BooleanResource ledDisable = sw.getSubResource("LED_DISABLE_CHANNELSTATE", BooleanResource.class);
+                ledDisable.create().activate(false);
+                ledDisable.addValueListener((BooleanResource br) -> {
+                    logger.debug("setting LED_DISABLE_CHANNELSTATE on {} to {}", desc.getAddress(), br.getValue());
+                    conn.performPutParamset(desc.getAddress(), "MASTER",
+                            Collections.singletonMap("LED_DISABLE_CHANNELSTATE", br.getValue()));
+                }, true);
+            }
             sw.stateControl().activate(false);
             sw.stateFeedback().activate(false);
             sw.activate(false);
