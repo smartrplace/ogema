@@ -37,6 +37,7 @@ public interface GenericFloatSensor extends Sensor {
 	GenericFloatTargetRange settings();
 
 	@Override
+	@Deprecated
 	GenericFloatTargetRange deviceSettings();
 
 	@Override

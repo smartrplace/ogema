@@ -36,6 +36,7 @@ public interface TemperatureSensor extends GenericFloatSensor {
 	TemperatureTargetRange settings();
 
 	@Override
+	@Deprecated
 	TemperatureTargetRange deviceSettings();
 
 	@Override
