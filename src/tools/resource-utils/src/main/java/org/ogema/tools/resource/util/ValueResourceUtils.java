@@ -521,7 +521,7 @@ public class ValueResourceUtils {
 	}
 	
 	/**
-	 * Replace one value of an ArrayResource or append one value to it. 
+	 * Replace one value of an ArrayResource or append one value to it. If more new values have to be added zero or empty value elements are inserted. 
 	 * If you want to replace all values at once, use {@link #setValue(ValueResource, Object)} instead. 
 	 * 
 	 * @param array
@@ -531,13 +531,23 @@ public class ValueResourceUtils {
 	 * @param object
 	 * 		the value to set. Must match the array type. A String convertible to the target type is fine, too.
 	 * @return
-	 * 		true, if value has been successfully replaced or appended; false, if the array resource does not exist, or the index is too large (or &lt; 0).
+	 * 		true, if value has been successfully replaced or appended; false, if the array resource does not exist (or &lt; 0).
 	 */
+	public static boolean setCreateValue(ArrayResource array, int idx, Object object) {
+		if(!array.exists()) {
+			array.create();
+			boolean result = setValue(array, idx, object);
+			array.activate(true);
+			return result;
+		} else
+			return setValue(array, idx, object);
+	}
 	public static boolean setValue(ArrayResource array, int idx, Object object) {
 		if (!array.exists())
 			return false;
 		int sz = getSize(array);
-		if (sz < idx || idx < 0)
+		//if (sz < idx || idx < 0)
+		if (idx < 0)
 			return false;
 		if (array instanceof IntegerArrayResource) {
 			int[] vals = ((IntegerArrayResource) array).getValues();
@@ -550,9 +560,11 @@ public class ValueResourceUtils {
 				vals[idx] = target;
 				((IntegerArrayResource) array).setValues(vals);
 			} else {
-				int[] newVals = new int[sz+1];
+				//int[] newVals = new int[sz+1];
+				int[] newVals = new int[idx+1];
 				System.arraycopy(vals, 0, newVals, 0, sz);
-				newVals[sz] = target;
+				//newVals[sz] = target;
+				newVals[idx] = target;
 				((IntegerArrayResource) array).setValues(newVals);
 			}
 			return true;
@@ -568,9 +580,11 @@ public class ValueResourceUtils {
 				vals[idx] = target;
 				((FloatArrayResource) array).setValues(vals);
 			} else {
-				float[] newVals = new float[sz+1];
+				//float[] newVals = new float[sz+1];
+				float[] newVals = new float[idx+1];
 				System.arraycopy(vals, 0, newVals, 0, sz);
-				newVals[sz] = target;
+				//newVals[sz] = target;
+				newVals[idx] = target;
 				((FloatArrayResource) array).setValues(newVals);
 			}
 			return true;
@@ -586,9 +600,11 @@ public class ValueResourceUtils {
 				vals[idx] = target;
 				((BooleanArrayResource) array).setValues(vals);
 			} else {
-				boolean[] newVals = new boolean[sz+1];
+				//boolean[] newVals = new boolean[sz+1];
+				boolean[] newVals = new boolean[idx+1];
 				System.arraycopy(vals, 0, newVals, 0, sz);
-				newVals[sz] = target;
+				//newVals[sz] = target;
+				newVals[idx] = target;
 				((BooleanArrayResource) array).setValues(newVals);
 			}	
 			return true;
@@ -604,9 +620,11 @@ public class ValueResourceUtils {
 				vals[idx] = target;
 				((TimeArrayResource) array).setValues(vals);
 			} else {
-				long[] newVals = new long[sz+1];
+				//long[] newVals = new long[sz+1];
+				long[] newVals = new long[idx+1];
 				System.arraycopy(vals, 0, newVals, 0, sz);
-				newVals[sz] = target;
+				//newVals[sz] = target;
+				newVals[idx] = target;
 				((TimeArrayResource) array).setValues(newVals);
 			}		
 			return true;
@@ -617,9 +635,11 @@ public class ValueResourceUtils {
 				vals[idx] = (String) object;
 				((StringArrayResource) array).setValues(vals);
 			} else {
-				String[] newVals = new String[sz+1];
+				//String[] newVals = new String[sz+1];
+				String[] newVals = new String[idx+1];
 				System.arraycopy(vals, 0, newVals, 0, sz);
-				newVals[sz] = (String) object;
+				//newVals[sz] = (String) object;
+				newVals[idx] = (String) object;
 				((StringArrayResource) array).setValues(newVals);
 			}		
 			return true;
@@ -635,9 +655,11 @@ public class ValueResourceUtils {
 				vals[idx] = target;
 				((ByteArrayResource) array).setValues(vals);
 			} else {
-				byte[] newVals = new byte[sz+1];
+				//byte[] newVals = new byte[sz+1];
+				byte[] newVals = new byte[idx+1];
 				System.arraycopy(vals, 0, newVals, 0, sz);
-				newVals[sz] = target;
+				//newVals[sz] = target;
+				newVals[idx] = target;
 				((ByteArrayResource) array).setValues(newVals);
 			}	
 			return true;
