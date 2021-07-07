@@ -16,6 +16,7 @@
 package org.ogema.model.devices.buildingtechnology;
 
 import org.ogema.core.model.simple.BooleanResource;
+import org.ogema.model.actors.MultiSwitch;
 import org.ogema.model.connections.ThermalConnection;
 import org.ogema.model.devices.generators.HeatPump;
 import org.ogema.model.sensors.TemperatureSensor;
@@ -41,5 +42,17 @@ public interface AirConditioner extends HeatPump {
 	 * {@link ThermalConnection#outputTemperature()}.
 	 */
 	TemperatureSensor temperatureSensor();
+	
+	/** Fan control*/
+	MechanicalFan fan();
 
+	/** The following values for stateControl and stateFeedback are defined:<br>
+	 * 1: off<br>
+	 * 2: cooling<br>
+	 * 3: heating<br>
+	 * 4: fan<br>
+	 * 5: dry<br>
+	 * 7: auto
+	 */
+	MultiSwitch operationMode();
 }
