@@ -50,13 +50,11 @@ public interface Sensor extends PhysicalElement {
 	 */
 	Range ratedValues();
 
-	/**
-	 * Control and alarm settings for the value that the management software should
-	 * take into account. For the settings sent to the device, use {@link #deviceSettings() }. 
-	 * Must be overwritten by a more
-	 * specialized TargetRange type in real sensors.
-	 */
-	TargetRange settings();
+	 // Updated from initial specification:
+	 //* Control and alarm settings for the value that the management software should
+	 //* take into account. For the settings sent to the device, use {@link #deviceSettings() }. 
+	 //* Must be overwritten by a more
+	 //* specialized TargetRange type in real sensors.
 
 	/**
 	 * GenericFloatSensor-related settings to be sent to external device for
@@ -65,9 +63,16 @@ public interface Sensor extends PhysicalElement {
 	 * Conversely, real sensors represented can create and activate this field
 	 * to indicate that there is an actual device involved. This can be done
 	 * even if no further entries are added below this field. 
-	 * The feedbacks
-	 * of these settings are in {@link #deviceFeedback() }.
+	 * The feedbacks of these settings are in {@link #deviceFeedback() }.
+	 */	
+	TargetRange settings();
+
+	@Deprecated
+	/** @deprecated Use {@link #settings()} instead
+	 * 
+	 * @return
 	 */
+
 	TargetRange deviceSettings();
 
 	/**

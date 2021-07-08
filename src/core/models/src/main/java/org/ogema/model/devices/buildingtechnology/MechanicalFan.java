@@ -34,6 +34,15 @@ public interface MechanicalFan extends PhysicalElement {
 
 	/**
 	 * Power setting relative to maximum powers.
+	 * If this controls the fan speed the following standard values are defined:
+	 * 0: auto<br>
+	 * 1: low<br>
+	 * 2: medium<br>
+	 * 3: max<br>
+	 * If more fan speeds are supported they shall be mapped to these values by the driver.
+	 * If only two speeds are supported medium may be mapped to may or a better decision
+	 * may be made by the driver if possible. A more detailed representation of the
+	 * fan speed may be given in a decorator.
 	 */
 	MultiSwitch setting();
 

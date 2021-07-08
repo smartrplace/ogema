@@ -520,6 +520,8 @@ public class HmConnection implements HomeMaticConnection {
 				throw new IllegalStateException("Invalid server or client address " + serverUrl + ", " + xmlRpcServiceUrl);
 			}
 			if (xmlRpcServiceUrl == null || xmlRpcServiceUrl.isEmpty()) {
+				if(Boolean.getBoolean("org.ogema.drivers.homematic.xmlrpc.hl.testwithoutconnection"))
+					return;
 				throw new IllegalStateException("CCU XML-RPC service not found. Serial number: " + config.serialNumber().getValue());
 			}
             final String alias = getServletAlias(config);
