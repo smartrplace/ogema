@@ -49,6 +49,9 @@ import org.slf4j.LoggerFactory;
  * @author brequardt
  */
 public class WeatherUtil {
+    
+    private static final int CONNECTION_TIMEOUT = 60000;
+    private static final int CONNECTION_READ_TIMEOUT = 30000;
 
 	private static WeatherUtil instance;
     
@@ -66,6 +69,8 @@ public class WeatherUtil {
 		String result = "{}";
 		try {
 			final URLConnection urlCon = new URL(query).openConnection();
+            urlCon.setConnectTimeout(CONNECTION_TIMEOUT);
+            urlCon.setReadTimeout(CONNECTION_READ_TIMEOUT);
 			urlCon.setRequestProperty("accept", "text/json");
 			final InputStream input = urlCon.getInputStream();
 			BufferedReader reader = new BufferedReader(new InputStreamReader(urlCon.getInputStream(), StandardCharsets.UTF_8));
@@ -89,6 +94,8 @@ public class WeatherUtil {
 //			sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
 			final SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 			final URLConnection urlCon = new URL(querry).openConnection();
+            urlCon.setConnectTimeout(CONNECTION_TIMEOUT);
+            urlCon.setReadTimeout(CONNECTION_READ_TIMEOUT);
 			urlCon.setRequestProperty("accept", "text/json");
 			((HttpsURLConnection) urlCon).setSSLSocketFactory(sslSocketFactory);
             try (InputStream input = urlCon.getInputStream()) {

@@ -55,30 +55,35 @@ public class WeatherDataController {
 
 				@Override
 				public void run() {
-					if(Boolean.getBoolean("org.ogema.apps.openweathermap.testwithoutconnection"))
-						return;
-					appMan.getLogger().info(
+                    try {
+                        if (Boolean.getBoolean("org.ogema.apps.openweathermap.testwithoutconnection")) {
+                            return;
+                        }
+                        appMan.getLogger().info(
 							"update weather info for location " + device.getModel().getName() + " next update in "
 									+ scheduleUpdateTime + "ms");
-
-                    OpenWeatherMapREST owmremote = OpenWeatherMapREST.getInstance();
-                    ForecastData data;
-                    CurrentData current;
-                    if (device.getLatitude().isActive()) {
-                        data = owmremote.getWeatherForcastCoord(device.getLatitude().getValue(), device.getLongitude().getValue());
-                        current = owmremote.getWeatherCurrentCoord(device.getLatitude().getValue(), device.getLongitude().getValue());
-                    } else if (device.getPostalCode().isActive()) {
-                        data = owmremote.getWeatherForcastZip(device.getPostalCode().getValue(), device.getCountry().getValue());
-                        current = owmremote.getWeatherCurrentZip(device.getPostalCode().getValue(), device.getCountry().getValue());
-                    } else {
-                        data = owmremote.getWeatherForcast(device.getCity().getValue(), device.getCountry().getValue());
-                        current = owmremote.getWeatherCurrent(device.getCity().getValue(), device.getCountry().getValue());
+                        OpenWeatherMapREST owmremote = OpenWeatherMapREST.getInstance();
+                        ForecastData data;
+                        CurrentData current;
+                        if (device.getLatitude().isActive()) {
+                            data = owmremote.getWeatherForcastCoord(device.getLatitude().getValue(), device.getLongitude().getValue());
+                            current = owmremote.getWeatherCurrentCoord(device.getLatitude().getValue(), device.getLongitude().getValue());
+                        } else if (device.getPostalCode().isActive()) {
+                            data = owmremote.getWeatherForcastZip(device.getPostalCode().getValue(), device.getCountry().getValue());
+                            current = owmremote.getWeatherCurrentZip(device.getPostalCode().getValue(), device.getCountry().getValue());
+                        } else {
+                            data = owmremote.getWeatherForcast(device.getCity().getValue(), device.getCountry().getValue());
+                            current = owmremote.getWeatherCurrent(device.getCity().getValue(), device.getCountry().getValue());
+                        }
+                        if (data == null) {
+                            appMan.getLogger().warn("No OPEN_WEATHERMAP Data !! Will not start !!");
+                            return;
+                        }
+                        util.store(data, current);
+                        appMan.getLogger().info("update complete for location {}", device.getModel().getName());
+                    } catch (RuntimeException e) {
+                        appMan.getLogger().warn("update failed", e);
                     }
-                    if(data == null) {
-    					appMan.getLogger().warn("No OPEN_WEATHERMAP Data !! Will not start !!");
-                    	return;
-                    }
-                    util.store(data, current);
 				}
 			};
 

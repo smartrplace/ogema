@@ -20,4 +20,5 @@
 (java.lang.RuntimePermission "accessDeclaredMembers")
 (java.lang.reflect.ReflectPermission "suppressAccessChecks")
 (java.util.PropertyPermission "com.fasterxml.jackson.*" "read")
+(java.util.PropertyPermission "org.ogema.apps.openweathermap.testwithoutconnection" "read")
 
