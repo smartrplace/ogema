@@ -530,7 +530,8 @@ public class HmConnection implements HomeMaticConnection {
             if (startServer != null && startServer.isActive() && startServer.getValue()) {
             //if (config.startServer().isActive() && config.startServer().getValue()) {
                 NetworkInterface iface = NetworkInterface.getByName(config.networkInterface().getValue());
-                Optional<InetAddress> ia = iface.inetAddresses().filter(InetAddress::isSiteLocalAddress).findAny();
+                Optional<InetAddress> ia = Collections.list(iface.getInetAddresses())
+                        .stream().filter(InetAddress::isSiteLocalAddress).findAny();
                 if (ia.isPresent()) {
                     try {
                         hm = new HomeMaticService(null, config.port().getValue(), ia.get());
