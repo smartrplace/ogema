@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.Stream;
 import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import org.osgi.service.component.annotations.Component;
@@ -89,7 +90,8 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
 
         @Override
         public boolean accept(DeviceDescription desc) {
-            return ("HmIP-FSM".equalsIgnoreCase(desc.getParentType()) || "HmIP-SCTH230".equalsIgnoreCase(desc.getParentType()))
+            
+            return Stream.of("HmIP-FSM", "HmIP-SCTH230", "HMIP-PS").anyMatch(t -> t.equalsIgnoreCase(desc.getParentType()))
                     && (SWITCH_TRANSMITTER_TYPE.equalsIgnoreCase(desc.getType())
                     || SWITCH_VIRTUAL_RECEIVER_TYPE.equalsIgnoreCase(desc.getType()));
         }
