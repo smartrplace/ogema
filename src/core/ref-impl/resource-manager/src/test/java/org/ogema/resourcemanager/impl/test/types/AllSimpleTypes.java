@@ -15,6 +15,7 @@
  */
 package org.ogema.resourcemanager.impl.test.types;
 
+import org.ogema.core.model.ModelModifiers;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.array.BooleanArrayResource;
 import org.ogema.core.model.array.ByteArrayResource;
@@ -58,4 +59,8 @@ public interface AllSimpleTypes extends Resource {
 	TimeArrayResource timeArray();
 
 	ByteArrayResource byteArray();
+    
+    @ModelModifiers.NonPersistent
+    FloatResource nonPersistent();
+    
 }

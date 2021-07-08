@@ -59,10 +59,14 @@ import org.ogema.resourcetree.listeners.InternalValueChangedListenerRegistration
 import org.ogema.resourcemanager.virtual.VirtualTreeElement;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 
 import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.Iterator;
+import org.ogema.core.model.ModelModifiers.NonPersistent;
+import org.ogema.core.model.ValueResource;
 
 /**
  * Base class of all Resource implementations, used as base class of concrete
@@ -82,6 +86,7 @@ public abstract class ResourceBase implements ConnectedResource {
 	protected final ApplicationResourceManager resMan;
 	protected final String path;
 	protected ResourceAccessRights accessRights;
+    private Boolean nonpersistent = null;
 
 	public ResourceBase(VirtualTreeElement el, String path, ApplicationResourceManager resMan) {
 		Objects.requireNonNull(el);
@@ -1820,6 +1825,35 @@ public abstract class ResourceBase implements ConnectedResource {
 
     private ResourceBase getLocationResourcePrivileged() {
     	return resMan.findResourcePrivileged("/" + getLocation());
+    }
+    
+    public synchronized boolean isNonpersistent() {
+        if (nonpersistent != null) {
+            return nonpersistent;
+        }
+        if (isDecorator() || !(ValueResource.class.isAssignableFrom(getResourceType()))) {
+            nonpersistent = false;
+            return nonpersistent;
+        }
+        Resource parent = getParent();
+        if (parent == null) {
+            nonpersistent = false;
+            return nonpersistent;
+        }
+        final String locName = getLocationResource().getName();
+        final Class<? extends Resource> pType = parent.getResourceType();
+        nonpersistent = AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
+            @Override            
+            public Boolean run() {
+                try {
+                    Method m = pType.getMethod(locName);
+                    return m.getAnnotation(NonPersistent.class) != null;
+                } catch (NoSuchMethodException | SecurityException ex) {
+                    return false;
+                }
+            }
+        });
+        return nonpersistent;
     }
 
 }

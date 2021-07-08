@@ -39,4 +39,13 @@ public interface ValueResource extends Resource {
 	 * the last update time is stored persistently.
 	 */
 	long getLastUpdateTime();
+    
+    /**
+     * Returns whether this resource's value will be persisted on every write.
+     * A ressource is persistent unless annotated with {@link ModelModifiers.NonPersistent}.
+     * 
+     * @return Ressource value is non persistent.
+     */
+    boolean isNonpersistent();
+    
 }

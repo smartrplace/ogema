@@ -35,6 +35,7 @@ import org.ogema.core.resourcemanager.ResourceException;
 import org.ogema.model.actors.OnOffSwitch;
 import org.ogema.model.devices.generators.HeatPump;
 import org.ogema.model.stakeholders.Language;
+import org.ogema.resourcemanager.impl.test.types.AllSimpleTypes;
 import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
 import org.ops4j.pax.exam.spi.reactors.PerClass;
 
@@ -189,4 +190,12 @@ public class SimpleResourceTest extends OsgiTestBase {
 		assertNotNull(program);
 		assertTrue(program.exists());
 	}
+    
+    @Test
+    public void isNonPersistentWorks() {
+        final AllSimpleTypes r = resMan.createResource(RESNAME + counter++, AllSimpleTypes.class);
+        assertTrue(r.nonPersistent().isNonpersistent());
+        assertFalse(r.integerArray().isNonpersistent());
+    }
+    
 }
