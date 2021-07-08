@@ -15,6 +15,9 @@
  */
 package org.ogema.drivers.homematic.xmlrpc.ll;
 
+import java.io.IOException;
+import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -24,9 +27,11 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.servlet.Servlet;
+import javax.servlet.ServletException;
 import org.apache.xmlrpc.XmlRpcException;
 import org.apache.xmlrpc.XmlRpcRequest;
 import org.apache.xmlrpc.server.RequestProcessorFactoryFactory;
+import org.apache.xmlrpc.webserver.ServletWebServer;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceListener;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmBackend;
@@ -55,13 +60,13 @@ public class HomeMaticService {
     private List<HmEventListener> eventListeners = new CopyOnWriteArrayList<>();
     private final ServiceRegistration<Servlet> registration;
     private final HomeMaticXmlRpcServlet servlet;
+    private ServletWebServer server;
     
     private HmBackend backend;
     
     public HomeMaticService(BundleContext ctx, String urlBase, String alias) {
         this.interfaceUrl = urlBase + alias;
-        
-        servlet = new HomeMaticXmlRpcServlet(ctx, procfac);
+        servlet = new HomeMaticXmlRpcServlet(procfac);
         @SuppressWarnings("UseOfObsoleteCollectionType")
         Dictionary<String, Object> parameters = new java.util.Hashtable<>();
         parameters.put("osgi.http.whiteboard.servlet.pattern", alias);
@@ -70,9 +75,36 @@ public class HomeMaticService {
         registration = ctx.registerService(Servlet.class, servlet, parameters);
     }
     
+    public HomeMaticService(String interfaceUrl, int port, InetAddress addr) throws ServletException, IOException {
+        servlet = new HomeMaticXmlRpcServlet(procfac);
+        if (interfaceUrl != null) {
+            this.interfaceUrl = interfaceUrl;
+        } else {
+            String address = addr.toString();
+            if (address.startsWith("/")) {
+                if (addr instanceof Inet6Address) {
+                    address = "[" + address.substring(1) + "]"; //XXX untested
+                } else {
+                    address = address.substring(1);
+                }
+            }
+            this.interfaceUrl = "http://" + address + ":" + port;
+        }
+        logger.debug("starting new server on {}:{} for callback URL {}", addr, port, this.interfaceUrl);
+        server = new ServletWebServer(servlet, port, addr);
+        server.start();
+        registration = null;
+    }
+    
     public void close() {
     	try {
-    		registration.unregister();
+            if (registration != null) {
+                registration.unregister();
+            }
+            if (server != null) {
+                logger.debug("shutting down server");
+                server.shutdown();
+            }
     		servlet.destroy();
     	} catch (Exception e) {
     		logger.error("Error removing HomeMatic servlet",e);

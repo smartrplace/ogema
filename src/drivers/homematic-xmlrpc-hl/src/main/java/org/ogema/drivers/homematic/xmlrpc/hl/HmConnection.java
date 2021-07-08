@@ -43,6 +43,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import javax.servlet.ServletException;
 import org.apache.xmlrpc.XmlRpcException;
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.core.model.Resource;
@@ -502,14 +504,16 @@ public class HmConnection implements HomeMaticConnection {
 					config.baseUrl().isActive() ||
 					config.clientUrl().isActive()) {
 				serverUrl = getServerUrl(config, interfaces, xmlRpcServiceUrl);
-				if (config.clientUrl().isActive())
+				if (config.clientUrl().isActive()) {
 					xmlRpcServiceUrl = config.clientUrl().getValue();
-				else
-					xmlRpcServiceUrl = getXmlRpcInterface(config, interfaces);
+                } else {
+					xmlRpcServiceUrl = discoverXmlRpcInterface(config, interfaces);
+                }
 			} else {
-				if (!config.clientPort().isActive())
+				if (!config.clientPort().isActive()) {
 					throw new IllegalStateException("Neither client port nor client URL set for config " + config);
-				xmlRpcServiceUrl = getXmlRpcInterface(config, interfaces);
+                }
+				xmlRpcServiceUrl = discoverXmlRpcInterface(config, interfaces);
 				serverUrl = getServerUrl(config, interfaces, xmlRpcServiceUrl);
 			}
 			if (serverUrl == null || serverUrl.isEmpty()) {
@@ -518,11 +522,30 @@ public class HmConnection implements HomeMaticConnection {
 			if (xmlRpcServiceUrl == null || xmlRpcServiceUrl.isEmpty()) {
 				throw new IllegalStateException("CCU XML-RPC service not found. Serial number: " + config.serialNumber().getValue());
 			}
-			final String alias = getServletAlias(config);
-			logger.info("New Homematic XML_RPC connection to {}, servlet URL {}{}", xmlRpcServiceUrl, serverUrl, alias);
+            final String alias = getServletAlias(config);
+            
+            BooleanResource startServer = config.getSubResource("startServer", BooleanResource.class);
+            if (startServer != null && startServer.isActive() && startServer.getValue()) {
+            //if (config.startServer().isActive() && config.startServer().getValue()) {
+                NetworkInterface iface = NetworkInterface.getByName(config.networkInterface().getValue());
+                Optional<InetAddress> ia = iface.inetAddresses().filter(InetAddress::isSiteLocalAddress).findAny();
+                if (ia.isPresent()) {
+                    try {
+                        hm = new HomeMaticService(null, config.port().getValue(), ia.get());
+                    } catch (ServletException ex) {
+                        throw new IllegalStateException("Could not start server for local XMLRPC endpoint: " + ex.getMessage());
+                    }
+                } else {
+                    throw new IllegalStateException("Could not find local IP address for interface: " + iface);
+                }
+            } else {
+                hm = new HomeMaticService(ctx.getBundleContext(), serverUrl, alias);
+            }
+            
+    		logger.info("New Homematic XML_RPC connection to {}, servlet URL {}{}", xmlRpcServiceUrl, serverUrl, alias);
 			client = new HomeMaticClient(xmlRpcServiceUrl, config.ccuUser().isActive() ? config.ccuUser().getValue() : null, config.ccuPw().isActive() ? config.ccuPw().getValue() : null);
 			commandLine = new HomeMaticClientCli(client).register(ctx.getBundleContext(), config.getName());
-			hm = new HomeMaticService(ctx.getBundleContext(), serverUrl, alias);
+			//hm = new HomeMaticService(ctx.getBundleContext(), serverUrl, alias);
 
 			config.installationMode().stateControl().create();
 			config.installationMode().stateFeedback().create();
@@ -635,23 +658,25 @@ public class HmConnection implements HomeMaticConnection {
 		return address;
 	}
 	
-	private static String getXmlRpcInterface(final HmLogicInterface config, final List<NetworkInterface> interfaces) throws SocketException {
+	private static String discoverXmlRpcInterface(final HmLogicInterface config, final List<NetworkInterface> interfaces) throws SocketException {
 		final Collection<Ccu> ccus = runCcuDiscovery(config, interfaces);
 		if (ccus.isEmpty()) {
 			logger.warn("No CCU found");
 			return null;
 		}
-		if (ccus.size() > 1) 
+		if (ccus.size() > 1) {
 			logger.warn("More than one matching CCU found: {}", ccus);
-		else
+        } else {
 			logger.debug("CCUs found: {}", ccus);
+        }
 		final Ccu ccu = ccus.iterator().next();
 		if (!config.serialNumber().isActive()) {
 			config.serialNumber().<StringResource> create().setValue(ccu.getSerialNumber());
 			config.serialNumber().activate(false);
 		}
-		if (interfaces.isEmpty())
+		if (interfaces.isEmpty()) {
 			interfaces.add(ccu.getNetworkInterface());
+        }
 		final int port = config.clientPort().getValue();
 		// by default, ports 42001 and 42010 are used for BidCos and IP with https, ports 2001 and 2010 with http
 		// see https://homematic-forum.de/forum/viewtopic.php?p=465022#p465022
@@ -682,16 +707,19 @@ public class HmConnection implements HomeMaticConnection {
 			outer: for (NetworkInterface nif : ifs) {
 				for (InterfaceAddress ia : nif.getInterfaceAddresses()) {
 					final InetAddress brdc = ia.getBroadcast();
-					if (brdc == null)
+					if (brdc == null) {
 						continue;
+                    }
 					udp.submit(brdc, nif, serialNr);
 					results = udp.getIntermediateResults(0);
-					if (results != null)
+					if (results != null) {
 						break outer; // closes UDP
+                    }
 				}
 			}
-			if (results == null)
+			if (results == null) {
 				results = udp.getIntermediateResults(2 * UdpDiscovery.LISTEN_TIMEOUT);
+            }
 		}
 		// determine client url from broadcast to xxx.xxx.xxx.255:43439
 		if (results != null && !results.isEmpty()) {

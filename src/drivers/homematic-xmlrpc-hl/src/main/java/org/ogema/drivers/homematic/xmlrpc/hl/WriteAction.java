@@ -15,10 +15,12 @@
  */
 package org.ogema.drivers.homematic.xmlrpc.hl;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.xmlrpc.XmlRpcException;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HomeMatic;
 import org.ogema.drivers.homematic.xmlrpc.ll.xmlrpc.MapXmlRpcStruct;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -30,6 +32,8 @@ public abstract class WriteAction {
     private final long firstTry = System.currentTimeMillis();
     private int tries = 0;
     private boolean success = false;
+    
+    private static final Logger LOGGER = LoggerFactory.getLogger(WriteScheduler.class);
     
     // for the scheduler
     long nextRun = firstTry;
@@ -64,6 +68,16 @@ public abstract class WriteAction {
      */
     abstract boolean performWrite();
     
+    /**
+     * Coalesce this action's parameters and those of a not yet perfomed previously
+     * enqueued action.
+     * 
+     * @param previous previous, not yet performed action
+     */
+    void coalesce(WriteAction previous) {
+        // only some actions can do something useful here
+    }
+    
     static WriteAction createSetValue(final HomeMatic hm, final String address, final String valueKey, final Object value) {
         return new WriteAction() {
             @Override
@@ -74,6 +88,7 @@ public abstract class WriteAction {
             @Override
             boolean performWrite() {
                 try {
+                    LOGGER.trace("performing SetValue {} {}:={}", address, valueKey, value);
                     hm.setValue(address, valueKey, value);
                     return true;
                 } catch (XmlRpcException ex) {
@@ -81,6 +96,7 @@ public abstract class WriteAction {
                     return false;
                 }
             }
+
         };
     }
     
@@ -94,6 +110,7 @@ public abstract class WriteAction {
             @Override
             boolean performWrite() {
                 try {
+                    LOGGER.trace("performing AddLink {}=>{} ('{}', {})", sender, receiver, name, description);
                     hm.addLink(sender, receiver, name, description);
                     return true;
                 } catch (XmlRpcException ex) {
@@ -102,6 +119,7 @@ public abstract class WriteAction {
                     return false;
                 }
             }
+            
         };
     }
     
@@ -109,12 +127,13 @@ public abstract class WriteAction {
         return new WriteAction() {
             @Override
             String target() {
-                return sender + ">|>" + receiver;
+                return sender + ">>" + receiver;
             }
 
             @Override
             boolean performWrite() {
                 try {
+                    LOGGER.trace("performing RemoveLink {}=>{}", sender, receiver);
                     hm.removeLink(sender, receiver);
                     return true;
                 } catch (XmlRpcException ex) {
@@ -123,12 +142,25 @@ public abstract class WriteAction {
                     return false;
                 }
             }
+            
         };
     }
     
-    static WriteAction createPutParamset(final HomeMatic hm, final String address, final String set, final Map<String, Object> values) {
-        return new WriteAction() {
-            @Override
+    static class PutParamsetAction extends WriteAction {
+        
+        final HomeMatic hm;
+        final String address;
+        final String set;
+        final Map<String, Object> values;
+
+        public PutParamsetAction(HomeMatic hm, String address, String set, Map<String, Object> values) {
+            this.hm = hm;
+            this.address = address;
+            this.set = set;
+            this.values = new LinkedHashMap<>(values);
+        }
+        
+        @Override
             String target() {
                 return "[" + set + "]@" + address;
             }
@@ -136,6 +168,7 @@ public abstract class WriteAction {
             @Override
             boolean performWrite() {
                 try {
+                    LOGGER.trace("performing PutParamset {} {} {}", address, set, values);
                     MapXmlRpcStruct valueStruct = new MapXmlRpcStruct(values);
                     hm.putParamset(address, set, valueStruct);
                     return true;
@@ -145,7 +178,23 @@ public abstract class WriteAction {
                     return false;
                 }
             }
-        };
+            
+            @Override
+            void coalesce(WriteAction previous) {
+                if (!(previous instanceof PutParamsetAction)) {
+                    return;
+                }
+                Map<String, Object> previousValues = ((PutParamsetAction)previous).values;
+                previousValues.forEach((key, val) -> {
+                    if (!values.containsKey(key)) {
+                        values.put(key, val);
+                    }
+                });
+            }
+    }
+    
+    static WriteAction createPutParamset(final HomeMatic hm, final String address, final String set, final Map<String, Object> values) {
+        return new PutParamsetAction(hm, address, set, values);
     }
     
 }

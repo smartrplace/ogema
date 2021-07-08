@@ -55,6 +55,13 @@ public interface HmLogicInterface extends Resource {
      */
     IntegerResource port();
     
+    /*
+     * Run the HomeMatic servlet in a separate server, this requires the
+     * {@link #port() } and {@link #networkInterface() } options to be set.
+     * @return Run in separate web server.
+     */
+    //BooleanResource startServer();
+    
     /**
      * URL of the XML-RPC service. Use alternatively to {@link #serialNumber()} and {@link #clientPort()} 
      * if gateway discovery is not available. With recent CCU software the preferred alternative

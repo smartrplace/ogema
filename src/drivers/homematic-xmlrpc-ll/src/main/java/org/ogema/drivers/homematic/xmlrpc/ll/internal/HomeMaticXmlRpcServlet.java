@@ -37,12 +37,14 @@ public class HomeMaticXmlRpcServlet extends XmlRpcServlet {
     
     private static final long serialVersionUID = 1L;
 
-    protected final BundleContext ctx;
     protected final RequestProcessorFactoryFactory procfac;
     protected final Logger logger = LoggerFactory.getLogger(getClass());
 
     public HomeMaticXmlRpcServlet(BundleContext ctx, RequestProcessorFactoryFactory procfac) {
-        this.ctx = ctx;
+        this.procfac = procfac;
+    }
+    
+    public HomeMaticXmlRpcServlet(RequestProcessorFactoryFactory procfac) {
         this.procfac = procfac;
     }
 
