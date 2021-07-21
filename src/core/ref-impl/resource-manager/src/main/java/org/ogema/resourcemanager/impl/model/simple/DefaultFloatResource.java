@@ -20,6 +20,7 @@ import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.recordeddata.RecordedData;
 import org.ogema.core.resourcemanager.AccessMode;
 import org.ogema.core.resourcemanager.ResourceAccessException;
+import org.ogema.core.resourcemanager.ResourceNotFoundException;
 import org.ogema.core.resourcemanager.VirtualResourceException;
 import org.ogema.resourcemanager.impl.ApplicationResourceManager;
 import org.ogema.resourcemanager.impl.model.schedule.HistoricalSchedule;
@@ -39,7 +40,11 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 	@Override
 	public float getValue() {
 		checkReadPermission();
-		return getEl().getData().getFloat();
+		try {
+			return getEl().getData().getFloat();
+		} catch(ResourceNotFoundException e) {
+			return Float.NaN;
+		}
 	}
 
 	private static long lastMinInterval = -1;
@@ -49,8 +54,8 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
-            /*
-			String resToTest = System.getProperty("org.ogema.resourcemanager.impl.model.simple.testForNaN");
+ 			/*
+ 			String resToTest = System.getProperty("org.ogema.resourcemanager.impl.model.simple.testForNaN");
 			if(resToTest != null && Float.isNaN(value) && el.getLocation().contains(resToTest))
 				System.out.println("Writing NaN to "+el.getLocation());
 			String resToTest2 = System.getProperty("org.ogema.resourcemanager.impl.model.simple.writeToConsole");
@@ -64,7 +69,7 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 				}
 				lastMinInterval = now;
 			}
-            */
+			*/
 			if (el.isVirtual() || getAccessModeInternal() == AccessMode.READ_ONLY) {
 				return false;
 			}
