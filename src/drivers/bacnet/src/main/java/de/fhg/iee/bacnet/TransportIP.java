@@ -29,6 +29,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 
 /**
  *
@@ -122,14 +123,18 @@ public class TransportIP extends AbstractTransport {
                         continue;
                     }
                     Npdu npdu = new Npdu(bb);
-
+                    
                     BACnetIpAddress srcAddr = new BACnetIpAddress();
                     srcAddr.addr = p.getAddress();
                     srcAddr.npdu = npdu;
                     srcAddr.port = p.getPort();
-
+                    
                     if (npdu.isNetworkMessage()) {
-                        logger.debug("ignoring network message (type {}) from {}", npdu.getMessageType(), srcAddr.addr);
+                        if (npdu.getMessageType() == 0x01) {
+                            logger.info("got I-Am-Router-To-Network from {}", srcAddr);
+                        } else {
+                            logger.debug("ignoring network message (type {}) from {}", npdu.getMessageType(), srcAddr.addr);
+                        }
                         continue;
                     }
                     ByteBuffer apdu = bb.slice().asReadOnlyBuffer();
@@ -195,10 +200,26 @@ public class TransportIP extends AbstractTransport {
 
         @Override
         public String toString() {
-            //TODO: include bacnet network info
             if(addr == null)
             	return null;
-        	return addr.toString();
+            StringBuilder sb = new StringBuilder();
+            sb.append(addr.toString()).append(" NPDU:");
+            if (npdu.hasSource()) {
+                sb.append(" src: ").append(npdu.getSourceNet())
+                        .append("/")
+                        .append(Arrays.toString(npdu.getSourceAddress()));
+                        //.append(bytesToString(npdu.getSourceAddress(), npdu.getSourceAddress().length));
+            }
+            if (npdu.hasDestination()) {
+                sb.append(" dst: ").append(npdu.getDestinationNet())
+                        .append("/")
+                        .append(Arrays.toString(npdu.getDestinationAddress()));
+                        //.append(bytesToString(npdu.getDestinationAddress(), npdu.getDestinationAddress().length));
+            }
+            if (!npdu.hasSource() && !npdu.hasDestination()) {
+                sb.append(" -");
+            }
+        	return sb.toString();
         }
 
     }
@@ -216,7 +237,7 @@ public class TransportIP extends AbstractTransport {
     public DeviceAddress getBroadcastAddress() {
         BACnetIpAddress addr = new BACnetIpAddress();
         addr.addr = broadcast;
-        addr.port = this.port; //FIXME need target port
+        addr.port = this.port;
         addr.npdu = new Npdu().withDestination(0xFFFF, null, 255);
         return addr;
     }
@@ -225,7 +246,6 @@ public class TransportIP extends AbstractTransport {
     protected void sendData(ByteBuffer data, Priority prio, boolean expectingReply, DeviceAddress destination) throws IOException {
         BACnetIpAddress addr = (BACnetIpAddress) destination;
         Npdu npdu = addr.npdu.withExpectingReply(expectingReply);
-        npdu = npdu.withoutDestination();
 
         byte[] npduOctets = npdu.toArray();
         int vlcSize = 4;

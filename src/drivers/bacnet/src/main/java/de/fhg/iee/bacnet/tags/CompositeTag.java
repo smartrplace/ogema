@@ -96,9 +96,9 @@ public class CompositeTag implements CompositeTagBase {
                 && ((basicTagData.lengthValueType & TagConstants.CONTEXT_CLOSING_TAG) == TagConstants.CONTEXT_CLOSING_TAG);
     }
 
-   @Override
-   @SuppressWarnings("unchecked")
-   public Collection<CompositeTag> getSubTags() {
+    @Override
+    @SuppressWarnings("unchecked")
+    public Collection<CompositeTag> getSubTags() {
         return Collections.unmodifiableCollection(subTags);
     }
 
@@ -200,17 +200,15 @@ public class CompositeTag implements CompositeTagBase {
     }
 
     public float getFloat() {
-        byte[] bytes = new byte[(int) basicTagData.getContentLength()];
-        content.get(bytes);
+        float rval = content.getFloat();
         content.rewind();
-        return content.getFloat();
+        return rval;
     }
 
     public double getDouble() {
-        byte[] bytes = new byte[(int) basicTagData.getContentLength()];
-        content.get(bytes);
+        double rval = content.getDouble();
         content.rewind();
-        return content.getDouble();
+        return rval;
     }
     
 	public long getContentLength() {

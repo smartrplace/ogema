@@ -263,7 +263,6 @@ public class CovSubscriber implements Closeable {
             if (isConfirmed || (pci.getPduType() == ApduConstants.TYPE_UNCONFIRMED_REQ
                     && pci.getServiceChoice() == BACnetUnconfirmedServiceChoice.unconfirmedCOVNotification.getBACnetEnumValue())) {
                 int id = new UnsignedIntTag(i.getData()).getValue().intValue();
-
                 ObjectIdentifierTag device = new ObjectIdentifierTag(i.getData());
                 ObjectIdentifierTag object = new ObjectIdentifierTag(i.getData());
                 Subscription sub = subscriptions.get(id);
@@ -272,7 +271,11 @@ public class CovSubscriber implements Closeable {
                     cancel(i.getSource().toDestinationAddress(), object, id);
                     return null;
                 }
-
+                if (!object.equals(sub.object)) {
+                    logger.warn("received COV event for {} on subscription ID {} for {}",
+                                object, id, sub.object);
+                    return null;
+                }
                 UnsignedIntTag timeRemaining = new UnsignedIntTag(i.getData());
                 CompositeTag values = new CompositeTag(i.getData());
                 Map<Integer, CompositeTag> valueMap = new HashMap<>();
