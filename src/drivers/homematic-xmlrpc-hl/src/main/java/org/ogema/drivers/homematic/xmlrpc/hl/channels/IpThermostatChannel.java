@@ -145,12 +145,19 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
 
     }
 
+    /*
+    HmIP-eTRV-* (actual valves) are handled by IpThermostatBChannel
+    
+    provided parameters:
+    HmIP-WTH-B: ACTUAL_TEMPERATURE, HUMIDITY, SET_POINT_TEMPERATURE
+    */
     @Override
     public boolean accept(DeviceDescription desc) {
         //System.out.println("parent type = " + desc.getParentType());
         return ("HMIP-eTRV".equalsIgnoreCase(desc.getParentType())
                 && "HEATING_CLIMATECONTROL_TRANSCEIVER".equalsIgnoreCase(desc.getType()))
-                || ("HmIP-WTH-2".equalsIgnoreCase(desc.getParentType())
+                || (desc.getParentType() != null
+                && desc.getParentType().toLowerCase().startsWith("hmip-wth-")
                 && "HEATING_CLIMATECONTROL_TRANSCEIVER".equalsIgnoreCase(desc.getType()));
     }
 
