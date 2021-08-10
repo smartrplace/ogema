@@ -75,6 +75,20 @@ public class ConfigurationConstants {
 	 * For admissible values see {@link #STYLE_CONFIG}. Default value is "primary".
 	 */
 	public static final String DEFAULT_STYLE_PROPERTY = "org.ogema.login.style.bootstrap";
-
+    
+    /**
+     * Configuration property for the login page (as bundle resource path).
+     */
+    public static final String LOGIN_PAGE_RESOURCE = "loginPage";
+    
+    /**
+     * Configuration property for the login page using remote library links (as bundle resource path).
+     */
+    public static final String LOGIN_PAGE_REMOTE_RESOURCE = "loginPageRem";
+    
+    /**
+     * The OGEMA start page as absolute url path (e.g. /ogema/index.html)
+     */
+    public static final String START_PAGE = "startPage";
 	
 }

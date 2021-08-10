@@ -46,13 +46,15 @@ public class LoginServlet extends HttpServlet {
 	private static final String PROPERTY_USE_CDN = "org.ogema.gui.usecdn";
 	private static final String PROPERTY_START_PAGE = "org.ogema.gui.startpage";
 	
-	protected static final String LOGIN_PATH;
-	protected static final String LOGIN_PATH_LOCAL = "/web/login.html";
-	protected static final String LOGIN_PATH_REMOTE = "/web/login2.html";
+	private String loginPath;
+	private String loginPathLocal;
+    private final static String LOGIN_PATH_LOCAL_DEFAULT = "/web/login.html";
+	private String loginPathRemoString;
+    private final static String LOGIN_PATH_REMOTE_DEFAULT = "/web/login2.html";
 	protected static final String LOGIN_SERVLET_PATH = "/ogema/login";
 	protected static final String OLDREQ_ATTR_NAME = "requestBeforeLogin";
 	
-	static final String START_PAGE;
+	protected static String START_PAGE;
 
 	private static final String LOGIN_FAILED_MSG = "Login failed: Username and/or Password wrong";
 	private static final String MAX_LOGIN_TRIES_EXCEEDED_MSG = "Max number of tries for login exceeded."
@@ -60,7 +62,6 @@ public class LoginServlet extends HttpServlet {
 	
 	static {
 		final boolean useCdn = Boolean.getBoolean(PROPERTY_USE_CDN);
-		LOGIN_PATH = useCdn ? LOGIN_PATH_REMOTE : LOGIN_PATH_LOCAL;
 		final String startProp = System.getProperty(PROPERTY_START_PAGE);
 		START_PAGE = startProp != null ? startProp : useCdn ? "/ogema/index2.html" : System.getProperty("org.ogema.impl.security.starturl", "/ogema/index.html");
 	}
@@ -84,11 +85,19 @@ public class LoginServlet extends HttpServlet {
 	}
 	
 	final void configUpdate(final Map<String, Object> config) {
+        loginPathLocal = config.getOrDefault(ConfigurationConstants.LOGIN_PAGE_RESOURCE, LOGIN_PATH_LOCAL_DEFAULT).toString();
+        loginPathRemoString = config.getOrDefault(ConfigurationConstants.LOGIN_PAGE_REMOTE_RESOURCE, LOGIN_PATH_REMOTE_DEFAULT).toString();
+        
 		// we may need to read system properties, and who knows what else is on the call stack...
 		AccessController.doPrivileged(new PrivilegedAction<Void>() {
 
 			@Override
 			public Void run() {
+                final boolean useCdn = Boolean.getBoolean(PROPERTY_USE_CDN);
+                loginPath = useCdn ? loginPathRemoString : loginPathLocal;
+                final String startProp = System.getProperty(PROPERTY_START_PAGE);
+                START_PAGE = startProp != null ? startProp : useCdn ? "/ogema/index2.html" : System.getProperty("org.ogema.impl.security.starturl", "/ogema/index.html");
+                START_PAGE = config.getOrDefault(ConfigurationConstants.START_PAGE, START_PAGE).toString();
 				Object iconObj = config.get(ConfigurationConstants.LOGIN_ICON_CONFIG);
 				final String icon = iconObj instanceof String ? (String) iconObj
 						: System.getProperty(ConfigurationConstants.DEFAULT_LOGIN_ICON_PROPERTY, "ogema.svg");
@@ -132,7 +141,7 @@ public class LoginServlet extends HttpServlet {
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 		failureInspector.cleanUp();
 		HttpSession session = req.getSession();
-		if (session.getAttribute(Constants.AUTH_ATTRIBUTE_NAME) != null) {
+        if (session.getAttribute(Constants.AUTH_ATTRIBUTE_NAME) != null) {
 			resp.sendRedirect(START_PAGE);
 			return;
 		}
@@ -141,7 +150,6 @@ public class LoginServlet extends HttpServlet {
 			resp.setCharacterEncoding("UTF-8");
 			resp.setContentType("text/plain");
 			resp.getWriter().write(STYLE);
-			resp.setStatus(HttpServletResponse.SC_OK);
 			return;
 		}
 		final URL resource;
@@ -150,25 +158,18 @@ public class LoginServlet extends HttpServlet {
 			resource = getClass().getResource(ICON);
 			resp.setContentType("image/" + ICON_TYPE);
 		} else {
-			resource = getClass().getResource("false".equalsIgnoreCase(req.getParameter("usecdn")) ? LOGIN_PATH_LOCAL : LOGIN_PATH);
+			resource = getClass().getResource("false".equalsIgnoreCase(req.getParameter("usecdn")) ? loginPathLocal : loginPath);
 		}
 		InputStream is;
 		OutputStream bout;
-		int len = 0;
+		int len;
 		byte[] buf = new byte[512];
 		try {
 			is = resource.openStream();
 			bout = resp.getOutputStream();
-			do {
-				len = is.read(buf);
-				if (len == -1) // This check is needed due to jetty's own OutputStream implementation.
-					break;
-				bout.write(buf, 0, len);
-				// NOTE: Jetty server has its own OutputStream class its write method doesn't throw this
-				// IndexOutOfBoundsException
-			} while (true);
-			resp.setStatus(HttpServletResponse.SC_OK);
-			//			resp.flushBuffer();
+            while ((len = is.read(buf)) != -1) {
+                bout.write(buf, 0, len);
+            }
 		} catch (IOException e1) {
 			e1.printStackTrace();
 			resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);

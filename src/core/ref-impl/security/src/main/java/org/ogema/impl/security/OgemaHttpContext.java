@@ -33,8 +33,10 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -56,6 +58,7 @@ import org.ogema.accesscontrol.HttpConfig;
 import org.ogema.accesscontrol.HttpConfigManagement;
 import org.ogema.accesscontrol.PermissionManager;
 import org.ogema.accesscontrol.SessionAuth;
+import org.ogema.accesscontrol.UserRightsProxy;
 import org.ogema.applicationregistry.ApplicationRegistry;
 import org.ogema.core.administration.AdminApplication;
 import org.ogema.core.application.AppID;
@@ -63,7 +66,11 @@ import org.ogema.core.application.Application;
 import org.ogema.core.security.WebAccessManager;
 import org.ogema.util.Util;
 import org.ogema.webadmin.AdminWebAccessManager;
+import org.osgi.framework.ServiceReference;
 import org.osgi.service.http.HttpContext;
+import org.osgi.service.useradmin.Authorization;
+import org.osgi.service.useradmin.User;
+import org.osgi.service.useradmin.UserAdmin;
 import org.slf4j.Logger;
 
 /**
@@ -211,7 +218,10 @@ public class OgemaHttpContext implements HttpContext {
 			response.flushBuffer();
 			return false;
 		}
-
+        
+        if (request.getSession(false) == null || request.getSession().getAttribute(Constants.AUTH_ATTRIBUTE_NAME) == null) {
+            tryBasicAuthLogin(request);
+        }
 		HttpSession httpses = request.getSession();
 		SessionAuth sesAuth;
 
@@ -247,9 +257,11 @@ public class OgemaHttpContext implements HttpContext {
 				// if we did not check for the method, then open browser tabs that periodically POST data would lead to invalid login requests
 				// and the user getting blocked...
 				if ("GET".equals(request.getMethod())) {
-					if (Configuration.DEBUG)
+					if (Configuration.DEBUG) {
 						logger.debug("New Session is forwarded to Login page.");
+                    }
 					request.getRequestDispatcher(LoginServlet.LOGIN_SERVLET_PATH).forward(request, response);
+                    return false;
 				}
 			} catch (ServletException | IOException e) {
 				logger.error(this.getClass().getSimpleName(), e);
@@ -260,8 +272,9 @@ public class OgemaHttpContext implements HttpContext {
 			return false;
 		}
 		else {
-			if (Configuration.DEBUG)
+			if (Configuration.DEBUG) {
 				logger.debug("Known Session detected.");
+            }
 		}
 		final HttpConfigManagement httpConfigs = httpConfigRef.get();
 		final HttpConfig httpConfig = httpConfigs == null ? null : httpConfigs.getConfig(owner.getBundle());
@@ -391,6 +404,54 @@ public class OgemaHttpContext implements HttpContext {
 			return true;
 		}
 	}
+    
+    /* see if there is a basic auth header and setup a session if login succeeds */
+    private void tryBasicAuthLogin(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Basic")) {
+            String authData = authHeader.substring(5).trim();
+            String creds = new String(Base64.getDecoder().decode(authData), StandardCharsets.UTF_8);
+            int p = creds.indexOf(":");
+            if (p != -1) {
+                String login = creds.substring(0, p).trim();
+                String password = creds.substring(p + 1).trim();
+                boolean successNatural
+                        = permMan.getAccessManager().authenticate(login, password, true);
+                boolean successMachine = !successNatural
+                        || permMan.getAccessManager().authenticate(login, password, false);
+                if (successNatural || successMachine) {
+                    HttpSession ses = request.getSession();
+                    UserRightsProxy urp = accessMngr.getUrp(login);
+                    if (urp != null) {
+                        try {
+                            ServiceReference<UserAdmin> srUA = urp.getBundle().getBundleContext().getServiceReference(UserAdmin.class);
+                            UserAdmin admin = urp.getBundle().getBundleContext().getService(srUA);
+                            User user = (User) AccessManagerImpl.findRole(admin, login);
+                            Authorization author = admin.getAuthorization(user);
+                            SessionAuth sauth = new SessionAuth(author, permMan.getAccessManager(), ses);
+                            ses.setAttribute(Constants.AUTH_ATTRIBUTE_NAME, sauth);
+                            logger.debug("login succeeded with basic auth for {}", login);
+                        } catch (NullPointerException npe) {
+                            logger.debug("something is missing", npe);
+                        }
+                    } else {
+                        logger.debug("no URP for user {}?!?", login);
+                    }
+                } else {
+                    logger.debug("invalid basic auth credentials provided for user {}", login);
+                }
+            } else {
+                logger.warn("invalid basic authorization in request: {} / {}", authHeader, creds);
+            }
+        } else {
+            if (authHeader == null) {
+                logger.debug("no authorization header");
+            } else {
+                logger.debug("unsupported authorization header: {}", authHeader);
+            }
+        }
+    }
+    
     
     private boolean handleUserNotAuthorized(HttpServletRequest request,
             HttpServletResponse response, String user, AppID app) throws IOException {
