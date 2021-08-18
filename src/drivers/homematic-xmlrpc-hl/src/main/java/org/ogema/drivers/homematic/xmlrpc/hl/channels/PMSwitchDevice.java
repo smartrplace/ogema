@@ -51,7 +51,7 @@ public class PMSwitchDevice extends AbstractDeviceHandler {
     public boolean accept(DeviceDescription desc) {
     	String type = desc.getType();
     	return "HM-ES-PMSw1-Pl".equals(type) || "HM-ES-PMSw1-Pl-DN-R1".equals(type)
-    			|| "HMIP-PSM".equals(type);
+    			|| "HMIP-PSM".equals(type) || "HMIP-PS".equals(type);
     }
 
     protected ResourceStructureListener subChannelListener(final HmDevice dev) {
@@ -95,6 +95,17 @@ public class PMSwitchDevice extends AbstractDeviceHandler {
             elConn.setAsReference(ssb.electricityConnection());
             sw.setAsReference(ssb.onOffSwitch());
 
+            ssb.activate(false);
+            return true;
+        } else if (switches.size() == 1 && "HMIP-PS".equals(dev.type().getValue())) {
+            String ssbName = ResourceUtils.getValidResourceName("HM-SingleSwitchBox-" + dev.address().getValue());
+            logger.debug("set up SingleSwitchBox for HomeMatic device {}", dev.address().getValue());
+            OnOffSwitch sw = switches.get(0);
+            SingleSwitchBox ssb = dev.getSubResource(ssbName, SingleSwitchBox.class);
+            ssb.onOffSwitch().stateControl().create().activate(false);
+            ssb.onOffSwitch().stateFeedback().create().activate(false);
+            ssb.onOffSwitch().activate(false);
+            sw.setAsReference(ssb.onOffSwitch());
             ssb.activate(false);
             return true;
         }
