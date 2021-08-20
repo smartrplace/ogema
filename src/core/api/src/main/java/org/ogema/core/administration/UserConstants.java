@@ -12,6 +12,8 @@ public final class UserConstants {
     
     public static final String SEND_INVITATION_BY_EMAIL = "user.inviteByMail";
     
+    public static final String SEND_RESET_BY_EMAIL = "user.passwordResetRequest";
+    
     public static final String PREFERRED_LOCALE = "user.locale";
     
     private UserConstants() {}
