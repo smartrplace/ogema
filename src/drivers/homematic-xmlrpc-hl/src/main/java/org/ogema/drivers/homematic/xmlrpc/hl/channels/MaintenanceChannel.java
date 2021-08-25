@@ -50,6 +50,7 @@ import org.ogema.tools.resource.util.ResourceUtils;
 public class MaintenanceChannel extends AbstractDeviceHandler {
 
     static final long RSSI_MAX_AGE = 15 * 60 * 1000L;
+
     public static enum PARAMS {
 
         CARRIER_SENSE_LEVEL, // 0..100% (HAP)
@@ -73,6 +74,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
         final HmMaintenance resource;
         final DeviceDescription desc;
         final Map<String, ParameterDescription<?>> values;
+        volatile long lastRead;
 
         public KnownDevice(HmMaintenance resource, DeviceDescription desc, Map<String, ParameterDescription<?>> values) {
             this.resource = resource;
@@ -84,12 +86,13 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
             //XXX system vs framework time.
             long now = System.currentTimeMillis();
             boolean updateRequired = false;
-            updateRequired |=
-                resource.rssiDevice().exists() && resource.rssiDevice().getLastUpdateTime() + maxAge < now;
-            updateRequired |=
-                resource.rssiPeer().exists() && resource.rssiPeer().getLastUpdateTime() + maxAge < now;
-            if (updateRequired) {
+            updateRequired
+                    |= resource.rssiDevice().exists() && resource.rssiDevice().getLastUpdateTime() + maxAge < now;
+            updateRequired
+                    |= resource.rssiPeer().exists() && resource.rssiPeer().getLastUpdateTime() + maxAge < now;
+            if (updateRequired && lastRead + maxAge < now) { // limit retries in case read returns 0
                 update(resource, desc.getAddress());
+                lastRead = now;
             }
         }
 
@@ -100,7 +103,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
         exec = Executors.newSingleThreadScheduledExecutor();
         exec.scheduleWithFixedDelay(this::updateRssi, 60, 60, TimeUnit.SECONDS);
     }
-    
+
     void updateRssi() {
         knownDevices.forEach(d -> {
             try {
@@ -156,15 +159,23 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                     }
                     mnt.batteryLow().setValue(e.getValueBoolean());
                 } else if (PARAMS.RSSI_DEVICE.name().equals(e.getValueKey())) {
-                    if (!mnt.rssiDevice().isActive()) {
-                        mnt.rssiDevice().create().activate(false);
+                    if (e.getValueInt() == 0) {
+                        logger.debug("cowardly refusing to store RSSI_DEVICE=0 for {}", e.getAddress());
+                    } else {
+                        if (!mnt.rssiDevice().isActive()) {
+                            mnt.rssiDevice().create().activate(false);
+                        }
+                        mnt.rssiDevice().setValue(e.getValueInt());
                     }
-                    mnt.rssiDevice().setValue(e.getValueInt());
                 } else if (PARAMS.RSSI_PEER.name().equals(e.getValueKey())) {
-                    if (!mnt.rssiPeer().isActive()) {
-                        mnt.rssiPeer().create().activate(false);
+                    if (e.getValueInt() == 0) {
+                        logger.debug("cowardly refusing to store RSSI_PEER=0 for {}", e.getAddress());
+                    } else {
+                        if (!mnt.rssiPeer().isActive()) {
+                            mnt.rssiPeer().create().activate(false);
+                        }
+                        mnt.rssiPeer().setValue(e.getValueInt());
                     }
-                    mnt.rssiPeer().setValue(e.getValueInt());
                 } else if (PARAMS.OPERATING_VOLTAGE.name().equals(e.getValueKey())) {
                     if (!mnt.battery().internalVoltage().reading().isActive()) {
                         mnt.battery().internalVoltage().reading().create().activate(false);
@@ -300,16 +311,24 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
             if (m.rssiDevice().exists()) { // available resources should be created in setup()
                 logger.trace("reading RSSI_DEVICE for {} / {}", m, channelAddress);
                 int rssiDevice = conn.getValue(channelAddress, PARAMS.RSSI_DEVICE.name());
-                m.rssiDevice().setValue(rssiDevice);
-                m.rssiDevice().activate(false);
-                updated = true;
+                if (rssiDevice == 0) {
+                    logger.debug("read returned RSSI_DEVICE=0 for {}", channelAddress);
+                } else {
+                    m.rssiDevice().setValue(rssiDevice);
+                    m.rssiDevice().activate(false);
+                    updated = true;
+                }
             }
             if (m.rssiPeer().exists()) {
                 logger.trace("reading RSSI_PEER for {} / {}", m, channelAddress);
                 int rssiPeer = conn.getValue(channelAddress, PARAMS.RSSI_PEER.name());
-                m.rssiPeer().setValue(rssiPeer);
-                m.rssiPeer().activate(false);
-                updated = true;
+                if (rssiPeer == 0) {
+                    logger.debug("read returned RSSI_PEER=0 for {}", channelAddress);
+                } else {
+                    m.rssiPeer().setValue(rssiPeer);
+                    m.rssiPeer().activate(false);
+                    updated = true;
+                }
             }
             return updated;
         } catch (IOException ex) {
