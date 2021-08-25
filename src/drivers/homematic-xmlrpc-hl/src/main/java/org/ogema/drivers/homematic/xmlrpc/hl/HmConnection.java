@@ -43,7 +43,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import javax.servlet.ServletException;
 import org.apache.xmlrpc.XmlRpcException;
 import org.ogema.core.application.ApplicationManager;
@@ -383,6 +382,7 @@ public class HmConnection implements HomeMaticConnection {
 
 	@Override
 	public void performSetValue(String address, String valueKey, Object value) {
+        logger.debug("adding setValue action: {}/{}={}", address, valueKey, value);
 		writer.addWriteAction(WriteAction.createSetValue(client, address, valueKey, value));
 	}
 
@@ -804,6 +804,8 @@ public class HmConnection implements HomeMaticConnection {
 			if (logger != null) {
 				logger.info("HomeMatic configuration removed: {}", config);
 			}
+            //deregister logic interface
+            hm.init(client, null);
 		} catch (Exception e) {
 			if (logger != null) {
 				logger.error("HomeMatic XmlRpc driver shutdown failed", e);

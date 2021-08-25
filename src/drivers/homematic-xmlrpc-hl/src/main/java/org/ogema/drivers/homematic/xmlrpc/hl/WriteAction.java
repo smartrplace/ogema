@@ -15,6 +15,7 @@
  */
 package org.ogema.drivers.homematic.xmlrpc.hl;
 
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.xmlrpc.XmlRpcException;
@@ -157,7 +158,20 @@ public abstract class WriteAction {
             this.hm = hm;
             this.address = address;
             this.set = set;
-            this.values = new LinkedHashMap<>(values);
+            this.values = makeXmlRpcMap(values);//new LinkedHashMap<>(values);
+        }
+        
+        private final Map<String, Object> makeXmlRpcMap(Map<String, Object> values) {
+            Map<String, Object> rval = new LinkedHashMap<>();
+            values.forEach((k,v) -> {
+                if (v instanceof Long || v instanceof BigInteger) {
+                    // CCU java XMLRPC interface does not support longs ("i8")
+                    rval.put(k, ((Number)v).intValue());
+                } else {
+                    rval.put(k, v);
+                }
+            });
+            return rval;
         }
         
         @Override

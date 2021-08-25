@@ -155,6 +155,7 @@ public class ThermostatChannel extends AbstractDeviceHandler {
 
         Thermostat thermos = parent.addDecorator(swName, Thermostat.class);
         conn.registerControlledResource(conn.getChannel(parent, deviceAddress), thermos);
+        ThermostatUtils.setupParameterResources(parent, desc, paramSets, conn, thermos, logger);
         Map<String, SingleValueResource> resources = new HashMap<>();
         for (Map.Entry<String, ParameterDescription<?>> e : values.entrySet()) {
             switch (e.getKey()) {

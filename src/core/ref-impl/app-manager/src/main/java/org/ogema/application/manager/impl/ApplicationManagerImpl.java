@@ -205,7 +205,7 @@ public class ApplicationManagerImpl implements ApplicationManager, TimerRemovedL
 				logger.warn("stop() call of application " + application.getClass().getName() + " timed out.");
 				if (tfac.getLastThread() != null) {
 					List<StackTraceElement> l = Arrays.asList(tfac.getLastThread().getStackTrace());
-					logger.debug("application '%s' stop() call timed out, application thread stack trace: %s",
+					logger.debug("application '{}' stop() call timed out, application thread stack trace: {}",
 							application.getClass().getName(), l);
 				}
 			}
