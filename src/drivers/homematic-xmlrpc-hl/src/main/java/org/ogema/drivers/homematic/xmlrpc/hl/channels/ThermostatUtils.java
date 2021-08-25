@@ -1,11 +1,11 @@
 package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
@@ -18,8 +18,6 @@ import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
-import org.ogema.model.actors.MultiSwitch;
-import org.ogema.model.devices.buildingtechnology.Thermostat;
 import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.slf4j.Logger;
 
@@ -97,10 +95,11 @@ abstract class ThermostatUtils {
         }
         ParameterListener l = new ParameterListener(conn, address, set.name(), logger);
         Runnable updateValues = () -> {
+            Thread.currentThread().setName("HomeMatic Thermostats Parameter Update");
             try {
                 Map<String, Object> values = conn.getParamset(address, set.name());
                 int count = 0;
-                for (String paramName: params.keySet()) {
+                for (String paramName : params.keySet()) {
                     Object value = values.get(paramName);
                     if (value == null) {
                         logger.debug("missing value for {} in getParamset response on {}", paramName, address);
@@ -138,7 +137,7 @@ abstract class ThermostatUtils {
                 r.activate(false);
                 r.addValueListener(l, true);
                 r.addValueListener(_r -> {
-                    CompletableFuture.delayedExecutor(3, TimeUnit.SECONDS).execute(updateValues);
+                    Executors.newSingleThreadScheduledExecutor().schedule(updateValues, 3, TimeUnit.SECONDS);
                 }, true);
                 params.put(p, r);
                 logger.debug("set up parameter {} on {}", p, address);
@@ -148,52 +147,7 @@ abstract class ThermostatUtils {
         update.create();
         update.addValueListener(updateListener, true);
         update.activate(false);
-        // automatic update on startup for all devices seems to cause problems...
-        //CompletableFuture.runAsync(updateValues);
+        CompletableFuture.runAsync(updateValues);
     }
-
-    /*
-    static void setupValveMaximumPosition(HmDevice parent, DeviceDescription desc,
-            Map<String, Map<String, ParameterDescription<?>>> paramSets,
-            HomeMaticConnection conn, Thermostat thermos, Logger logger) {
-        String parameterName = "VALVE_MAXIMUM_POSITION";
-        ParameterDescription.SET_TYPES set = ParameterDescription.SET_TYPES.MASTER;
-        Map<String, ParameterDescription<?>> masterParams = paramSets.get(set.name());
-        if (masterParams == null) {
-            logger.debug("no parameter set 'MASTER' for {}", parent.address());
-            return;
-        }
-        ParameterDescription<?> pdesc = masterParams.get(parameterName);
-        if (pdesc == null) {
-            logger.debug("no parameter '{}' for {}", parameterName, parent.address());
-            return;
-        }
-        MultiSwitch vmp = thermos.getSubResource("valveMaximumPosition", MultiSwitch.class);
-        vmp.stateControl().create();
-        vmp.stateFeedback().create();
-
-        Runnable getStateFeedback = () -> {
-            try {
-                Object val = conn.getParamset(desc.getAddress(), set.name()).get(parameterName);
-                if (!(val instanceof Number)) {
-                    logger.debug("received null or unsupported type for {} on {}: {}", parameterName, desc.getAddress(), val);
-                    return;
-                }
-                vmp.stateFeedback().setValue(((Number) val).floatValue());
-                vmp.stateFeedback().activate(false);
-            } catch (IOException | RuntimeException ex) {
-                logger.debug("could not read value '{}' on {}: {}", parameterName, desc.getAddress(), ex.getMessage());
-            }
-        };
-
-        vmp.stateControl().addValueListener((FloatResource r) -> {
-            float v = r.getValue();
-            conn.performPutParamset(desc.getAddress(), set.name(), Collections.singletonMap(parameterName, v));
-            CompletableFuture.delayedExecutor(3, TimeUnit.SECONDS).execute(getStateFeedback);
-        }, true);
-        vmp.stateControl().activate(false);
-        vmp.activate(false);
-    }
-    */
 
 }
