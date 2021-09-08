@@ -54,6 +54,7 @@ import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
 
     public static final String PID = "org.ogema.apps.OpenWeatherMap";
+    public static final boolean OFFLINE_MODE = Boolean.getBoolean("org.ogema.apps.openweathermap.testwithoutconnection");
 
     @ObjectClassDefinition(
             localization = "OSGI-INF/l10n/OpenWeatherMapConfig",
@@ -83,6 +84,12 @@ public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
         
         @AttributeDefinition(name = "%useSensorDevice", description = "%useSensorDevice_desc")
         boolean useSensorDevice() default false;
+        
+        @AttributeDefinition(name = "%updateInterval", description = "%updateInterval_desc")
+        String updateInterval();
+        
+        @AttributeDefinition(name = "%updateIntervalCurrent", description = "%updateIntervalCurrent_desc")
+        String updateIntervalCurrentData();
 
     }
 
@@ -188,6 +195,16 @@ public class OpenWeatherMapApplication implements OpenWeatherMapApplicationI {
             model.getPostalCode().<StringResource>create().setValue(cfg.postalCode());
         } else {
             model.getPostalCode().delete();
+        }
+        if (cfg.updateInterval() != null && !cfg.updateInterval().isEmpty()) {
+            model.getForecastDataUpdateInterval().<StringResource>create().setValue(cfg.updateInterval());
+        } else {
+            model.getForecastDataUpdateInterval().delete();
+        }
+        if (cfg.updateIntervalCurrentData()!= null && !cfg.updateIntervalCurrentData().isEmpty()) {
+            model.getCurrentDataUpdateInterval().<StringResource>create().setValue(cfg.updateIntervalCurrentData());
+        } else {
+            model.getCurrentDataUpdateInterval().delete();
         }
         model.getModel().activate(true);
     }
