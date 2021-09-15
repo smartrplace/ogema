@@ -27,7 +27,6 @@ import java.security.spec.InvalidKeySpecException;
 import java.util.Base64;
 import java.util.Dictionary;
 import java.util.Objects;
-import java.util.logging.Level;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
@@ -63,9 +62,23 @@ public class CredentialStoreImpl implements CredentialStore {
     private final static int PW_KEY_LEN = 256;
     private final static String PW_STORED_PREFIX = "PBKDF2:";
     
+    private final static SecureRandom saltPrng;
+    
+    static {
+        try {
+            saltPrng = SecureRandom.getInstance("SHA1PRNG");
+        } catch (NoSuchAlgorithmException ex) {
+            logger.error("missing algorithm for PRNG: SHA1PRNG ({})", ex.getMessage());
+            throw new RuntimeException("could not initialize salt PRNG", ex);
+        }
+    }
+    
     static String encodePassword(String password, int iterations) throws NoSuchAlgorithmException, InvalidKeySpecException {
-        byte[] salt = SecureRandom.getInstance("SHA1PRNG").generateSeed(PW_SEED_LEN);
-        String store = "PBKDF2:" + iterations + ":" + Base64.getEncoder().encodeToString(salt) + ":" + hashPassword(password, salt, iterations);
+        byte[] salt = new byte[PW_SEED_LEN];
+        saltPrng.nextBytes(salt);
+        String store = PW_STORED_PREFIX + iterations + ":"
+                + Base64.getEncoder().encodeToString(salt) + ":"
+                + hashPassword(password, salt, iterations);
         return store;
     }
     
@@ -75,7 +88,7 @@ public class CredentialStoreImpl implements CredentialStore {
         SecretKey key = f.generateSecret(new PBEKeySpec(
             password.toCharArray(), salt, iterations, PW_KEY_LEN));
         long time = System.currentTimeMillis() - start;
-        logger.debug("password hashed in {}ms", time);
+        logger.debug("password hashed in {}ms, {} iterations", time, iterations);
         return Base64.getEncoder().encodeToString(key.getEncoded());
     }
     
@@ -87,7 +100,7 @@ public class CredentialStoreImpl implements CredentialStore {
         }
         String[] a = stored.split(":");
         if (a.length != 4) {
-            logger.error("stored password has incorect format: {}", stored);
+            logger.error("stored password has incorrect format: {}", stored);
             return false;
         }
         String storedHash = a[3];
@@ -97,7 +110,7 @@ public class CredentialStoreImpl implements CredentialStore {
             String givenPasswordHash = hashPassword(password, salt, iterations);
             return equalsConstantTime(givenPasswordHash, storedHash);
         } catch (NumberFormatException nfe) {
-            logger.error("stored password has incorect format: {}", stored);
+            logger.error("stored password has incorrect format: {}", stored);
             return false;
         }
     }
@@ -115,14 +128,15 @@ public class CredentialStoreImpl implements CredentialStore {
         return c == 0;
     }
 
+    @Override
 	public void setGWPassword(String usrName, String oldPwd, final String newPwd) {
 		if (!login(usrName, oldPwd))
-			throw new SecurityException("Wrong old passowrd!");
+			throw new SecurityException("Wrong old password!");
 		Role role = findRole(usrName);
 		final User usr = (User) role;
 
 		if (role == null) {
-			throw new IllegalArgumentException("User doesn't exist: " + usrName);
+			throw new IllegalArgumentException("User does not exist: " + usrName);
 		}
 		else {
 			// Set users default password
@@ -211,6 +225,7 @@ public class CredentialStoreImpl implements CredentialStore {
 			return false;
 		final User admin = (User) role;
 		Boolean hasCred = AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
+            @Override
 			public Boolean run() {
                 Object o = admin.getCredentials().get(Constants.PASSWORD_NAME);
                 if (o == null || pwd == null) {
@@ -226,10 +241,7 @@ public class CredentialStoreImpl implements CredentialStore {
                 }
 			}
 		});
-		if (!hasCred)
-			return false;
-		return true;
-
+		return hasCred;
 	}
 
 	@Override
@@ -292,6 +304,7 @@ public class CredentialStoreImpl implements CredentialStore {
 	@Override
 	public String getGWId() {
 		String clientID = AccessController.doPrivileged(new PrivilegedAction<String>() {
+            @Override
 			public String run() {
 				String id = FrameworkUtil.getBundle(getClass()).getBundleContext()
 						.getProperty("org.ogema.secloader.gatewayidentifier");
