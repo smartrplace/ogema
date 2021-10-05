@@ -88,12 +88,13 @@ public class HmConnection implements HomeMaticConnection {
 	private final ComponentContext ctx;
 	public static final Logger logger = LoggerFactory.getLogger(HomeMaticDriver.class);
 	private final HomeMaticDriver hmDriver;
+    private boolean dynamicCcuDiscovery = false;
 
 	final int MAX_RETRIES = 5;
 
 	// private final Runnable initTask;
-	protected long reInitTryTime = 2 * 60000;
-	public static final long MAX_REINITTRYTIME = 24 * 60 * 60000;
+	protected long reInitTryTime = 2 * 60_000;
+	public static final long MAX_REINITTRYTIME = 15 * 60_000;
 	private Thread connectionThread;
 
 	// quasi-final: not changed after init() call
@@ -102,7 +103,8 @@ public class HmConnection implements HomeMaticConnection {
 	HomeMatic client;
 	final HmLogicInterface baseResource;
 	// quasi-final: not changed after init() call
-	ServiceRegistration<HomeMaticClientCli> commandLine;
+	ServiceRegistration<HomeMaticClientCli> commandLineRegistration;
+    HomeMaticClientCli commandLine;
 
 	private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 	ScheduledFuture<?> installModePoller;
@@ -181,7 +183,8 @@ public class HmConnection implements HomeMaticConnection {
 				Thread.currentThread().interrupt();
 				return;
 			}
-			logger.error("could not start HomeMatic driver for config {}", baseResource.getPath());
+			logger.error("could not start HomeMatic driver for config {}: {}",
+                    baseResource.getPath(), e.getMessage());
 			logger.debug("Exception details:", e);
 			retryConnect();
 			return;
@@ -357,7 +360,7 @@ public class HmConnection implements HomeMaticConnection {
 						return true;
 					} else {
 						logger.warn("Homematic service for {} does not respond, registering again...", baseResource.getName());
-						performConnect();
+						performConnect(true);
 						return false;
 					}
 				} catch (XmlRpcException ex) {
@@ -503,17 +506,19 @@ public class HmConnection implements HomeMaticConnection {
 			if (config.networkInterface().isActive() ||
 					config.baseUrl().isActive() ||
 					config.clientUrl().isActive()) {
-				serverUrl = getServerUrl(config, interfaces, xmlRpcServiceUrl);
 				if (config.clientUrl().isActive()) {
 					xmlRpcServiceUrl = config.clientUrl().getValue();
                 } else {
 					xmlRpcServiceUrl = discoverXmlRpcInterface(config, interfaces);
+                    dynamicCcuDiscovery = xmlRpcServiceUrl != null;
                 }
+                serverUrl = getServerUrl(config, interfaces, xmlRpcServiceUrl);
 			} else {
 				if (!config.clientPort().isActive()) {
 					throw new IllegalStateException("Neither client port nor client URL set for config " + config);
                 }
 				xmlRpcServiceUrl = discoverXmlRpcInterface(config, interfaces);
+                dynamicCcuDiscovery = xmlRpcServiceUrl != null;
 				serverUrl = getServerUrl(config, interfaces, xmlRpcServiceUrl);
 			}
 			if (serverUrl == null || serverUrl.isEmpty()) {
@@ -522,7 +527,9 @@ public class HmConnection implements HomeMaticConnection {
 			if (xmlRpcServiceUrl == null || xmlRpcServiceUrl.isEmpty()) {
 				if(Boolean.getBoolean("org.ogema.drivers.homematic.xmlrpc.hl.testwithoutconnection"))
 					return;
-				throw new IllegalStateException("CCU XML-RPC service not found. Serial number: " + config.serialNumber().getValue());
+                retryInit();
+                return;
+                //throw new IllegalStateException("CCU XML-RPC service not found. Serial number: " + config.serialNumber().getValue());
 			}
             final String alias = getServletAlias(config);
             
@@ -547,7 +554,8 @@ public class HmConnection implements HomeMaticConnection {
             
     		logger.info("New Homematic XML_RPC connection to {}, servlet URL {}{}", xmlRpcServiceUrl, serverUrl, alias);
 			client = new HomeMaticClient(xmlRpcServiceUrl, config.ccuUser().isActive() ? config.ccuUser().getValue() : null, config.ccuPw().isActive() ? config.ccuPw().getValue() : null);
-			commandLine = new HomeMaticClientCli(client).register(ctx.getBundleContext(), config.getName());
+            commandLine = new HomeMaticClientCli(client);
+			commandLineRegistration = commandLine.register(ctx.getBundleContext(), config.getName());
 			//hm = new HomeMaticService(ctx.getBundleContext(), serverUrl, alias);
 
 			config.installationMode().stateControl().create();
@@ -559,7 +567,7 @@ public class HmConnection implements HomeMaticConnection {
 			hm.setBackend(persistence);
 
 			hm.addDeviceListener(persistence);
-			performConnect();
+			performConnect(false);
 		} catch (IOException ex) {
 			logger.error("could not start HomeMatic driver for config {} (2)", baseResource.getPath());
 			logger.debug("Exception details:", ex);
@@ -743,12 +751,27 @@ public class HmConnection implements HomeMaticConnection {
 	}
 
 	protected void retryConnect() {
+		logger.info("Will retry initial connect for config {} after " + (reInitTryTime / 1000) + " seconds.",
+				baseResource.getPath());
+		executor.schedule(new Runnable() {
+			@Override
+			public void run() {
+				performConnect(true);
+			}
+		}, reInitTryTime, TimeUnit.MILLISECONDS);
+		reInitTryTime *= 2;
+		if (reInitTryTime > MAX_REINITTRYTIME) {
+			reInitTryTime = MAX_REINITTRYTIME;
+		}
+	}
+    
+    protected void retryInit() {
 		logger.info("Will retry init for config {} after " + (reInitTryTime / 1000) + " seconds.",
 				baseResource.getPath());
 		executor.schedule(new Runnable() {
 			@Override
 			public void run() {
-				performConnect();
+				init();
 			}
 		}, reInitTryTime, TimeUnit.MILLISECONDS);
 		reInitTryTime *= 2;
@@ -759,8 +782,25 @@ public class HmConnection implements HomeMaticConnection {
 
 	// no synchronization for connectionThread because it is only executed in the
 	// single-threaded scheduler (after init())
-	protected void performConnect() {
+	protected void performConnect(boolean isRetry) {
 		if (connectionThread == null || !connectionThread.isAlive()) {
+            if (isRetry && dynamicCcuDiscovery) {
+                logger.debug("connection lost for CCU with dynamic discovery, re-running discovery...");
+                try {
+                    String xmlRpcServiceUrl = discoverXmlRpcInterface(baseResource, new ArrayList<>());
+                    if (xmlRpcServiceUrl == null) {
+                        logger.debug("dynamic discovery returned nothing for SN {}", baseResource.serialNumber().getValue());
+                        return;
+                    } else {
+                        logger.debug("discovered connection URL for SN {}: {}",
+                                baseResource.serialNumber().getValue(), xmlRpcServiceUrl);
+                    }
+                    client = new HomeMaticClient(xmlRpcServiceUrl, baseResource.ccuUser().isActive() ? baseResource.ccuUser().getValue() : null, baseResource.ccuPw().isActive() ? baseResource.ccuPw().getValue() : null);
+                    commandLine.setClient(client);
+                } catch (IOException ioex) {
+                    logger.debug("exception in discovery on reconnect: {} ({})", ioex.getMessage(), ioex.getClass().getSimpleName());
+                }
+            }
 			connectionThread = new Thread(new Runnable() {
 				@Override
 				public void run() {
@@ -791,8 +831,8 @@ public class HmConnection implements HomeMaticConnection {
 						if (hm != null) {
 							hm.close();
 						}
-						if (commandLine != null) {
-							commandLine.unregister();
+						if (commandLineRegistration != null) {
+							commandLineRegistration.unregister();
 						}
 					}
 				}).start();

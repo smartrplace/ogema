@@ -39,7 +39,7 @@ import org.osgi.framework.ServiceRegistration;
  */
 public class HomeMaticClientCli {
 
-    private final HomeMatic client;
+    private HomeMatic client;
 
     public HomeMaticClientCli(HomeMatic client) {
         this.client = client;
@@ -233,6 +233,10 @@ public class HomeMaticClientCli {
     
     public HomeMatic client(String none) {
         return client;
+    }
+    
+    public void setClient(HomeMatic client) {
+        this.client = client;
     }
     
 }
