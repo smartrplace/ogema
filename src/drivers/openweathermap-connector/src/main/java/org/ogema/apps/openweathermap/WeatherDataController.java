@@ -15,6 +15,8 @@
  */
 package org.ogema.apps.openweathermap;
 
+import java.time.Duration;
+import java.time.format.DateTimeParseException;
 import java.util.Timer;
 import java.util.TimerTask;
 import org.ogema.apps.openweathermap.dao.CurrentData;
@@ -36,10 +38,37 @@ public class WeatherDataController {
 	private final WeatherDataModel device;
 	private final long scheduleUpdateTime;
 	private TimerTask task;
+    private final long currentDataUpdateInterval;
 
 	public WeatherDataController(ApplicationManager appMan, WeatherDataModel rad) {
-		scheduleUpdateTime = Long.getLong(OpenWeatherMapApplication.UPDATE_INTERVAL,
-				OpenWeatherMapApplication.UPDATE_INTERVAL_DEFAULT);
+        long forecastDataUpdateInterval = -1;
+        if (rad.getForecastDataUpdateInterval().isActive()) {
+            try {
+                Duration d = Duration.parse(rad.getForecastDataUpdateInterval().getValue());
+                forecastDataUpdateInterval = d.toMillis();
+            } catch (DateTimeParseException dtpe) {
+                appMan.getLogger().warn("invalid forecast data update interval '{}': {}",
+                        rad.getForecastDataUpdateInterval().getValue(), dtpe.getMessage());
+            }
+        }
+		scheduleUpdateTime = forecastDataUpdateInterval != -1
+                ? forecastDataUpdateInterval
+                : Long.getLong(OpenWeatherMapApplication.UPDATE_INTERVAL, OpenWeatherMapApplication.UPDATE_INTERVAL_DEFAULT);
+        long updateInterval2 = -1;
+        if (rad.getCurrentDataUpdateInterval().isActive()) {
+            try {
+                Duration d = Duration.parse(rad.getCurrentDataUpdateInterval().getValue());
+                updateInterval2 = d.toMillis();
+            } catch (DateTimeParseException dtpe) {
+                appMan.getLogger().warn("invalid current data update interval '{}': {}",
+                        rad.getCurrentDataUpdateInterval().getValue(), dtpe.getMessage());
+            }
+        }
+        currentDataUpdateInterval = updateInterval2;
+        appMan.getLogger().debug("update interval: {}ms", scheduleUpdateTime);
+        if (currentDataUpdateInterval != -1) {
+            appMan.getLogger().debug("update interval for current data: {}ms", currentDataUpdateInterval);
+        }
 		this.appMan = appMan;
 		this.device = rad;
 	}
@@ -50,21 +79,20 @@ public class WeatherDataController {
 				|| device.getCity() != null) {
 
 			final ResourceUtil util = new ResourceUtil(appMan, device);
-
+            if (OpenWeatherMapApplication.OFFLINE_MODE) {
+                return;
+            }
 			task = new TimerTask() {
 
 				@Override
 				public void run() {
                     try {
-                        if (Boolean.getBoolean("org.ogema.apps.openweathermap.testwithoutconnection")) {
-                            return;
-                        }
                         appMan.getLogger().info(
-							"update weather info for location " + device.getModel().getName() + " next update in "
+							"updating weather info for location " + device.getModel().getName() + " next update in "
 									+ scheduleUpdateTime + "ms");
                         OpenWeatherMapREST owmremote = OpenWeatherMapREST.getInstance();
                         ForecastData data;
-                        CurrentData current;
+                        CurrentData current = null;
                         if (device.getLatitude().isActive()) {
                             data = owmremote.getWeatherForcastCoord(device.getLatitude().getValue(), device.getLongitude().getValue());
                             current = owmremote.getWeatherCurrentCoord(device.getLatitude().getValue(), device.getLongitude().getValue());
@@ -82,13 +110,42 @@ public class WeatherDataController {
                         util.store(data, current);
                         appMan.getLogger().info("update complete for location {}", device.getModel().getName());
                     } catch (RuntimeException e) {
-                        appMan.getLogger().warn("update failed", e);
+                        appMan.getLogger().warn("update failed: {}", e.getMessage());
+                        appMan.getLogger().debug("update failed", e);
                     }
 				}
 			};
 
 			Timer t = new Timer();
 			t.schedule(task, 0, scheduleUpdateTime);
+            
+            if (currentDataUpdateInterval != -1) {
+                TimerTask updateCurrentData = new TimerTask() {
+                    @Override
+                    public void run() {
+                        try {
+                            appMan.getLogger().info(
+                                    "updating current weather info for location " + device.getModel().getName() + " next update in "
+                                    + currentDataUpdateInterval + "ms");
+                            OpenWeatherMapREST owmremote = OpenWeatherMapREST.getInstance();
+                            CurrentData current = null;
+                            if (device.getLatitude().isActive()) {
+                                current = owmremote.getWeatherCurrentCoord(device.getLatitude().getValue(), device.getLongitude().getValue());
+                            } else if (device.getPostalCode().isActive()) {
+                                current = owmremote.getWeatherCurrentZip(device.getPostalCode().getValue(), device.getCountry().getValue());
+                            } else {
+                                current = owmremote.getWeatherCurrent(device.getCity().getValue(), device.getCountry().getValue());
+                            }
+                            util.storeCurrent(current);
+                            appMan.getLogger().info("update complete for location {}", device.getModel().getName());
+                        } catch (RuntimeException re) {
+                            appMan.getLogger().warn("current data update failed: {}", re.getMessage());
+                            appMan.getLogger().debug("update failed", re);
+                        }
+                    }
+                };
+                t.scheduleAtFixedRate(updateCurrentData, 0, currentDataUpdateInterval);
+            }
 
 		}
 	}

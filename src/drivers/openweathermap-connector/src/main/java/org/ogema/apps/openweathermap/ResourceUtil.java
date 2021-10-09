@@ -69,7 +69,7 @@ public class ResourceUtil {
 		this.appMan = appMan;
 	}
     
-    private void storeCurrent(CurrentData current) {
+    public void storeCurrent(CurrentData current) {
         pattern.getTempSens().reading().create();
         pattern.getTempSens().reading().setKelvin(current.getMain().getTemp().floatValue());
         pattern.getTempSens().reading().activate(false);

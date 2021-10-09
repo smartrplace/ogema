@@ -57,6 +57,10 @@ public class WeatherSensorDeviceRad extends ResourcePattern<SensorDevice> implem
     protected FloatResource longitude = model.location().getSubResource("longitude", FloatResource.class);
     @Existence(required = CreateMode.OPTIONAL)
     protected FloatResource latitude = model.location().getSubResource("latitude", FloatResource.class);
+    @Existence(required = CreateMode.OPTIONAL)
+    protected StringResource currentDataUpdateInterval = model.location().getSubResource("currentDataUpdateInterval", StringResource.class);
+    @Existence(required = CreateMode.OPTIONAL)
+    protected StringResource forecastDataUpdateInterval = model.location().getSubResource("forecastDataUpdateInterval", StringResource.class);
     
 	public WeatherSensorDeviceRad(Resource match) {
 		super(match);
@@ -145,6 +149,16 @@ public class WeatherSensorDeviceRad extends ResourcePattern<SensorDevice> implem
     @Override
     public FloatResource getLatitude() {
         return latitude;
+    }
+
+    @Override
+    public StringResource getCurrentDataUpdateInterval() {
+        return currentDataUpdateInterval;
+    }
+
+    @Override
+    public StringResource getForecastDataUpdateInterval() {
+        return forecastDataUpdateInterval;
     }
 
 }

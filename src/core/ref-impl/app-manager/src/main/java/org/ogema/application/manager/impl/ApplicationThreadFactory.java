@@ -52,7 +52,11 @@ class ApplicationThreadFactory implements ThreadFactory {
 	@Override
 	public Thread newThread(Runnable r) {
 		Thread t = new Thread(group, r);
-		t.setName("App '" + application.getClass().getName() + "' (" + threadCount.incrementAndGet() + ")");
+        String threadName = String.format("%s OGEMA app thread (%d)",
+                application.getClass().getSimpleName(),
+                threadCount.incrementAndGet()
+        );
+		t.setName(threadName);
 		lastThread = t;
 		return t;
 	}

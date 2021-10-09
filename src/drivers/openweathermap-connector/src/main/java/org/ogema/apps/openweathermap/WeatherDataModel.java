@@ -81,4 +81,8 @@ public interface WeatherDataModel {
      */
     FloatResource getLatitude();
     
+    StringResource getForecastDataUpdateInterval();
+    
+    StringResource getCurrentDataUpdateInterval();
+    
 }

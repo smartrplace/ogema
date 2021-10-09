@@ -122,6 +122,8 @@ public class HomeMaticClient implements HomeMatic {
         config.setEnabledForExtensions(true);
         config.setEncoding("ISO-8859-1"); //only used in modified XmlRpcStreamTransport
         config.setEnabledForExceptions(true);
+        config.setReplyTimeout(10_000);
+        config.setConnectionTimeout(10_000);
         client = new XmlRpcClient();
         client.setConfig(config);
         // we cannot expect valid certificates in a home network

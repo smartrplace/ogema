@@ -337,7 +337,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                 // happens for RSSI_DEVICE on a HM_HmIP_SWDM even though it's listed as supported parameter
                 logger.debug("read mysteriously failed for {}: {}", m, msg);
             } else {
-                logger.warn("read failed for {}", m, ex);
+                logger.warn("read failed for {}: {} ({})", m, ex.getMessage(), ex.getClass().getSimpleName());
             }
         }
         return updated;
