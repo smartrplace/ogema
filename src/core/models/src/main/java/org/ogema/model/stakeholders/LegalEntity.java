@@ -35,7 +35,8 @@ public interface LegalEntity extends Data {
 
 	/**
 	 * Name of user for identification purposes; if the user has an account on the OGEMA gateway the name should be the
-	 * same as the login user name
+	 * same as the login user name<br>
+	 * Note that userName is also stored in user administration and this is used e.g. in invitation emails
 	 */
 	StringResource userName();
 
