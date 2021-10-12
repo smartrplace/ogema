@@ -26,12 +26,7 @@ import org.ogema.model.sensors.LuminousFluxSensor;
 /**
  * Electric light
  */
-public interface ElectricLight extends PhysicalElement {
-
-	/**
-	 * Switch to control when the light is on or off
-	 */
-	OnOffSwitch onOffSwitch();
+public interface ElectricLight extends RGBLight {
 
 	/**
 	 * Power setting for the light.
