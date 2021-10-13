@@ -9,7 +9,7 @@
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expush or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
@@ -21,23 +21,28 @@ import org.ogema.model.devices.storage.ElectricityStorage;
 import org.ogema.model.sensors.GenericFloatSensor;
 
 /**
- * Models a remote control with a single button and an RGB light.
+ * A push button that signals operation as completed events, e.g.
+ * single push, double push or long push.
  */
-public interface RemoteControlButton extends Actor {
+public interface EventPushButton extends Actor {
 
 	ElectricityStorage battery();
 
-	/** Each time the button is operated an event is written. Several short press events are usually interpreted
-	 * 	as a single event that represents a single action
-	 *  1: Short pressed event<br>
-	 *  2: Long pressed event<br>
-	 *  3: Double short pressed event<br>
-	 *  4: Triple short pressed event
+	/** Sensor for button push events.
+     * <dl>
+     * <dt>1</dt><dd>Long push event</dd>
+     * <dt>9</dt><dd>Short push event</dd>
+	 * <dt>10</dt><dd>Double short push event</dd>
+     * <dt>11</dt><dd>Triple short push event</dd>
+     * </dl>
+     * @return Push event sensor.
 	 */
 	GenericFloatSensor event();
 	
 	RGBLight buttonLight();
 	
-	/**If false the device is offline*/
+	/**
+     * @return Device online state.
+     */
 	BooleanResource online();
 }
