@@ -15,7 +15,9 @@
  */
 package org.ogema.model.devices.connectiondevices;
 
+import org.ogema.core.model.ResourceList;
 import org.ogema.model.connections.ElectricityConnection;
+import org.ogema.model.metering.ElectricityMeter;
 
 /**
  * Electrical connection point as physical element including relevant installation cabinet
@@ -23,4 +25,8 @@ import org.ogema.model.connections.ElectricityConnection;
 public interface ElectricityConnectionBox extends GenericConnectionBox {
 	@Override
 	ElectricityConnection connection();
+
+	@Override
+	ResourceList<ElectricityMeter> meters();
+
 }

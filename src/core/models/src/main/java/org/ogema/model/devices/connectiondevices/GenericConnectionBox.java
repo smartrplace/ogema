@@ -15,8 +15,10 @@
  */
 package org.ogema.model.devices.connectiondevices;
 
+import org.ogema.core.model.ResourceList;
 import org.ogema.model.locations.Building;
 import org.ogema.model.locations.BuildingPropertyUnit;
+import org.ogema.model.metering.GenericMeter;
 import org.ogema.model.prototypes.Connection;
 import org.ogema.model.prototypes.PhysicalElement;
 
@@ -39,4 +41,7 @@ public interface GenericConnectionBox extends PhysicalElement {
 	 * Reference to building which the connection box connects a public grid to, if applicable
 	 */
 	Building building();
+
+	ResourceList<? extends GenericMeter> meters();
+
 }

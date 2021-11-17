@@ -15,7 +15,9 @@
  */
 package org.ogema.model.devices.connectiondevices;
 
+import org.ogema.core.model.ResourceList;
 import org.ogema.model.connections.ThermalConnection;
+import org.ogema.model.metering.HeatMeter;
 
 /**
  * Heat connection point as physical element including relevant installation cabinet.
@@ -23,4 +25,8 @@ import org.ogema.model.connections.ThermalConnection;
 public interface HeatConnectionBox extends GenericConnectionBox {
 	@Override
 	ThermalConnection connection();
+
+	@Override
+	ResourceList<HeatMeter> meters();
+
 }
