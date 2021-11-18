@@ -22,6 +22,7 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.WildcardType;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -1164,13 +1165,21 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 				 * if its a ComplexResourceType set the type of the elements as the type of the node.
 				 */
 				if (typekey == DBConstants.TYPE_KEY_COMPLEX_ARR) {
-
 					Type genericType = m.getGenericReturnType();
-					if (genericType instanceof ParameterizedType) {
-						Type[] actualTypes = ((ParameterizedType) genericType).getActualTypeArguments();
-						if (actualTypes.length > 0) {
-							clazz = (Class<?>) actualTypes[0];
-						}
+                    if (genericType instanceof ParameterizedType) {
+                        Type[] actualTypes = ((ParameterizedType) genericType).getActualTypeArguments();
+                        if (actualTypes.length > 0) {
+                            if (actualTypes[0] instanceof WildcardType) {
+                                WildcardType wct = (WildcardType) actualTypes[0];
+                                Type[] bounds = wct.getLowerBounds();
+                                if (bounds.length == 0) {
+                                    bounds = wct.getUpperBounds();
+                                }
+                                clazz = (Class<?>) bounds[0];
+                            } else {
+                                clazz = (Class<?>) actualTypes[0];
+                            }
+                        }
 					}
 				}
 				Class<?> cls = typesMap.get(name);

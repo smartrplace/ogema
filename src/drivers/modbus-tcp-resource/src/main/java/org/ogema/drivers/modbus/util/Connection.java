@@ -83,9 +83,8 @@ public class Connection {
 		}
 		con = new TCPMasterConnection(host.getAddress());
 		con.setPort(host.getPort());
-		try {			
-			con.connect();
-//			con.setTimeout(10000);
+		try {
+            connect();
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -93,16 +92,17 @@ public class Connection {
 
 	}
 
-	public void connect() throws Exception {
-		
+	public final void connect() throws Exception {
 		if(Boolean.getBoolean("org.ogema.drivers.modbus.testwithoutconnection")) {
 			return;
 		}
 		if (!con.isConnected()) {
-
 			con.connect();
+            int timeout = Integer.getInteger("org.ogema.drivers.modbus.timeout", -1);
+            if (timeout > -1) {
+                con.setTimeout(timeout);
+            }
 			transaction = new ModbusTCPTransaction(con);
-
 		}
 	}
 

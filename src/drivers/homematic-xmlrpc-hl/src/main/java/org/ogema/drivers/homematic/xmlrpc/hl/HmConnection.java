@@ -59,6 +59,7 @@ import org.ogema.drivers.homematic.xmlrpc.hl.channels.MaintenanceChannel;
 import org.ogema.drivers.homematic.xmlrpc.hl.channels.MotionDetectorChannel;
 import org.ogema.drivers.homematic.xmlrpc.hl.channels.PMSwitchDevice;
 import org.ogema.drivers.homematic.xmlrpc.hl.channels.PowerMeterChannel;
+import org.ogema.drivers.homematic.xmlrpc.hl.channels.HmEsTxWmPowerMeterChannel;
 import org.ogema.drivers.homematic.xmlrpc.hl.channels.ShutterContactChannel;
 import org.ogema.drivers.homematic.xmlrpc.hl.channels.SmokeDetectorChannel;
 import org.ogema.drivers.homematic.xmlrpc.hl.channels.SwitchChannel;
@@ -166,6 +167,7 @@ public class HmConnection implements HomeMaticConnection {
 		this.handlers.add(new ThermostatChannel(this));
 		this.handlers.add(new SwitchChannel(this));
 		this.handlers.add(new PowerMeterChannel(this));
+        this.handlers.add(new HmEsTxWmPowerMeterChannel(this));
 		this.handlers.add(new WeatherChannel(this));
 		this.handlers.add(new ShutterContactChannel(this));
 		this.handlers.add(new MotionDetectorChannel(this));

@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.security.AllPermission;
-import java.security.Permission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -30,6 +29,7 @@ import java.util.Dictionary;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -425,7 +425,9 @@ public class ShellCommands {
 		for (UserAccount user: admin.getAllUsers()) {
 			if (!roles.contains(user.getName()))
 				continue;
-			sb.append(" ").append(user.getName()).append(": ").append((accMan.isNatural(user.getName()) ? "natural" : "machine") + " user");
+			sb.append(" ").append(user.getName()).append(": ")
+                    .append((accMan.isNatural(user.getName()) ? "natural" : "machine"))
+                    .append(" user");
 			if (checkUserAdmin(user.getName())) {
 				sb.append(" (admin)");
 			}
@@ -505,36 +507,39 @@ public class ShellCommands {
 	
 	@SuppressWarnings("unchecked")
 	@Descriptor("Print user or group properties")
-	public Dictionary<String, Object> getUserProps(@Descriptor("User or group id") String user) {
-		user = user.trim();
-		final Role r = userAdmin.getRole(user);
-		if (r == null) {
-			System.out.println("User " + user + " not found");
-			return null;
-		}
-		return r.getProperties();
+	public Map<String, Object> getUserProps(@Descriptor("User or group id") String user) {
+        Optional<UserAccount> acc = admin.getAllUsers().stream().filter(ua -> ua.getName().equals(user.trim())).findAny();
+		if (!acc.isPresent()) {
+            System.err.println("user not found: " + user);
+            return null;
+        }
+		return acc.get().getProperties();
 	}
 	
 	@SuppressWarnings("unchecked")
 	@Descriptor("Set user or group properties")
-	public Dictionary<String, Object> setUserProp(
-			@Descriptor("User or group id") String user,
+	public Map<String, Object> setUserProp(
+			@Descriptor("User or group id") final String user,
 			@Descriptor("Property key") String key,
-			@Descriptor("Property value") String value) {
-		user = user.trim();
-		final Role r = userAdmin.getRole(user);
-		if (r == null) {
-			System.out.println("User " + user + " not found");
-			return null;
-		}
+			@Descriptor("Property value, null to remove key") String value) {
+        Optional<UserAccount> acc = admin.getAllUsers().stream().filter(ua -> ua.getName().equals(user.trim())).findAny();
+		if (!acc.isPresent()) {
+            System.err.println("user not found: " + user);
+            return null;
+        }
 		key = key.trim();
+        if (value == null) {
+            //System.out.println("removing key " + key);
+            acc.get().getProperties().remove(key);
+            return acc.get().getProperties();
+        }
 		value = value.trim();
 		if (key.isEmpty() || value.isEmpty()) {
-			System.out.println("Key or value is empty");
-			return r.getProperties();
+			System.err.println("Key or value is empty");
+			return acc.get().getProperties();
 		}
-		r.getProperties().put(key, value);
-		return r.getProperties();
+		acc.get().getProperties().put(key, value);
+		return acc.get().getProperties();
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -669,7 +674,7 @@ public class ShellCommands {
 			
 			@Override
 			public void run() {
-				synchronized (this) {
+				synchronized (latch) {
 					if (latch.getCount() == 0) // already executed
 						return;
 					latch.countDown();
@@ -679,7 +684,7 @@ public class ShellCommands {
 					System.out.println("Bundle restarted.");
 				} catch (BundleException e) {
 					System.err.print("Bundle restart failed.");
-					e.printStackTrace();
+					e.printStackTrace(System.err);
 				}
 			}
 		};
@@ -713,7 +718,7 @@ public class ShellCommands {
 	}
 	
 	// we assume here that the updated bundle was not active, so in particular not the framework bundle itself
-	private final static void checkForFrameworkExtensionBundle(final Collection<Bundle> bundlesToBeRefreshed) {
+	private static void checkForFrameworkExtensionBundle(final Collection<Bundle> bundlesToBeRefreshed) {
 		for (Bundle b: bundlesToBeRefreshed) {
 			if (b.getBundleId() == 0) {
 				// this is a hack to overcome a problem with Felix and Knopflerfish framework bundles when a framework

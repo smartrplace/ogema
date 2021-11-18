@@ -28,10 +28,10 @@ import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.Service;
 import org.ogema.core.administration.FrameworkClock;
 import org.ogema.core.application.Timer;
+import org.ogema.core.application.TimerListener;
 import org.ogema.timer.TimerRemovedListener;
 import org.ogema.timer.TimerScheduler;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Component
 @Service(TimerScheduler.class)
@@ -95,7 +95,12 @@ public class DefaultTimerScheduler implements TimerScheduler, FrameworkClock.Clo
                 	try {
                 		executeTimer(timer, executionTime);
                 	} catch (RejectedExecutionException e) {
-                		timer.logger.error("Failed to execute timer", e);
+                        TimerListener tl = timer.getListeners().get(0);
+                        String timername = tl == null
+                                ? "empty timer"
+                                : tl.getClass().getCanonicalName();
+                		timer.logger.error("Failed to execute timer '{}': {}",
+                                timername, e.getMessage());
                 	}
                 }
                 timer.forward();

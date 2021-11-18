@@ -127,6 +127,7 @@ public class ModbusDriverUtil {
 		case BOOLEAN:
 			bb.putShort((short) (value.getBooleanValue() ? 1 : 0));
 			registers = byteBufferToRegister(bb, count, useLittelEndian);
+            break;
 		case INT:
 			bb.putInt(value.getIntegerValue());
 			registers = byteBufferToRegister(bb, count, useLittelEndian);
