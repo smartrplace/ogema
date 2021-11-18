@@ -21,7 +21,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 
 import org.apache.felix.scr.annotations.Activate;
-
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
 import org.apache.felix.scr.annotations.Reference;
@@ -31,7 +30,6 @@ import org.ogema.core.application.Timer;
 import org.ogema.timer.TimerRemovedListener;
 import org.ogema.timer.TimerScheduler;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Component
 @Service(TimerScheduler.class)
@@ -83,12 +81,18 @@ public class DefaultTimerScheduler implements TimerScheduler, FrameworkClock.Clo
 
     };
 
+//private static int counterTimers = 1;    
     private void processTimer(ApplicationTimer timer, long executionTime) {
         //open synchronization issues: possible to enqueue callback for paused/stopped timer.
         switch (timer.getState()) {
             case PAUSED:
                 timer.forward();
                 timers.offer(timer);
+/*counterTimers++;
+if(counterTimers % 1000 == 0)
+System.out.println("DH37GHGFGHXDX PAUSED Total Timer count:"+timers.size());
+if(timers.size() > 10000)
+System.out.println("DH37GHGFGHXDX Queue Size:"+timers.size());*/
                 break;
             case RUNNING:
                 if (timer.isIdle()) {
@@ -100,6 +104,11 @@ public class DefaultTimerScheduler implements TimerScheduler, FrameworkClock.Clo
                 }
                 timer.forward();
                 timers.offer(timer);
+/*counterTimers++;
+if(counterTimers % 1000 == 0)
+System.out.println("DH37GHGFGHXDX RUNNING Total Timer count:"+counterTimers);
+if(timers.size() > 10000)
+System.out.println("DH37GHGFGHXDX Queue Size:"+timers.size());*/
                 break;
             case SHUTDOWN:
                 break;
@@ -137,6 +146,11 @@ public class DefaultTimerScheduler implements TimerScheduler, FrameworkClock.Clo
             timers.remove(timer);
             timers.offer(timer);
             timers.notifyAll();
+/*counterTimers++;
+if(counterTimers % 1000 == 0)
+System.out.println("DH37GHGFGHXDX reschedule Total Timer count:"+counterTimers);
+if(timers.size() > 10000)
+System.out.println("DH37GHGFGHXDX Queue Size:"+timers.size());*/
         }
     }
 
