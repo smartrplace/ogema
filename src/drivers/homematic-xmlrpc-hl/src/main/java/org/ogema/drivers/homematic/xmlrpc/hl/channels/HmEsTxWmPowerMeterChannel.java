@@ -76,7 +76,7 @@ public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
                     continue;
                 }
                 switch (e.getValueKey()) {
-                    case "POWER":
+                    case "IEC_POWER":
                         PowerResource pwr = meter.powerReading();
                         if (!pwr.exists()) {
                             pwr.create();
@@ -85,7 +85,7 @@ public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
                         pwr.activate(false);
                         logger.debug("power reading updated: {} = {}", pwr.getPath(), e.getValueFloat());
                         break;
-                    case "ENERGY_COUNTER": {
+                    case "IEC_ENERGY_COUNTER": {
                         EnergyResource reading = meter.energyReading();
                         if (!reading.exists()) {
                             reading.create();
@@ -138,7 +138,7 @@ public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
             ElectricityMeter meterGen = ecb.meters().getSubResource("generation", ElectricityMeter.class);
             if (!meterGen.type().isActive()) {
                 meterGen.type().create();
-                meterGen.type().setValue(2);
+                meterGen.type().setValue(3);
                 meterGen.type().activate(false);
             }
             meters.put(base + ":1", meterCon);
