@@ -15,6 +15,7 @@
  */
 package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -28,65 +29,69 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEventListener;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
-import org.ogema.model.connections.ElectricityConnection;
-import org.ogema.tools.resource.util.ResourceUtils;
+import org.ogema.model.devices.connectiondevices.ElectricityConnectionBox;
+import org.ogema.model.metering.ElectricityMeter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- *
+ * Setup electricity metering for HM-ES-TX-WM devices.
+ * 
  * @author jlapp
  */
-public class PowerMeterIecChannel extends AbstractDeviceHandler {
-
+public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
+    
     Logger logger = LoggerFactory.getLogger(getClass());
     
     final static String LAST_READING_DECORATOR = "lastReading";
-
-    public PowerMeterIecChannel(HomeMaticConnection conn) {
+    
+    public HmEsTxWmPowerMeterChannel(HomeMaticConnection conn) {
         super(conn);
     }
     
     class PowerMeterEventListener implements HmEventListener {
-
-        final ElectricityConnection elconn;
-        final String address;
-        final EnergyResource lastReading;
-
-        public PowerMeterEventListener(ElectricityConnection elconn, String address) {
-            this.elconn = elconn;
-            this.address = address;
-            this.lastReading = elconn.energySensor().getSubResource(LAST_READING_DECORATOR, EnergyResource.class);
-            if (!elconn.energySensor().reading().isActive()) {
-                elconn.energySensor().reading().create();
-                elconn.energySensor().reading().setUnit(PhysicalUnit.KILOWATT_HOURS);
-                elconn.energySensor().reading().activate(false);
-            }
+        
+        final Map<String, ElectricityMeter> meters;
+        
+        public PowerMeterEventListener(Map<String, ElectricityMeter> meters) {
+            this.meters = meters;
+            meters.values().forEach(m -> {
+                if (!m.energyReading().isActive()) {
+                    m.energyReading().create();
+                    m.energyReading().setUnit(PhysicalUnit.KILOWATT_HOURS);
+                    m.energyReading().activate(false);
+                }
+            });
         }
-
+        
+        private EnergyResource getLastReading(ElectricityMeter meter) {
+            return meter.getSubResource(LAST_READING_DECORATOR, EnergyResource.class);
+        }
+        
         @Override
         public void event(List<HmEvent> events) {
             for (HmEvent e : events) {
-                if (!address.equals(e.getAddress())) {
+                ElectricityMeter meter = meters.get(e.getAddress());
+                if (meter == null) {
                     continue;
                 }
                 switch (e.getValueKey()) {
                     case "POWER":
-                        PowerResource pwr = elconn.powerSensor().reading();
+                        PowerResource pwr = meter.powerReading();
                         if (!pwr.exists()) {
                             pwr.create();
-                            elconn.powerSensor().activate(true);
                         }
                         pwr.setValue(e.getValueFloat());
+                        pwr.activate(false);
                         logger.debug("power reading updated: {} = {}", pwr.getPath(), e.getValueFloat());
                         break;
                     case "ENERGY_COUNTER": {
-                        EnergyResource reading = elconn.energySensor().reading();
+                        EnergyResource reading = meter.energyReading();
                         if (!reading.exists()) {
                             reading.create();
-                            elconn.energySensor().activate(true);
                         }
-                        float readingKWh = e.getValueFloat() / 1000;
+                        float readingKWh = e.getValueFloat();
+                        EnergyResource lastReading = getLastReading(meter);
                         if (readingKWh < reading.getValue()) {
                             //overflow, battery changed / whatever
                             lastReading.create();
@@ -104,25 +109,42 @@ public class PowerMeterIecChannel extends AbstractDeviceHandler {
                 }
             }
         }
-
+        
     }
-
+    
     @Override
-    /** Note: The main detection is performed in {@link PMSwitchDevice}. Here
-     * you should only enter the sub channel relevant for the power meter
-     */
     public boolean accept(DeviceDescription desc) {
-        return "POWERMETER_IEC1".equalsIgnoreCase(desc.getType()); //XXX POWERMETER_IEC2?
+        return "HM-ES-TX-WM".equals(desc.getParentType())
+                && desc.getType().toUpperCase().startsWith("POWERMETER_IEC");
     }
-
+    
     @Override
-    public void setup(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
-        LoggerFactory.getLogger(getClass()).debug("setup POWERMETER_IEC1 handler for address {}", desc.getAddress());
-        String swName = ResourceUtils.getValidResourceName("POWERMETER_IEC1_" + desc.getAddress());
-        ElectricityConnection elconn = parent.addDecorator(swName, ElectricityConnection.class);
-        conn.addEventListener(new PowerMeterEventListener(elconn, desc.getAddress()));
-        elconn.create();
-        elconn.activate(true);
+    public void setup(HmDevice parent, DeviceDescription desc,
+            Map<String, Map<String, ParameterDescription<?>>> paramSets) {
+        if (desc.getAddress().endsWith(":1")) {
+            LoggerFactory.getLogger(getClass())
+                    .debug("setup HM-ES-TX-WM handler for address {}", desc.getAddress());
+            String base = desc.getAddress().substring(0, desc.getAddress().length() - 2);
+            ElectricityConnectionBox ecb
+                    = parent.addDecorator("electricityMetering_" + base, ElectricityConnectionBox.class);
+            ecb.meters().create().activate(false);
+            Map<String, ElectricityMeter> meters = new HashMap<>();
+            ElectricityMeter meterCon = ecb.meters().getSubResource("consumption", ElectricityMeter.class);
+            if (!meterCon.type().isActive()) {
+                meterCon.type().create();
+                meterCon.type().setValue(2);
+                meterCon.type().activate(false);
+            }
+            ElectricityMeter meterGen = ecb.meters().getSubResource("generation", ElectricityMeter.class);
+            if (!meterGen.type().isActive()) {
+                meterGen.type().create();
+                meterGen.type().setValue(2);
+                meterGen.type().activate(false);
+            }
+            meters.put(base + ":1", meterCon);
+            meters.put(base + ":2", meterGen);
+            conn.addEventListener(new PowerMeterEventListener(meters));
+        }
     }
-
+    
 }
