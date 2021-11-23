@@ -102,6 +102,7 @@ public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
                             readingKWh += lastReading.getValue();
                         }
                         reading.setValue(readingKWh);
+                        reading.activate(false);
                         logger.debug("energy reading updated: {} = {} (device reading: {})",
                                 reading.getPath(), readingKWh, e.getValueFloat());
                         break;
@@ -143,6 +144,8 @@ public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
             }
             meters.put(base + ":1", meterCon);
             meters.put(base + ":2", meterGen);
+            meters.values().forEach(m -> m.activate(false));
+            ecb.activate(false);
             conn.addEventListener(new PowerMeterEventListener(meters));
         }
     }
