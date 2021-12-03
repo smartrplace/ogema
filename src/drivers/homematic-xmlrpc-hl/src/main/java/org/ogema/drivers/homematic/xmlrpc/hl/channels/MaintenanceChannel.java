@@ -26,6 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+import org.ogema.core.model.simple.BooleanResource;
 
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmMaintenance;
@@ -237,6 +238,24 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
         if (values.containsKey(PARAMS.RSSI_PEER.name())) {
             mnt.rssiPeer().create();
         }
+        
+        Map<String, ParameterDescription<?>> master =
+                paramSets.get(ParameterDescription.SET_TYPES.MASTER.name());
+        if (master != null) {
+            if (master.containsKey("GLOBAL_BUTTON_LOCK")) {
+                BooleanResource globalButtonLock =
+                        mnt.addDecorator("globalButtonLock", BooleanResource.class);
+                globalButtonLock.create().activate(false);
+                globalButtonLock.addValueListener((BooleanResource br) -> {
+                    boolean val = br.getValue();
+                    logger.debug("setting GLOBAL_BUTTON_LOCK on {} to {}",
+                            desc.getAddress(), val);
+                    conn.performPutParamset(desc.getAddress(),"MASTER",
+                            Collections.singletonMap("GLOBAL_BUTTON_LOCK", val));
+                }, true);
+            }
+        }
+        
         conn.addEventListener(new MaintenanceEventListener(parent, mnt, desc.getAddress()));
         knownDevices.add(new KnownDevice(mnt, desc, values));
         update(mnt, desc.getAddress());
