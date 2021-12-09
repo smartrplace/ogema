@@ -173,7 +173,6 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
         }
 
         Thermostat thermos = parent.addDecorator(swName, Thermostat.class);
-        conn.registerControlledResource(conn.getChannel(parent, deviceAddress), thermos);
         ThermostatUtils.setupParameterResources(parent, desc, paramSets, conn, thermos, logger);
         Map<String, SingleValueResource> resources = new HashMap<>();
         for (Map.Entry<String, ParameterDescription<?>> e : values.entrySet()) {
@@ -245,10 +244,12 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
 
         }, true);
 
+        conn.registerControlledResource(conn.getChannel(parent, deviceAddress), thermos);
+        conn.registerControlledResource(conn.getChannel(parent, deviceAddress), thermos.temperatureSensor());
         setupControlModeResource(thermos, deviceAddress);
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
         setupHmParameterValues(thermos, desc.getAddress());
-        setupTempSensLinking(thermos);
+        IpThermostatBChannel.setupTempSensLinking(thermos, conn, logger);
     }
 
     class ParameterListener implements ResourceValueListener<SingleValueResource> {
@@ -291,85 +292,6 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
             l.resourceChanged(tf_modus);
         }
         tf_modus.addValueListener(l, true);
-    }
-
-    private void linkTempSens(Thermostat thermos, TemperatureSensor tempSens, boolean removeLink) {
-        final String thermosAddress = getWeatherReceiverChannelAddress(thermos);
-        if (thermosAddress == null) {
-            return;
-        }
-        HmDevice tempSensChannel = conn.findControllingDevice(tempSens);
-        if (tempSensChannel == null) {
-            logger.warn("cannot find HomeMatic channel for TemperatureSensor {}", tempSens);
-            return;
-        }
-        if (!tempSensChannel.type().getValue().equalsIgnoreCase("WEATHER")) {
-            logger.warn(
-                    "HomeMatic channel controlling TemperatureSensor {} is not a WEATHER channel (type is {}). Cannot link",
-                    tempSens, tempSensChannel.type().getValue());
-            return;
-        }
-        //XXX: address mangling (find HEATING_ROOM_TH_RECEIVER channel instead?)
-        String weatherAddress = tempSensChannel.address().getValue();
-        if (removeLink) {
-            conn.performRemoveLink(weatherAddress, thermosAddress);
-            return;
-        }
-        logger.info("HomeMatic weather channel for TempSens {}: {}", tempSens, weatherAddress);
-        conn.performAddLink(weatherAddress, thermosAddress, "TempSens", "external temperature sensor");
-    }
-
-    private void setupTempSensLinking(final Thermostat thermos) {
-        TemperatureSensor tempSens = thermos.getSubResource(LINKED_TEMP_SENS_DECORATOR, TemperatureSensor.class);
-
-        ResourceStructureListener l = new ResourceStructureListener() {
-
-            @Override
-            public void resourceStructureChanged(ResourceStructureEvent event) {
-                Resource added = event.getChangedResource();
-                if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_ADDED) {
-                    if (added.getName().equals(LINKED_TEMP_SENS_DECORATOR) && added instanceof TemperatureSensor) {
-                        linkTempSens(thermos, (TemperatureSensor) added, false);
-                    }
-                } else if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_REMOVED
-                        && added.getName().equals(LINKED_TEMP_SENS_DECORATOR)) {
-                    // since we do not know which resource the link referenced before it got deleted
-                    // we need to use the low level API to find out all links for the weather receiver channel
-                    final String weatherChannelAddress = getWeatherReceiverChannelAddress(thermos);
-                    if (weatherChannelAddress == null) {
-                        return;
-                    }
-                    for (Map<String, Object> link : getConnection().performGetLinks(weatherChannelAddress, 0)) {
-                        if (!weatherChannelAddress.equals(link.get("RECEIVER"))) {
-                            continue;
-                        }
-                        final Object sender = link.get("SENDER");
-                        if (!(sender instanceof String)) {
-                            continue;
-                        }
-                        getConnection().performRemoveLink((String) sender, weatherChannelAddress);
-                        logger.info("Thermostat-temperature sensor connection removed. Thermostat channel {}, temperature sensor {}",
-                                weatherChannelAddress, sender);
-                    }
-                }
-            }
-        };
-        thermos.addStructureListener(l);
-        if (tempSens.isActive()) {
-            linkTempSens(thermos, tempSens, false);
-        }
-
-    }
-
-    private String getWeatherReceiverChannelAddress(final Thermostat thermos) {
-        HmDevice thermostatChannel = conn.findControllingDevice(thermos);
-        if (thermostatChannel == null) {
-            logger.error("cannot find HomeMatic channel for Thermostat {}", thermos);
-            return null;
-        }
-        HmDevice thermostatDevice = conn.getToplevelDevice(thermostatChannel);
-        //XXX: address mangling (find HEATING_ROOM_TH_RECEIVER channel instead?)
-        return thermostatDevice.address().getValue() + ":6";
     }
 
     private void setupControlModeResource(Thermostat thermos, final String deviceAddress) {

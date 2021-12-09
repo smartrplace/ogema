@@ -154,7 +154,6 @@ public class ThermostatChannel extends AbstractDeviceHandler {
         }
 
         Thermostat thermos = parent.addDecorator(swName, Thermostat.class);
-        conn.registerControlledResource(conn.getChannel(parent, deviceAddress), thermos);
         ThermostatUtils.setupParameterResources(parent, desc, paramSets, conn, thermos, logger);
         Map<String, SingleValueResource> resources = new HashMap<>();
         for (Map.Entry<String, ParameterDescription<?>> e : values.entrySet()) {
@@ -214,7 +213,9 @@ public class ThermostatChannel extends AbstractDeviceHandler {
                 conn.performSetValue(deviceAddress, "SET_TEMPERATURE", Double.valueOf(resource.getCelsius()));
             }            
         }, true);
-        
+
+        conn.registerControlledResource(conn.getChannel(parent, deviceAddress), thermos);
+        conn.registerControlledResource(conn.getChannel(parent, deviceAddress), thermos.temperatureSensor());
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
         setupHmParameterValues(thermos, parent.address().getValue());
         setupTempSensLinking(thermos);
