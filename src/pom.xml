@@ -19,6 +19,8 @@
 		<lang3.version.max>4.0</lang3.version.max>
 		<org.json.version.min>20160212</org.json.version.min>
 		<org.json.version.max>20201116</org.json.version.max>
+		<jackson.version>2.9.10</jackson.version>
+		<jackson.databind.version>2.9.10.8</jackson.databind.version>
 	</properties>
 
 	<scm>
@@ -167,16 +169,26 @@
 			<!-- we try to support also versions > 19.0, by specifying
 			the import package range in pom.xml files declaring a dependency to this;
 			must not build against higher versions, though, since they require Java8 -->	
-			 <dependency>
-			 	<groupId>com.google.guava</groupId>
-			 	<artifactId>guava</artifactId>
-			 	<version>19.0</version>
-			 </dependency>
-			 <dependency>
+			<dependency>
+				<groupId>com.google.guava</groupId>
+				<artifactId>guava</artifactId>
+				<version>19.0</version>
+			</dependency>
+			<dependency>
                 <groupId>javax.xml.bind</groupId>
                 <artifactId>jaxb-api</artifactId>
                 <version>2.3.1</version>
-             </dependency>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.databind.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.module</groupId>
+                <artifactId>jackson-module-jaxb-annotations</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
 		</dependencies>
 	</dependencyManagement>
 
