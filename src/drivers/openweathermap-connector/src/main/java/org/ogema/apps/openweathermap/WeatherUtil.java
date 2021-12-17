@@ -26,6 +26,11 @@ import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoField;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
@@ -197,7 +202,9 @@ public class WeatherUtil {
 				if (sunUp < dayMillis && dayMillis < sunDown) {
 					irradiance = calculateIrradiation(latitude, longitude, cloudPercent, millis);
 				}
-				entry.setIrradiation(irradiance);
+                if (!Double.isNaN(irradiance)) {
+                    entry.setIrradiation(irradiance);
+                }
 			}
 		}
 		/*
@@ -212,7 +219,15 @@ public class WeatherUtil {
 		return millis % day;
 	}
     
+    boolean isSunUp(CurrentData data) {
+        return (data.getSys().getSunrise() <= data.getDt())
+                && (data.getSys().getSunset() >= data.getDt());
+    }
+    
     public double calculateCurrentIrradiance(CurrentData data) {
+        if (!isSunUp(data)) {
+            return 0;
+        }
         return calculateIrradiation(
                 data.getCoord().getLat(),
                 data.getCoord().getLon(),
@@ -222,17 +237,18 @@ public class WeatherUtil {
 
 	private Double calculateIrradiation(final Double latidute, final Double longitude, final Integer cloudPercent,
 			final long LT) {
-
-//		DateTime cal = new DateTime(LT);
-		Calendar cal = Calendar.getInstance(Locale.ENGLISH);
-		cal.setTimeInMillis(LT);
+        //FIXME: select timezone
+        ZonedDateTime zdt = ZonedDateTime.ofInstant(Instant.ofEpochMilli(LT), ZoneId.systemDefault());
 
 		final double LSTM = 15.0;
 		final double EoT = getEoT(LT);
 		final double TC = 4 * (longitude - LSTM) + EoT;
-//		final Double LST = (double) cal.getHourOfDay() + (double) cal.getMinuteOfHour() / 60 + (TC / 60);
-		final double LST = (double) cal.get(Calendar.HOUR_OF_DAY) + (double) cal.get(Calendar.MINUTE) / 60 + (TC / 60);
 
+        //Local Solar Time
+        final double LST = (double) zdt.get(ChronoField.HOUR_OF_DAY)
+                + (double) zdt.get(ChronoField.MINUTE_OF_HOUR) / 60 + (TC / 60);
+
+        //solar hour angle
 		final double HRA = (-1 * LSTM) * (LST - 12);
 		final double B = getB(LT);
 
@@ -242,10 +258,13 @@ public class WeatherUtil {
 		final double angleSunEarth = Math.asin(Math.cos(Math.toRadians(latidute))
 				* Math.cos(Math.toRadians(deklination)) * Math.cos(Math.toRadians(HRA))
 				+ Math.sin(Math.toRadians(latidute)) * Math.sin(Math.toRadians(deklination)));
-
 		double irradiance = (1066 - cloudPercent * 3.14d) * Math.sin(angleSunEarth);
+        LOGGER.info("irradiance lat. {}, dekl. {}, HRA {}, elev. {}, clouds {}, time {}: {}",
+                latidute, deklination, HRA, Math.toDegrees(angleSunEarth), cloudPercent, Instant.ofEpochMilli(LT), irradiance);
+        //this method should not be called for night times. In case it is, 
+        // we will get a negative elevation...
 		if (irradiance < 0) {
-			irradiance = 0.0d;
+			irradiance = Double.NaN;//0.0d;
 		}
 		return irradiance;
 	}

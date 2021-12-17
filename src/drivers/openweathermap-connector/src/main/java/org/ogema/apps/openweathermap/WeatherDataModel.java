@@ -20,6 +20,7 @@ import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.StringResource;
 import org.ogema.model.devices.sensoractordevices.WindSensor;
 import org.ogema.model.locations.GeographicLocation;
+import org.ogema.model.sensors.GenericFloatSensor;
 import org.ogema.model.sensors.HumiditySensor;
 import org.ogema.model.sensors.SolarIrradiationSensor;
 import org.ogema.model.sensors.TemperatureSensor;
@@ -84,5 +85,7 @@ public interface WeatherDataModel {
     StringResource getForecastDataUpdateInterval();
     
     StringResource getCurrentDataUpdateInterval();
+    
+    GenericFloatSensor getCloudCoverage();
     
 }

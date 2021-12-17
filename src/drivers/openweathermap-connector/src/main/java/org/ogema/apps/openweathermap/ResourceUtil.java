@@ -40,6 +40,7 @@ public class ResourceUtil {
 	private final Schedule irradiationForecast;
 	private final Schedule humidityForecast;
 	private final Schedule temperatureForecast;
+    private final Schedule cloudCoverageForecast;
 	private Schedule windSpeedForecast = null;
 	private Schedule windDirectionForecast = null;
 	private final ApplicationManager appMan;
@@ -50,6 +51,7 @@ public class ResourceUtil {
 		temperatureForecast = pattern.getTempSens().reading().forecast().create();
 		humidityForecast = pattern.getHumiditySens().reading().forecast().create();
 		irradiationForecast = pattern.getIrradSensor().reading().forecast().create();
+        cloudCoverageForecast = pattern.getCloudCoverage().reading().forecast().create();
 		temperatureForecast.setInterpolationMode(InterpolationMode.LINEAR);
 		humidityForecast.setInterpolationMode(InterpolationMode.LINEAR);
 		irradiationForecast.setInterpolationMode(InterpolationMode.LINEAR);
@@ -80,11 +82,13 @@ public class ResourceUtil {
         pattern.getHumiditySens().reading().activate(false);
         pattern.getHumiditySens().activate(false);
         
-        float irrad = (float) WeatherUtil.getInstance().calculateCurrentIrradiance(current);
-        pattern.getIrradSensor().reading().create();
-        pattern.getIrradSensor().reading().setValue(irrad);
-        pattern.getIrradSensor().reading().activate(false);
-        pattern.getIrradSensor().activate(false);
+        double irrad = WeatherUtil.getInstance().calculateCurrentIrradiance(current);
+        if (!Double.isNaN(irrad)) {
+            pattern.getIrradSensor().reading().create();
+            pattern.getIrradSensor().reading().setValue((float)irrad);
+            pattern.getIrradSensor().reading().activate(false);
+            pattern.getIrradSensor().activate(false);
+        }
         
         if(pattern.getWindSens().isActive()) {
             pattern.getWindSens().speed().reading().create();
@@ -99,6 +103,12 @@ public class ResourceUtil {
             
             pattern.getWindSens().activate(false);
         }
+        
+        pattern.getCloudCoverage().create().activate(false);
+        pattern.getCloudCoverage().reading().create();
+        float cloudCoverage = current.getClouds().getAll() / 100f;
+        pattern.getCloudCoverage().reading().setValue(cloudCoverage);
+        pattern.getCloudCoverage().reading().activate(false);
     }
     
     public void store(ForecastData data, CurrentData current) {
@@ -109,6 +119,7 @@ public class ResourceUtil {
 		List<SampledValue> tempList = new ArrayList<>();
 		List<SampledValue> humidityList = new ArrayList<>();
 		List<SampledValue> irradiationList = new ArrayList<>();
+        List<SampledValue> cloudCoverageList = new ArrayList<>();
 		List<SampledValue> windSpeedList = null;
 		List<SampledValue> windDirectionList = null;
 		if(!ignoreWind) {
@@ -117,14 +128,15 @@ public class ResourceUtil {
 		}
 
 		for (org.ogema.apps.openweathermap.dao.List entry : data.getList()) {
-
 			SampledValue temp = newSampledDouble(entry.getMain().getTemp(), entry.getDt() * 1000l);
 			SampledValue humidity = newSampledDouble(((double) entry.getMain().getHumidity()) / 100.0, entry.getDt() * 1000l);
 			SampledValue irrad = newSampledDouble(entry.getIrradiation(), entry.getDt() * 1000l);
+            SampledValue clouds = newSampledDouble(entry.getClouds().getAll() / 100d, entry.getDt() * 1000l);
 			
 			tempList.add(temp);
 			humidityList.add(humidity);
 			irradiationList.add(irrad);
+            cloudCoverageList.add(clouds);
 
 			if(!ignoreWind) {
 				SampledValue windSpeed = newSampledDouble((double)entry.getWind().getSpeed(), entry.getDt() * 1000l);
@@ -137,6 +149,7 @@ public class ResourceUtil {
 		temperatureForecast.addValues(tempList);
 		humidityForecast.addValues(humidityList);
 		irradiationForecast.addValues(irradiationList);
+        cloudCoverageForecast.addValues(cloudCoverageList);
 		
 		if(!ignoreWind) {
 			windSpeedForecast.addValues(windSpeedList);
@@ -148,6 +161,7 @@ public class ResourceUtil {
 		appMan.getLogger().debug("wrote {} values to {}", tempList.size(), temperatureForecast.getPath());
 		appMan.getLogger().debug("wrote {} values to {}", humidityList.size(), humidityForecast.getPath());
 		appMan.getLogger().debug("wrote {} values to {}", irradiationList.size(), irradiationForecast.getPath());
+        appMan.getLogger().debug("wrote {} values to {}", cloudCoverageList.size(), cloudCoverageForecast.getPath());
     }
 
 	/**
