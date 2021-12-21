@@ -24,6 +24,7 @@ import org.ogema.core.resourcemanager.pattern.ResourcePattern.Existence;
 import org.ogema.model.devices.sensoractordevices.SensorDevice;
 import org.ogema.model.devices.sensoractordevices.WindSensor;
 import org.ogema.model.locations.GeographicLocation;
+import org.ogema.model.sensors.GenericFloatSensor;
 import org.ogema.model.sensors.HumiditySensor;
 import org.ogema.model.sensors.SolarIrradiationSensor;
 import org.ogema.model.sensors.TemperatureSensor;
@@ -46,6 +47,8 @@ public class WeatherSensorDeviceRad extends ResourcePattern<SensorDevice> implem
     protected WindSensor windSens = model.sensors().getSubResource("wind", WindSensor.class);
     @Existence(required = CreateMode.MUST_EXIST)
     protected SolarIrradiationSensor irradSensor = model.sensors().getSubResource("solarIrradiation", SolarIrradiationSensor.class);
+    @Existence(required = CreateMode.OPTIONAL)
+    protected GenericFloatSensor cloudCoverage = model.sensors().getSubResource("cloudCoverage", GenericFloatSensor.class);
 
     @Existence(required = CreateMode.OPTIONAL)
     protected StringResource city = model.location().geographicLocation().getSubResource("city", StringResource.class);
@@ -161,4 +164,8 @@ public class WeatherSensorDeviceRad extends ResourcePattern<SensorDevice> implem
         return forecastDataUpdateInterval;
     }
 
+    public GenericFloatSensor getCloudCoverage() {
+        return cloudCoverage;
+    }
+    
 }

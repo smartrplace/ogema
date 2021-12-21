@@ -129,6 +129,10 @@ public class CurrentData {
 		this.clouds = clouds;
 	}
 
+    /**
+     * Time of data calculation, unix, UTC
+     * @return time of data calculation
+     */
 	@JsonProperty("dt")
 	public Long getDt() {
 		return dt;

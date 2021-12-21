@@ -91,6 +91,7 @@ public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
                             reading.create();
                         }
                         float readingKWh = e.getValueFloat();
+                        /*
                         EnergyResource lastReading = getLastReading(meter);
                         if (readingKWh < reading.getValue()) {
                             //overflow, battery changed / whatever
@@ -101,6 +102,7 @@ public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
                         if (lastReading.isActive()) {
                             readingKWh += lastReading.getValue();
                         }
+                        */
                         reading.setValue(readingKWh);
                         reading.activate(false);
                         logger.debug("energy reading updated: {} = {} (device reading: {})",

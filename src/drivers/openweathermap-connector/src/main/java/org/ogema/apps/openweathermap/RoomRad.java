@@ -24,6 +24,7 @@ import org.ogema.core.resourcemanager.pattern.ResourcePattern.Existence;
 import org.ogema.model.devices.sensoractordevices.WindSensor;
 import org.ogema.model.locations.GeographicLocation;
 import org.ogema.model.locations.Room;
+import org.ogema.model.sensors.GenericFloatSensor;
 import org.ogema.model.sensors.HumiditySensor;
 import org.ogema.model.sensors.SolarIrradiationSensor;
 import org.ogema.model.sensors.TemperatureSensor;
@@ -45,6 +46,8 @@ public class RoomRad extends ResourcePattern<Room> implements WeatherDataModel {
     protected HumiditySensor humiditySens = model.humiditySensor();
     @Existence(required = CreateMode.OPTIONAL)
     protected WindSensor windSens = model.getSubResource("windSensor", WindSensor.class);
+    @Existence(required = CreateMode.OPTIONAL)
+    protected GenericFloatSensor cloudCoverage = model.getSubResource("cloudCoverage", GenericFloatSensor.class);
     @Existence(required = CreateMode.OPTIONAL)
     protected StringResource city = model.location().geographicLocation().getSubResource("city", StringResource.class);
     @Existence(required = CreateMode.OPTIONAL)
@@ -161,4 +164,8 @@ public class RoomRad extends ResourcePattern<Room> implements WeatherDataModel {
         return forecastDataUpdateInterval;
     }
 
+    public GenericFloatSensor getCloudCoverage() {
+        return cloudCoverage;
+    }
+    
 }

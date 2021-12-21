@@ -26,6 +26,11 @@ import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoField;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
@@ -157,8 +162,8 @@ public class WeatherUtil {
 		final StringBuilder sb = new StringBuilder();
 		String city = data.getName();
 		SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss");
-		String sunUp = sdf.format(new Date(data.getSys().getSunrise()));
-		String sunDown = sdf.format(new Date(data.getSys().getSunset()));
+		String sunUp = sdf.format(new Date(data.getSys().getSunrise() * 1000L));
+		String sunDown = sdf.format(new Date(data.getSys().getSunset() * 1000L));
 		Double temp = (Math.round((data.getMain().getTemp() - 273.15) * 100) / 100.0);
 
 		sb.append(city).append(":\n\tSonnenaufgang: ").append(sunUp).append(", Sonnenuntergang: ").append(sunDown)
@@ -180,8 +185,8 @@ public class WeatherUtil {
 	public void calculateIrradiation(ForecastData data, CurrentData current) {
 		
 		if (current != null) {
-			final long sunUp = getMillisOfDay(current.getSys().getSunrise());
-			final long sunDown = getMillisOfDay(current.getSys().getSunset());
+			final long sunUp = getMillisOfDay(current.getSys().getSunrise() * 1000L);
+			final long sunDown = getMillisOfDay(current.getSys().getSunset() * 1000L);
 
 			final Double latitude = data.getCity().getCoord().getLat(); // Breitengrad
 			final Double longitude = data.getCity().getCoord().getLon(); // Laengengrad
@@ -197,7 +202,9 @@ public class WeatherUtil {
 				if (sunUp < dayMillis && dayMillis < sunDown) {
 					irradiance = calculateIrradiation(latitude, longitude, cloudPercent, millis);
 				}
-				entry.setIrradiation(irradiance);
+                if (!Double.isNaN(irradiance)) {
+                    entry.setIrradiation(irradiance);
+                }
 			}
 		}
 		/*
@@ -212,7 +219,15 @@ public class WeatherUtil {
 		return millis % day;
 	}
     
+    boolean isSunUp(CurrentData data) {
+        return (data.getSys().getSunrise() <= data.getDt())
+                && (data.getSys().getSunset() >= data.getDt());
+    }
+    
     public double calculateCurrentIrradiance(CurrentData data) {
+        if (!isSunUp(data)) {
+            return 0;
+        }
         return calculateIrradiation(
                 data.getCoord().getLat(),
                 data.getCoord().getLon(),
@@ -222,48 +237,51 @@ public class WeatherUtil {
 
 	private Double calculateIrradiation(final Double latidute, final Double longitude, final Integer cloudPercent,
 			final long LT) {
+        //FIXME: select timezone
+        ZonedDateTime zdt = ZonedDateTime.ofInstant(Instant.ofEpochMilli(LT), ZoneId.systemDefault());
 
-//		DateTime cal = new DateTime(LT);
-		Calendar cal = Calendar.getInstance(Locale.ENGLISH);
-		cal.setTimeInMillis(LT);
+		final double LSTM = 15.0;
+		final double EoT = getEoT(LT);
+		final double TC = 4 * (longitude - LSTM) + EoT;
 
-		final Double LSTM = 15.0d;
-		final Double EoT = getEoT(LT);
-		final Double TC = 4 * (longitude - LSTM) + EoT;
-//		final Double LST = (double) cal.getHourOfDay() + (double) cal.getMinuteOfHour() / 60 + (TC / 60);
-		final Double LST = (double) cal.get(Calendar.HOUR_OF_DAY) + (double) cal.get(Calendar.MINUTE) / 60 + (TC / 60);
+        //Local Solar Time
+        final double LST = (double) zdt.get(ChronoField.HOUR_OF_DAY)
+                + (double) zdt.get(ChronoField.MINUTE_OF_HOUR) / 60 + (TC / 60);
 
-		final Double HRA = (-1 * LSTM) * (LST - 12);
-		final Double B = getB(LT);
+        //solar hour angle
+		final double HRA = (-1 * LSTM) * (LST - 12);
+		final double B = getB(LT);
 
 		// So far, all angles were expressed as gradiant values. However, they
 		// need to be converted to Radians because Math functions use those!
-		final Double deklination = 23.45 * Math.sin(Math.toRadians(B));
-		final Double angleSunEarth = Math.asin(Math.cos(Math.toRadians(latidute))
+		final double deklination = 23.45 * Math.sin(Math.toRadians(B));
+		final double angleSunEarth = Math.asin(Math.cos(Math.toRadians(latidute))
 				* Math.cos(Math.toRadians(deklination)) * Math.cos(Math.toRadians(HRA))
 				+ Math.sin(Math.toRadians(latidute)) * Math.sin(Math.toRadians(deklination)));
-
-		Double irradiance = (1066 - cloudPercent * 3.14d) * Math.sin(angleSunEarth);
+		double irradiance = (1066 - cloudPercent * 3.14d) * Math.sin(angleSunEarth);
+        LOGGER.info("irradiance lat. {}, dekl. {}, HRA {}, elev. {}, clouds {}, time {}: {}",
+                latidute, deklination, HRA, Math.toDegrees(angleSunEarth), cloudPercent, Instant.ofEpochMilli(LT), irradiance);
+        //this method should not be called for night times. In case it is, 
+        // we will get a negative elevation...
 		if (irradiance < 0) {
-			irradiance = 0.0d;
+			irradiance = Double.NaN;//0.0d;
 		}
-
 		return irradiance;
 	}
 
-	private Double getEoT(long millis) {
-		final Double B = getB(millis);
-		final Double eot = 9.87f * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
+	private double getEoT(long millis) {
+		final double B = getB(millis);
+		final double eot = 9.87d * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
 		return eot;
 	}
 
-	private Double getB(long millis) {
-		final Integer d = getDayofYear(millis);
-		Double B = (double) 360 / 365 * (double) d - 81;
+	private double getB(long millis) {
+		final double d = getDayofYear(millis);
+		double B = 360d / 365d * d - 81;
 		return B;
 	}
 
-	private Integer getDayofYear(long millis) {
+	private int getDayofYear(long millis) {
 		Calendar cal = Calendar.getInstance();
 		cal.setTimeInMillis(millis);
 		return cal.get(Calendar.DAY_OF_YEAR);

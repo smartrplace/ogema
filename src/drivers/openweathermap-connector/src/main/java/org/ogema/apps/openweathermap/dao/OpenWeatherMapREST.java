@@ -140,9 +140,6 @@ public class OpenWeatherMapREST {
 		ObjectMapper mapper = new ObjectMapper();
 		try {
 			CurrentData data = mapper.readValue(json, CurrentData.class);
-			data.getSys().setSunrise(data.getSys().getSunrise() * 1000l);
-			data.getSys().setSunset(data.getSys().getSunset() * 1000l);
-			data.setDt(data.getDt() * 1000l);
 			return data;
 		} catch (IOException e) {
 			LOGGER.error("irradiation could not be calculated", e);

@@ -58,7 +58,7 @@ public class CredentialStoreImpl implements CredentialStore {
 	private final static Logger logger = LoggerFactory.getLogger(CredentialStoreImpl.class);
     
     private final static int PW_ITERATIONS = Integer.getInteger("ogema.apploader.pw_hash_iterations", 100); //very low default for raspi etc.
-    private final static int PW_SEED_LEN = 32;
+    private final static int PW_SALT_LEN = 32;
     private final static int PW_KEY_LEN = 256;
     private final static String PW_STORED_PREFIX = "PBKDF2:";
     
@@ -74,7 +74,7 @@ public class CredentialStoreImpl implements CredentialStore {
     }
     
     static String encodePassword(String password, int iterations) throws NoSuchAlgorithmException, InvalidKeySpecException {
-        byte[] salt = new byte[PW_SEED_LEN];
+        byte[] salt = new byte[PW_SALT_LEN];
         saltPrng.nextBytes(salt);
         String store = PW_STORED_PREFIX + iterations + ":"
                 + Base64.getEncoder().encodeToString(salt) + ":"
@@ -108,11 +108,28 @@ public class CredentialStoreImpl implements CredentialStore {
             int iterations = Integer.parseInt(a[1]);
             byte[] salt = Base64.getDecoder().decode(a[2]);
             String givenPasswordHash = hashPassword(password, salt, iterations);
-            return equalsConstantTime(givenPasswordHash, storedHash);
+            //logger.debug("checking password hash {} against stored hash: {}", givenPasswordHash, storedHash);
+            return givenPasswordHash.length() == storedHash.length()
+                    ? equalsConstantTime(givenPasswordHash, storedHash)
+                    : equalsConstantTimeBase64(givenPasswordHash, storedHash, PW_SALT_LEN);
         } catch (NumberFormatException nfe) {
             logger.error("stored password has incorrect format: {}", stored);
             return false;
         }
+    }
+    
+    static boolean equalsConstantTimeBase64(String a, String b, int len) {
+        byte[] bytesA = Base64.getDecoder().decode(a);
+        byte[] bytesB = Base64.getDecoder().decode(b);
+        logger.debug("{}, {}, {}", len, bytesA.length, bytesB.length);
+        if (bytesA.length < len || bytesB.length < len) {
+            return false;
+        }
+        int c = 0;
+        for (int i = 0; i < len; i++) {
+            c |= bytesA[i] ^ bytesB[i];
+        }
+        return c == 0;
     }
     
     static boolean equalsConstantTime(String a, String b) {
