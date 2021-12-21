@@ -87,6 +87,8 @@ public class WeatherDataController {
 				@Override
 				public void run() {
                     try {
+                    	if(Boolean.getBoolean("org.ogema.apps.openweathermap.testwithoutconnection"))
+                    		return;
                         appMan.getLogger().info(
 							"updating weather info for location " + device.getModel().getName() + " next update in "
 									+ scheduleUpdateTime + "ms");
