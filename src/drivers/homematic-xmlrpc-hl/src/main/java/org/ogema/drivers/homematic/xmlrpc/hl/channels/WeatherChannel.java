@@ -162,7 +162,8 @@ public class WeatherChannel extends AbstractDeviceHandler {
     public boolean accept(DeviceDescription desc) {
         return "WEATHER".equalsIgnoreCase(desc.getType()) // WDS40, WDS100-C6-O-2
                 || "CLIMATE_TRANSCEIVER".equalsIgnoreCase(desc.getType()) // HmIP-SCTH230
-                || "WEATHER_TRANSMIT".equalsIgnoreCase(desc.getType()); // TC-IT-WM-W
+                || "WEATHER_TRANSMIT".equalsIgnoreCase(desc.getType()) // TC-IT-WM-W
+                || "COND_SWITCH_TRANSMITTER_TEMPERATURE".equalsIgnoreCase(desc.getType()); // HmIP-STE2-PCB
     }
     
     private ResourceList<Sensor> getSensorList(HmDevice parent, String deviceName) {
