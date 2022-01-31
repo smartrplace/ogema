@@ -35,7 +35,7 @@ public interface Room extends PhysicalElement {
 
 	/**
 	 * Type of room:<br>
-	 * 0: outside of building <br>
+	 * 0: not set / undefined <br>
 	 * 1: Living room (private)<br>
 	 * 2: Combined living room with kitchen (private)<br>
 	 * 3: Kitchen (private)<br>
@@ -50,6 +50,7 @@ public interface Room extends PhysicalElement {
 	 * 101: Meeting room<br>
 	 * 200: Commercial kitchen<br>
 	 * 210: Commercial public dining room<br>
+	 * 500: outside of building <br>
 	 * ...<br>
 	 * greater/equal 10.000: custom values
 	 */
