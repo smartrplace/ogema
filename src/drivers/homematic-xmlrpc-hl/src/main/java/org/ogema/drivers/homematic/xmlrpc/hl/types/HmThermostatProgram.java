@@ -14,6 +14,12 @@ public interface HmThermostatProgram extends Data {
     
     IntegerResource programNumber();
     
+    /**
+     * Bitflags for the days that shall be transmitted, {@code 1 (Monday) ... 1 << 6 = 64 (Sunday)},
+     * generally {@link DayOfWeek#getValue} - 1, use 127 for all days.
+     * 
+     * @return Bitflags for days to transmit: {@code 1 (Monday) ... 1 << 6 = 64 (Sunday)}
+     */
     IntegerResource update();
     
     /**
@@ -25,7 +31,7 @@ public interface HmThermostatProgram extends Data {
     default void triggerUpdate(DayOfWeek ... days) {
         int val = 0;
         for (DayOfWeek d: days) {
-            val |= 1 << d.getValue();
+            val |= 1 << (d.getValue() - 1);
         }
         update().create();
         update().setValue(val);

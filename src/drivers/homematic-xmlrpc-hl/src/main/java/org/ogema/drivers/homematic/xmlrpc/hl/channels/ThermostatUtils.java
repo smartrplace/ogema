@@ -155,9 +155,14 @@ abstract class ThermostatUtils {
         CompletableFuture.runAsync(updateValues);
     }
     
-    static void setupProgramListener(HmDevice parent, HomeMaticConnection conn,
+    static void setupProgramListener(String address, HomeMaticConnection conn,
             Resource model, Logger logger) {
-        
+        //XXX might need aditional program resources or maybe a StructureListener for new HmThermostatPrograms
+        HmThermostatProgram prog = model.getSubResource("program", HmThermostatProgram.class);
+        prog.update().addValueListener(_res -> {
+            logger.debug("program update triggered for {} / {}", model.getPath(), address);
+            transmitProgram(conn, address, prog, logger);
+        }, true);
     }
     
     static void transmitProgram(HomeMaticConnection conn, String address, HmThermostatProgram prg, Logger logger) {
@@ -170,7 +175,8 @@ abstract class ThermostatUtils {
         String TEMPERATURE_PATTERN = "P%d_TEMPERATURE_%s_%d";
         for (DayOfWeek day: DayOfWeek.values()) {
             String dayString = day.name().toUpperCase();
-            if ((updateVal & (1 << day.getValue())) != 0) {
+            // DayOfWeek values are 1 (Monday) ... 7 (Sunday)
+            if ((updateVal & (1 << day.getValue() - 1)) != 0) {
                 Optional<int[]> endTimes = endTimesDay(prg, day);
                 endTimes.ifPresent(timesArray -> {
                     Optional<float[]> temperatures = temperaturesDay(prg, day);
@@ -193,8 +199,13 @@ abstract class ThermostatUtils {
                 });
             }
         }
-        logger.debug("built program parameters for {}: {}", prg.getPath(), programParams);
-        conn.performPutParamset(address, "MASTER", programParams);
+        if (programParams.isEmpty()) {
+            logger.debug("built empty program for {}, update value {}", prg.getPath(), updateVal);
+        } else {
+            logger.debug("built program parameters for {}: {}", prg.getPath(), programParams);
+            logger.debug("transmitting new program to {}", address);
+            conn.performPutParamset(address, "MASTER", programParams);
+        }
     }
     
     static Optional<int[]> endTimesDay(HmThermostatProgram prg, DayOfWeek day) {

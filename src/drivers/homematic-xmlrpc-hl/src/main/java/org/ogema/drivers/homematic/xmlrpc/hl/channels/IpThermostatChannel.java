@@ -247,6 +247,7 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
         conn.registerControlledResource(conn.getChannel(parent, deviceAddress), thermos);
         conn.registerControlledResource(conn.getChannel(parent, deviceAddress), thermos.temperatureSensor());
         setupControlModeResource(thermos, deviceAddress);
+        ThermostatUtils.setupProgramListener(deviceAddress, conn, thermos, logger);
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
         setupHmParameterValues(thermos, desc.getAddress());
         IpThermostatBChannel.setupTempSensLinking(thermos, conn, logger);
