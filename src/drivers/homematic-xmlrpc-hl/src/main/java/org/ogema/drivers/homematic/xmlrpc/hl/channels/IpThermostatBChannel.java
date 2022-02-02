@@ -106,7 +106,9 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
 
         },
         
-        LEVEL;
+        LEVEL,
+        
+        VALVE_STATE;
 
         public float convertInput(float v) {
             return v;
@@ -204,6 +206,16 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
                         }
                         logger.debug("found supported thermostat parameter {} on {}", e.getKey(), desc.getAddress());
                         resources.put(e.getKey(), reading);
+                        break;
+                    }
+                    case VALVE_STATE: {
+                        FloatResource valveState = thermos.valve().getSubResource("eq3state", FloatResource.class);
+                        if (!valveState.exists()) {
+                            valveState.create();
+                            valveState.activate(false);
+                        }
+                        logger.debug("found supported thermostat parameter {} on {}", e.getKey(), desc.getAddress());
+                        resources.put(e.getKey(), valveState);
                         break;
                     }
                 }
