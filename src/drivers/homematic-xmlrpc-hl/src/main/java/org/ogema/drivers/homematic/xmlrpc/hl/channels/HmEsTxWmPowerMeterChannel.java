@@ -84,7 +84,7 @@ public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
             ElectricityConnectionBox ecb
                     = parent.addDecorator("electricityMetering_" + base, ElectricityConnectionBox.class);
             ecb.meters().create().activate(false);
-            Map<String, ElectricityMeter> meters = new HashMap<>();
+            //Map<String, ElectricityMeter> meters = new HashMap<>();
             ElectricityMeter meterCon = ecb.meters().getSubResource("consumption", ElectricityMeter.class);
             if (!meterCon.type().isActive()) {
                 meterCon.type().create();
@@ -108,6 +108,7 @@ public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
                     m.energyReading().activate(false);
                 }
             });
+            logger.debug("initialized electricity meters: {}", meters);
             electricityResourcesInitialized = true;
         }
 
@@ -116,11 +117,11 @@ public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
             for (HmEvent e : events) {
                 switch (e.getValueKey()) {
                     case "IEC_POWER": {
+                        initElectricityMetering();
                         ElectricityMeter meter = meters.get(e.getAddress());
                         if (meter == null) {
                             continue;
                         }
-                        initElectricityMetering();
                         PowerResource pwr = meter.powerReading();
                         if (!pwr.exists()) {
                             pwr.create();
@@ -131,11 +132,11 @@ public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
                         break;
                     }
                     case "IEC_ENERGY_COUNTER": {
+                        initElectricityMetering();
                         ElectricityMeter meter = meters.get(e.getAddress());
                         if (meter == null) {
                             continue;
                         }
-                        initElectricityMetering();
                         EnergyResource reading = meter.energyReading();
                         if (!reading.exists()) {
                             reading.create();
