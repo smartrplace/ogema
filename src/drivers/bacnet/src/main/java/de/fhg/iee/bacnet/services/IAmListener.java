@@ -27,6 +27,8 @@ import de.fhg.iee.bacnet.enumerations.BACnetUnconfirmedServiceChoice;
 import de.fhg.iee.bacnet.tags.ObjectIdentifierTag;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +46,8 @@ public class IAmListener implements IndicationListener<Boolean> {
     final int maxApduSizeAccepted;
     final BACnetSegmentation segmentationSupport;
     final int vendorId;
+    
+    final Map<String, Long> lastIam = new ConcurrentHashMap<>();
     
     static final Logger LOGGER = LoggerFactory.getLogger(IAmListener.class);
 
@@ -77,7 +81,18 @@ public class IAmListener implements IndicationListener<Boolean> {
         if (pci.getPduType() == ApduConstants.TYPE_UNCONFIRMED_REQ
                 && pci.getServiceChoice() == BACnetUnconfirmedServiceChoice.who_Is.getBACnetEnumValue()) {
             LOGGER.trace("received who-is from {}", i.getSource());
-            sendIAm(i.getTransport(), i.getSource().toDestinationAddress());
+            
+            // testing
+            //FIXME: address needs equals & hashcode
+            String dest = i.getSource().toDestinationAddress().toString();
+            long minInterval = 5_000;
+            long now = System.currentTimeMillis();
+            if (lastIam.getOrDefault(dest, now) + minInterval > now) {
+                LOGGER.trace("not answering who-is from {}", i.getSource());
+            } else {
+                lastIam.put(dest, now);
+                sendIAm(i.getTransport(), i.getSource().toDestinationAddress());
+            }
             return true;
         }
         return false;

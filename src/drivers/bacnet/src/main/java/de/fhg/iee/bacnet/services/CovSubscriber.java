@@ -212,8 +212,12 @@ public class CovSubscriber implements Closeable {
                             @Override
                             public Void event(Indication ind) {
                                 //TODO: check for error result
-                                if (ind.getProtocolControlInfo().getPduType() == ApduConstants.TYPE_SIMPLE_ACK) {
+                                ProtocolControlInformation pci = ind.getProtocolControlInfo();
+                                if (pci.getPduType() == ApduConstants.TYPE_SIMPLE_ACK) {
                                     logger.trace("subscription confirmed for {}@{}", sub.object, sub.destination);
+                                } else {
+                                    logger.error("subscription refresh failed (type {}) for {}@{}",
+                                            pci.getPduType(), sub.object, sub.destination);
                                 }
                                 return null;
                             }
@@ -241,10 +245,14 @@ public class CovSubscriber implements Closeable {
             public Subscription event(Indication i) {
                 //TODO: handle failure (COV_SUBSCRIPTION_FAILED)
                 // BACnetErrorClass.services + BACnetErrorCode.cov_subscription_failed
-                if (i.getProtocolControlInfo().getPduType() == ApduConstants.TYPE_SIMPLE_ACK) {
+                ProtocolControlInformation pci = i.getProtocolControlInfo();
+                if (pci.getPduType() == ApduConstants.TYPE_SIMPLE_ACK) {
                     logger.trace("subscription confirmed for {}@{}", object, device);
                     subscriptions.put(sub.id, sub);
                     scheduleRefresh(sub);
+                } else {
+                    logger.error("subscription failed (type {}) for {}@{}",
+                            pci.getPduType(), sub.object, sub.destination);
                 }
                 return sub;
             }
