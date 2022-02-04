@@ -11,8 +11,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
-import org.ogema.core.model.array.FloatArrayResource;
-import org.ogema.core.model.array.IntegerArrayResource;
 import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
@@ -20,9 +18,9 @@ import org.ogema.core.model.simple.SingleValueResource;
 import org.ogema.core.resourcemanager.ResourceValueListener;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
-import org.ogema.drivers.homematic.xmlrpc.hl.types.HmThermostatProgram;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
+import org.ogema.model.devices.buildingtechnology.ThermostatProgram;
 import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.slf4j.Logger;
 
@@ -158,14 +156,18 @@ abstract class ThermostatUtils {
     static void setupProgramListener(String address, HomeMaticConnection conn,
             Resource model, Logger logger) {
         //XXX might need aditional program resources or maybe a StructureListener for new HmThermostatPrograms
-        HmThermostatProgram prog = model.getSubResource("program", HmThermostatProgram.class);
+        ThermostatProgram prog = model.getSubResource("program", ThermostatProgram.class);
         prog.update().addValueListener(_res -> {
             logger.debug("program update triggered for {} / {}", model.getPath(), address);
             transmitProgram(conn, address, prog, logger);
         }, true);
     }
     
-    static void transmitProgram(HomeMaticConnection conn, String address, HmThermostatProgram prg, Logger logger) {
+    static float toCelsius(float k) {
+        return k - 273.15f;
+    }
+    
+    static void transmitProgram(HomeMaticConnection conn, String address, ThermostatProgram prg, Logger logger) {
         int updateVal = prg.update().getValue();
         int prgNum = prg.programNumber().isActive()
                 ? prg.programNumber().getValue()
@@ -177,9 +179,9 @@ abstract class ThermostatUtils {
             String dayString = day.name().toUpperCase();
             // DayOfWeek values are 1 (Monday) ... 7 (Sunday)
             if ((updateVal & (1 << day.getValue() - 1)) != 0) {
-                Optional<int[]> endTimes = endTimesDay(prg, day);
+                Optional<int[]> endTimes = prg.endTimesDay(day);
                 endTimes.ifPresent(timesArray -> {
-                    Optional<float[]> temperatures = temperaturesDay(prg, day);
+                    Optional<float[]> temperatures = prg.temperaturesDay(day);
                     temperatures.ifPresent(tempArray -> {
                         if (tempArray.length != timesArray.length) {
                             logger.debug("skipping {}/{}, temperatures array has different size!", prg.getPath(), day);
@@ -190,8 +192,8 @@ abstract class ThermostatUtils {
                             String paramNameTime = String.format(ENDTIME_PATTERN, prgNum, dayString, i+1);
                             String paramNameTemp = String.format(TEMPERATURE_PATTERN, prgNum, dayString, i+1);
                             programParams.put(paramNameTime, t);
-                            programParams.put(paramNameTemp, tempArray[i]);
-                            if (t == 1440) {
+                            programParams.put(paramNameTemp, toCelsius(tempArray[i]));
+                            if (t >= 1440) {
                                 break;
                             }
                         }
@@ -208,40 +210,4 @@ abstract class ThermostatUtils {
         }
     }
     
-    static Optional<int[]> endTimesDay(HmThermostatProgram prg, DayOfWeek day) {
-        IntegerArrayResource iar = null;
-        switch (day) {
-            case MONDAY : iar = prg.endTimesMonday().isActive() ? prg.endTimesMonday() : prg.endTimesWeekdays(); break;
-            case TUESDAY : iar = prg.endTimesTuesday().isActive() ? prg.endTimesTuesday() : prg.endTimesWeekdays(); break;
-            case WEDNESDAY : iar = prg.endTimesWednesday().isActive() ? prg.endTimesWednesday(): prg.endTimesWeekdays(); break;
-            case THURSDAY : iar = prg.endTimesThursday().isActive() ? prg.endTimesThursday(): prg.endTimesWeekdays(); break;
-            case FRIDAY : iar = prg.endTimesFriday().isActive() ? prg.endTimesFriday(): prg.endTimesWeekdays(); break;
-            case SATURDAY : iar = prg.endTimesSaturday().isActive() ? prg.endTimesSaturday(): prg.endTimesWeekends(); break;
-            case SUNDAY : iar = prg.endTimesSunday().isActive() ? prg.endTimesSunday(): prg.endTimesWeekends(); break;
-        }
-        if (iar != null && iar.isActive()) {
-            return Optional.of(iar.getValues());
-        } else {
-            return Optional.empty();
-        }
-    }
-    
-    static Optional<float[]> temperaturesDay(HmThermostatProgram prg, DayOfWeek day) {
-        FloatArrayResource iar = null;
-        switch (day) {
-            case MONDAY : iar = prg.temperaturesMonday().isActive() ? prg.temperaturesMonday() : prg.temperaturesWeekdays(); break;
-            case TUESDAY : iar = prg.temperaturesTuesday().isActive() ? prg.temperaturesTuesday() : prg.temperaturesWeekdays(); break;
-            case WEDNESDAY : iar = prg.temperaturesWednesday().isActive() ? prg.temperaturesWednesday(): prg.temperaturesWeekdays(); break;
-            case THURSDAY : iar = prg.temperaturesThursday().isActive() ? prg.temperaturesThursday(): prg.temperaturesWeekdays(); break;
-            case FRIDAY : iar = prg.temperaturesFriday().isActive() ? prg.temperaturesFriday(): prg.temperaturesWeekdays(); break;
-            case SATURDAY : iar = prg.temperaturesSaturday().isActive() ? prg.temperaturesSaturday(): prg.temperaturesWeekends(); break;
-            case SUNDAY : iar = prg.temperaturesSunday().isActive() ? prg.temperaturesSunday(): prg.temperaturesWeekends(); break;
-        }
-        if (iar != null && iar.isActive()) {
-            return Optional.of(iar.getValues());
-        } else {
-            return Optional.empty();
-        }
-    }
-
 }
