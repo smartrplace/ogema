@@ -145,7 +145,7 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
                 }
                 try {
                     PARAMS p = PARAMS.valueOf(e.getValueKey());
-                    ValueResourceUtils.setValue(res, e.getValue());
+                    ValueResourceUtils.setValue(res, p.convertInput(e.getValueFloat()));
                     //((FloatResource) res).setValue(p.convertInput(e.getValueFloat()));
                     logger.debug("resource updated ({}/{}): {} = {}", p, e, res.getPath(), e.getValue());
                 } catch (IllegalArgumentException ex) {
