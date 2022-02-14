@@ -219,6 +219,9 @@ public class ThermostatChannel extends AbstractDeviceHandler {
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
         setupHmParameterValues(thermos, parent.address().getValue());
         setupTempSensLinking(thermos);
+        //FIXME for classic, program parameters are located on the main device channel
+        // and have a different format (no programm number / only 1 program)
+        //ThermostatUtils.setupProgramListener(parent.address().getValue(), conn, thermos, logger);
         setupControlModeResource(thermos, deviceAddress);
     }
     

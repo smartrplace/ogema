@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmMaintenance;
 import org.ogema.tools.resource.util.ResourceUtils;
+import org.ogema.tools.resource.util.ValueResourceUtils;
 
 /**
  * HEATING_CLIMATECONTROL_TRANSCEIVER channel for the HmIP-SK9 thermostat, copied
@@ -108,6 +109,8 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
         
         LEVEL,
         
+        SET_POINT_MODE,
+        
         VALVE_STATE;
 
         public float convertInput(float v) {
@@ -142,7 +145,8 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
                 }
                 try {
                     PARAMS p = PARAMS.valueOf(e.getValueKey());
-                    ((FloatResource) res).setValue(p.convertInput(e.getValueFloat()));
+                    ValueResourceUtils.setValue(res, e.getValue());
+                    //((FloatResource) res).setValue(p.convertInput(e.getValueFloat()));
                     logger.debug("resource updated ({}/{}): {} = {}", p, e, res.getPath(), e.getValue());
                 } catch (IllegalArgumentException ex) {
                     //this block intentionally left blank
@@ -180,6 +184,16 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
                 switch (PARAMS.valueOf(e.getKey())) {
                     case SET_POINT_TEMPERATURE: {
                         TemperatureResource reading = thermos.temperatureSensor().deviceFeedback().setpoint();
+                        if (!reading.exists()) {
+                            reading.create();
+                            thermos.activate(true);
+                        }
+                        logger.debug("found supported thermostat parameter {} on {}", e.getKey(), desc.getAddress());
+                        resources.put(e.getKey(), reading);
+                        break;
+                    }
+                    case SET_POINT_MODE: {
+                        IntegerResource reading = thermos.getSubResource("controlModeFeedback", IntegerResource.class);
                         if (!reading.exists()) {
                             reading.create();
                             thermos.activate(true);

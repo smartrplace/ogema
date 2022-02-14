@@ -55,6 +55,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
     public static enum PARAMS {
 
         CARRIER_SENSE_LEVEL, // 0..100% (HAP)
+        CONFIG_PENDING,
         DUTY_CYCLE, // boolean (HAP)
         DUTY_CYCLE_LEVEL, // 0..100% (HAP)
         ERROR_CODE,
@@ -135,6 +136,12 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                 }
                 if (PARAMS.CARRIER_SENSE_LEVEL.name().equals(e.getValueKey())) {
                     maintenanceSensorReading(parent, PARAMS.CARRIER_SENSE_LEVEL, e);
+                } else if (PARAMS.CONFIG_PENDING.name().equals(e.getValueKey())) {
+                    if (!mnt.configPending().isActive()) {
+                        mnt.configPending().create();
+                    }
+                    mnt.configPending().setValue(e.getValueBoolean());
+                    mnt.configPending().activate(false);
                 } else if (PARAMS.DUTY_CYCLE.name().equals(e.getValueKey())) {
                     if (!mnt.dutyCycle().isActive()) {
                         mnt.dutyCycle().reading().create().activate(false);

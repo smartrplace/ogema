@@ -68,4 +68,6 @@ public interface HmMaintenance extends Resource {
      */
     GenericBinarySensor dutyCycle();
     
+    BooleanResource configPending();
+    
 }
