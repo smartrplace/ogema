@@ -59,7 +59,7 @@ public class IAmListener implements IndicationListener<Boolean> {
     }
     
     public void broadcastIAm(Transport t) {
-        LOGGER.trace("broadcasting i-am");
+        LOGGER.debug("broadcasting i-am to {}", t.getBroadcastAddress());
         sendIAm(t, t.getBroadcastAddress());
     }
 
@@ -68,7 +68,7 @@ public class IAmListener implements IndicationListener<Boolean> {
                 new ObjectIdentifierTag(BACnetObjectType.device, instanceNumber),
                 maxApduSizeAccepted, segmentationSupport, vendorId);
         try {
-            LOGGER.trace("sending i-am to {}", target);
+            LOGGER.debug("sending i-am to {}", target);
             t.request(target, iAmPdu, Transport.Priority.Normal, false, null);
         } catch (IOException ex) {
             LoggerFactory.getLogger(getClass()).error("sending of i-am request failed", ex);

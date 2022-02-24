@@ -37,6 +37,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,13 +77,26 @@ public abstract class AbstractTransport implements Transport {
         });
     }
 
-    protected static class InvokeIds {
+    protected class InvokeIds {
 
         BitSet ids = new BitSet(256);
         int lastId = 42;
+        int inUse = 0;
 
         synchronized int getId() {
+            inUse++;
+            //FIXME stupid way to prevent running out of invoke IDs
+            if (inUse > 150) {
+                logger.debug("running out of invoke IDs?");
+                try {
+                    logger.debug("sleeping...");
+                    Thread.sleep((inUse / 50) * 100);
+                } catch (InterruptedException ex) {
+                    logger.debug("", ex);
+                }
+            }
             if (ids.nextClearBit(0) > 255) {
+                logger.warn("out of invoke IDs");
                 throw new IllegalStateException("out of invoke IDs");
             }
             do {
@@ -93,6 +107,7 @@ public abstract class AbstractTransport implements Transport {
         }
 
         synchronized void release(int id) {
+            inUse--;
             ids.clear(id & 255);
         }
 

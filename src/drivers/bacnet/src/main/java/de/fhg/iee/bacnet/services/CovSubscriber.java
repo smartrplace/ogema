@@ -22,6 +22,8 @@ import de.fhg.iee.bacnet.api.Indication;
 import de.fhg.iee.bacnet.api.IndicationListener;
 import de.fhg.iee.bacnet.api.Transport;
 import de.fhg.iee.bacnet.enumerations.BACnetConfirmedServiceChoice;
+import de.fhg.iee.bacnet.enumerations.BACnetErrorClass;
+import de.fhg.iee.bacnet.enumerations.BACnetErrorCode;
 import de.fhg.iee.bacnet.enumerations.BACnetUnconfirmedServiceChoice;
 import de.fhg.iee.bacnet.tags.CompositeTag;
 import de.fhg.iee.bacnet.tags.ObjectIdentifierTag;
@@ -34,6 +36,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -43,6 +46,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,6 +140,10 @@ public class CovSubscriber implements Closeable {
             return CovSubscriber.this.cancel(destination, object, id);
         }
 
+        public boolean isSubscribed() {
+            return subscriptions.containsKey(id);
+        }
+
     }
 
     public CovSubscriber(Transport transport, ObjectIdentifierTag subscribingObject) {
@@ -147,7 +155,7 @@ public class CovSubscriber implements Closeable {
     private ByteBuffer createCancellationMessage(Subscription sub) {
         return createCancellationMessage(sub.object, sub.id);
     }
-    
+
     private ByteBuffer createCancellationMessage(ObjectIdentifierTag oid, int subId) {
         ByteBuffer bb = ByteBuffer.allocate(50);
         ProtocolControlInformation pci = new ProtocolControlInformation(
@@ -162,16 +170,19 @@ public class CovSubscriber implements Closeable {
         bb.flip();
         return bb;
     }
-    
+
     private Future<Boolean> cancel(DeviceAddress dest, ObjectIdentifierTag oid, int subId) {
         logger.debug("Cancel subscription {} on {} / {}", subId, oid.getObjectType(), oid.getInstanceNumber());
-        subscriptions.remove(subId);
         try {
             IndicationListener<Boolean> simpleAckListener = new IndicationListener<Boolean>() {
                 @Override
                 public Boolean event(Indication ind) {
                     ProtocolControlInformation pci = ind.getProtocolControlInfo();
-                    return pci.getPduType() == ApduConstants.TYPE_SIMPLE_ACK;
+                    if (pci.getPduType() == ApduConstants.TYPE_SIMPLE_ACK) {
+                        subscriptions.remove(subId);
+                        return true;
+                    }
+                    return false;
                 }
             };
             return transport.request(dest, createCancellationMessage(oid, subId), Transport.Priority.Normal, true, simpleAckListener);
@@ -234,7 +245,7 @@ public class CovSubscriber implements Closeable {
     }
 
     public Future<Subscription> subscribe(DeviceAddress device, ObjectIdentifierTag object, boolean confirmed, int lifetime, CovListener l) throws IOException {
-        logger.trace("Send Subscribe to "+device+" for "+object.getObjectType()+" / "+object.getInstanceNumber());
+        logger.trace("Send Subscribe to " + device + " for " + object.getObjectType() + " / " + object.getInstanceNumber());
         Objects.requireNonNull(object);
         Objects.requireNonNull(l);
         int id = subscriptionID.incrementAndGet();
@@ -246,6 +257,7 @@ public class CovSubscriber implements Closeable {
                 //TODO: handle failure (COV_SUBSCRIPTION_FAILED)
                 // BACnetErrorClass.services + BACnetErrorCode.cov_subscription_failed
                 ProtocolControlInformation pci = i.getProtocolControlInfo();
+                /*
                 if (pci.getPduType() == ApduConstants.TYPE_SIMPLE_ACK) {
                     logger.trace("subscription confirmed for {}@{}", object, device);
                     subscriptions.put(sub.id, sub);
@@ -255,6 +267,36 @@ public class CovSubscriber implements Closeable {
                             pci.getPduType(), sub.object, sub.destination);
                 }
                 return sub;
+                 */
+                switch (pci.getPduType()) {
+                    case ApduConstants.TYPE_SIMPLE_ACK:
+                        logger.trace("subscription confirmed for {}@{}", object, device);
+                        subscriptions.put(sub.id, sub);
+                        scheduleRefresh(sub);
+                        return sub;
+                    case ApduConstants.TYPE_REJECT: {
+                        logger.warn("subscription attempt returned REJECT");
+                        return sub;
+                    }
+                    case ApduConstants.TYPE_ERROR: {
+                        ByteBuffer apdu = i.getData();
+                        CompositeTag errorClass = new CompositeTag(apdu);
+                        Optional<BACnetErrorClass> eClass = Stream.of(BACnetErrorClass.values()).filter(bec -> bec.getBACnetEnumValue() == errorClass.getUnsignedInt().intValue()).findAny();
+                        CompositeTag errorCode = new CompositeTag(apdu);
+                        Optional<BACnetErrorCode> eCode = Stream.of(BACnetErrorCode.values()).filter(bec -> bec.getBACnetEnumValue() == errorCode.getUnsignedInt().intValue()).findAny();
+                        apdu.reset();
+                        logger.warn("subscription attempt for {} on {} returned error {} / {}",
+                                object, device,
+                                eClass.map(BACnetErrorClass::toString).orElse("unknown:" + errorClass.getUnsignedInt()),
+                                eCode.map(BACnetErrorCode::toString).orElse("unknown:" + errorCode.getUnsignedInt()));
+                        return sub;
+                    }
+                    default: {
+                        logger.warn("subscription attempt for {} on {} returned unsupported response type {}",
+                                object, device, pci.getPduType());
+                        return sub;
+                    }
+                }
             }
         };
 
@@ -281,7 +323,7 @@ public class CovSubscriber implements Closeable {
                 }
                 if (!object.equals(sub.object)) {
                     logger.warn("received COV event for {} on subscription ID {} for {}",
-                                object, id, sub.object);
+                            object, id, sub.object);
                     return null;
                 }
                 UnsignedIntTag timeRemaining = new UnsignedIntTag(i.getData());
@@ -318,7 +360,7 @@ public class CovSubscriber implements Closeable {
         ProtocolControlInformation ackPci
                 = new ProtocolControlInformation(ApduConstants.APDU_TYPES.SIMPLE_ACK, BACnetConfirmedServiceChoice.confirmedCOVNotification)
                         .withInvokeId(i.getProtocolControlInfo().getInvokeId());
-        logger.trace("Send Ack to "+i.getSource().toDestinationAddress()+" from CovSubscriber");
+        logger.trace("Send Ack to " + i.getSource().toDestinationAddress() + " from CovSubscriber");
         ByteBuffer bb = ByteBuffer.allocate(10);
         ackPci.write(bb);
         bb.flip();

@@ -38,15 +38,26 @@ import java.util.Arrays;
 public class TransportIP extends AbstractTransport {
     
     public final static int MAX_APDU_SIZE = 1476;
+    
+    private final boolean offlineMode = Boolean.getBoolean("org.ogema.driver.bacnet.testwithoutconnection");
 
-    final int port;
-    final DatagramSocket sock;
-    InetAddress broadcast;
-    Inet4Address localAddress;
-    Thread receiverThread;
+    private int port;
+    private DatagramSocket sock;
+    private DatagramSocket sendingSocket;
+    private InetAddress broadcast;
+    private InetAddress localAddress;
+    private Thread receiverThread;
 
+    public TransportIP(InetAddress localAddress, InetAddress broadcast, int port) throws IOException {
+        this.localAddress = localAddress;
+        this.broadcast = broadcast;
+        this.port = port;
+        openSocket();
+    }
+    
     /**
-     * Create a new BACnet IP transport on the selected interface and port.
+     * Create a new BACnet IP transport using the first IP4 address on the
+     * selected interface and port.
      * @param iface network interface
      * @param port port number, using 0 will automatically select a free port.
      * @throws IOException
@@ -58,16 +69,37 @@ public class TransportIP extends AbstractTransport {
                 broadcast = ia.getBroadcast();
             }
         }
-        this.sock = new DatagramSocket(null);
-        this.sock.setReuseAddress(true);
-        this.sock.setBroadcast(true);
+        this.port = port;
+        openSocket();
+    }
+    
+    private void openSocket() throws IOException {
+        if (offlineMode) {
+            logger.info("BACnet IP transport created in offline mode.");
+        }
+        sock = new DatagramSocket(null);
+        sock.setReuseAddress(true);
+        sock.setBroadcast(true);
+        //if we want to receive broadcast traffic on linux, we need to bind to the wildcard address
+        //InetSocketAddress sockAddr = new InetSocketAddress(localAddress, port);
+        //InetSocketAddress sockAddr = new InetSocketAddress(broadcast, port); //cannot send, maybe works for receiving only???
         InetSocketAddress sockAddr = new InetSocketAddress(port);
-        //this.sock.bind(port == 0 ? null : sockAddr);
-        this.sock.bind(sockAddr);
-        this.port = this.sock.getLocalPort();
-        logger.debug("opened UDP port {}, broadcast={} ({}), reuse={}", this.port,
+        sock.bind(sockAddr);
+        port = sock.getLocalPort(); //actual port in case parameter was 0
+        
+        sendingSocket = sock;        
+        /*
+        sendingSocket = new DatagramSocket(null);
+        sendingSocket.setReuseAddress(true);
+        sendingSocket.setBroadcast(true);
+        sendingSocket.bind(new InetSocketAddress(localAddress, 0));
+        */
+        
+        logger.debug("opened UDP port {}:{}, broadcast={} ({}), reuse={}", localAddress, port,
                 sock.getBroadcast(), broadcast, sock.getReuseAddress());
-        receiverThread = new Thread(receiver, getClass().getSimpleName() + " UDP receiver");
+        //logger.debug("receive buffer size: {}", sock.getReceiveBufferSize());
+        //logger.debug("supported options: {}", sock.supportedOptions());
+        receiverThread = new Thread(receiver, getClass().getSimpleName() + " UDP receiver " + localAddress + ":" + port);
     }
     
     static String bytesToString(byte[] bytes, int l) {
@@ -92,10 +124,12 @@ public class TransportIP extends AbstractTransport {
 
         @Override
         public void run() {
+            logger.trace("starting UDP receiver thread");
             byte[] buf = new byte[2048];
             DatagramPacket p = new DatagramPacket(buf, buf.length);
             while (!Thread.interrupted()) {
                 try {
+                    //logger.trace("receive...");
                     sock.receive(p);
                     if (logger.isTraceEnabled()) {
                         if (p.getLength() <= 40) {
@@ -268,9 +302,13 @@ public class TransportIP extends AbstractTransport {
             }
         }
         DatagramPacket p = new DatagramPacket(packetData, packetData.length, addr.addr, addr.port);
-        if(Boolean.getBoolean("org.ogema.driver.bacnet.testwithoutconnection"))
-        	return;
-        sock.send(p);
+        
+        if (offlineMode) {
+            return;
+        }
+        
+        //sock.send(p);
+        sendingSocket.send(p);
     }
 
     @Override
@@ -278,6 +316,9 @@ public class TransportIP extends AbstractTransport {
         receiverThread.interrupt();
         if (sock != null) {
             sock.close();
+        }
+        if (sendingSocket != null) {
+            sendingSocket.close();
         }
     }
 
