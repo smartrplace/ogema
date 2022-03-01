@@ -20,30 +20,39 @@ import de.fhg.iee.bacnet.api.DeviceAddress;
 import de.fhg.iee.bacnet.api.Indication;
 import java.io.IOException;
 import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.channels.DatagramChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
 /**
  *
  * @author jlapp
  */
 public class TransportIP extends AbstractTransport {
-    
+
     public final static int MAX_APDU_SIZE = 1476;
-    
+
     private final boolean offlineMode = Boolean.getBoolean("org.ogema.driver.bacnet.testwithoutconnection");
 
     private int port;
-    private DatagramSocket sock;
-    private DatagramSocket sendingSocket;
+    
+    private DatagramChannel sendChannel;
+    private final Map<DatagramChannel, SelectionKey> channels = new HashMap<>();
+    
+    private Selector sel;
     private InetAddress broadcast;
     private InetAddress localAddress;
     private Thread receiverThread;
@@ -54,10 +63,11 @@ public class TransportIP extends AbstractTransport {
         this.port = port;
         openSocket();
     }
-    
+
     /**
      * Create a new BACnet IP transport using the first IP4 address on the
      * selected interface and port.
+     *
      * @param iface network interface
      * @param port port number, using 0 will automatically select a free port.
      * @throws IOException
@@ -72,36 +82,35 @@ public class TransportIP extends AbstractTransport {
         this.port = port;
         openSocket();
     }
-    
+
     private void openSocket() throws IOException {
         if (offlineMode) {
             logger.info("BACnet IP transport created in offline mode.");
         }
-        sock = new DatagramSocket(null);
-        sock.setReuseAddress(true);
-        sock.setBroadcast(true);
-        //if we want to receive broadcast traffic on linux, we need to bind to the wildcard address
-        //InetSocketAddress sockAddr = new InetSocketAddress(localAddress, port);
-        //InetSocketAddress sockAddr = new InetSocketAddress(broadcast, port); //cannot send, maybe works for receiving only???
-        InetSocketAddress sockAddr = new InetSocketAddress(port);
-        sock.bind(sockAddr);
-        port = sock.getLocalPort(); //actual port in case parameter was 0
+        sel = Selector.open();
+
+        sendChannel = DatagramChannel.open();
+        sendChannel.configureBlocking(false);
+        sendChannel.setOption(StandardSocketOptions.SO_BROADCAST, true);
+        sendChannel.setOption(StandardSocketOptions.SO_REUSEPORT, true);
+        sendChannel.bind(new InetSocketAddress(localAddress, port));
+        channels.put(sendChannel, sendChannel.register(sel, SelectionKey.OP_READ));
+        // in case of port = 0
+        port = sendChannel.socket().getLocalPort();
+
+        DatagramChannel broadcastChannel = DatagramChannel.open();
+        broadcastChannel.configureBlocking(false);
+        broadcastChannel.setOption(StandardSocketOptions.SO_BROADCAST, true);
+        broadcastChannel.setOption(StandardSocketOptions.SO_REUSEPORT, true);
+        broadcastChannel.bind(new InetSocketAddress(broadcast, port));
+        channels.put(broadcastChannel, broadcastChannel.register(sel, SelectionKey.OP_READ));
         
-        sendingSocket = sock;        
-        /*
-        sendingSocket = new DatagramSocket(null);
-        sendingSocket.setReuseAddress(true);
-        sendingSocket.setBroadcast(true);
-        sendingSocket.bind(new InetSocketAddress(localAddress, 0));
-        */
+        logger.debug("opened UDP port {}:{}, broadcast={} ({})", localAddress, port,
+                sendChannel.socket().getBroadcast(), broadcast);
         
-        logger.debug("opened UDP port {}:{}, broadcast={} ({}), reuse={}", localAddress, port,
-                sock.getBroadcast(), broadcast, sock.getReuseAddress());
-        //logger.debug("receive buffer size: {}", sock.getReceiveBufferSize());
-        //logger.debug("supported options: {}", sock.supportedOptions());
-        receiverThread = new Thread(receiver, getClass().getSimpleName() + " UDP receiver " + localAddress + ":" + port);
+        receiverThread = new Thread(this::receive, getClass().getSimpleName() + " UDP receiver " + localAddress + ":" + port);
     }
-    
+
     static String bytesToString(byte[] bytes, int l) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < l; i++) {
@@ -120,86 +129,96 @@ public class TransportIP extends AbstractTransport {
         return sb.toString();
     }
 
-    Runnable receiver = new Runnable() {
+    void receive() {
+        logger.trace("starting UDP receiver thread");
+        ByteBuffer recbuf = ByteBuffer.allocate(2048);
+        recbuf.order(ByteOrder.BIG_ENDIAN); 
+        while (!Thread.interrupted()) {
+            try {
+                if (sel.select() > 0) {
+                    Iterator<SelectionKey> keys = sel.selectedKeys().iterator();
+                    while (keys.hasNext()) {
+                        SelectionKey k = keys.next();
+                        keys.remove();
+                        recbuf.clear();
 
-        @Override
-        public void run() {
-            logger.trace("starting UDP receiver thread");
-            byte[] buf = new byte[2048];
-            DatagramPacket p = new DatagramPacket(buf, buf.length);
-            while (!Thread.interrupted()) {
-                try {
-                    //logger.trace("receive...");
-                    sock.receive(p);
-                    if (logger.isTraceEnabled()) {
-                        if (p.getLength() <= 40) {
-                            logger.trace("received {} bytes from {}:{} [{}]",
-                                p.getLength(), p.getAddress(), p.getPort(), bytesToString(p.getData(), p.getLength()));
-                        } else {
-                            logger.trace("received {} bytes from {}:{}", p.getLength(), p.getAddress(), p.getPort());
+                        DatagramChannel chan = (DatagramChannel) k.channel();
+
+                        InetSocketAddress src = (InetSocketAddress) chan.receive(recbuf);
+                        int len = recbuf.position();
+                        recbuf.flip();
+
+                        byte[] msg = new byte[len];
+                        
+                        recbuf.get(msg);
+                        //System.arraycopy(buf, 0, msg, 0, msg.length);
+                        ByteBuffer bb = ByteBuffer.wrap(msg);
+
+                        if (logger.isTraceEnabled()) {
+                            if (len <= 40) {
+                                logger.trace("received {} bytes on {} from {}:{} [{}]",
+                                        len, chan.getLocalAddress(), src.getAddress(), src.getPort(), bytesToString(msg, len));
+                            } else {
+                                logger.trace("received {} bytes on {} from {}:{}", len, chan.getLocalAddress(), src.getAddress(), src.getPort());
+                            }
                         }
-                    }
-
-                    byte[] msg = new byte[p.getLength()];
-                    System.arraycopy(buf, 0, msg, 0, msg.length);
-                    ByteBuffer bb = ByteBuffer.wrap(msg);
-
-                    //all virtual link control messages start with type, function & length
-                    int bvlcType = Npdu.getUnsignedByte(bb);
-                    int bvlcFunction = Npdu.getUnsignedByte(bb);
-                    int bvlcLength = bb.order(ByteOrder.BIG_ENDIAN).getChar();
-                    if (bvlcType != 0x81) {
-                        logger.debug("package is not a BACnet/IP message, BVLC Type field has value {}", Integer.toHexString(bvlcType));
-                        continue;
-                    }
-                    if (bvlcFunction != 0x0a && bvlcFunction != 0x0b) {
-                        logger.warn("received unsupported BVLC Function: {}", Integer.toHexString(bvlcType));
-                        continue;
-                    }
-                    Npdu npdu = new Npdu(bb);
-                    
-                    BACnetIpAddress srcAddr = new BACnetIpAddress();
-                    srcAddr.addr = p.getAddress();
-                    srcAddr.npdu = npdu;
-                    srcAddr.port = p.getPort();
-                    
-                    if (npdu.isNetworkMessage()) {
-                        if (npdu.getMessageType() == 0x01) {
-                            logger.info("got I-Am-Router-To-Network from {}", srcAddr);
-                        } else {
-                            logger.debug("ignoring network message (type {}) from {}", npdu.getMessageType(), srcAddr.addr);
+                        
+                        //all virtual link control messages start with type, function & length
+                        int bvlcType = Npdu.getUnsignedByte(bb);
+                        int bvlcFunction = Npdu.getUnsignedByte(bb);
+                        int bvlcLength = bb.order(ByteOrder.BIG_ENDIAN).getChar();
+                        if (bvlcType != 0x81) {
+                            logger.debug("package is not a BACnet/IP message, BVLC Type field has value {}", Integer.toHexString(bvlcType));
+                            continue;
                         }
-                        continue;
+                        if (bvlcFunction != 0x0a && bvlcFunction != 0x0b) {
+                            logger.warn("received unsupported BVLC Function: {}", Integer.toHexString(bvlcType));
+                            continue;
+                        }
+                        Npdu npdu = new Npdu(bb);
+
+                        BACnetIpAddress srcAddr = new BACnetIpAddress();
+                        srcAddr.addr = src.getAddress();
+                        srcAddr.npdu = npdu;
+                        srcAddr.port = src.getPort();
+
+                        if (npdu.isNetworkMessage()) {
+                            if (npdu.getMessageType() == 0x01) {
+                                logger.debug("got I-Am-Router-To-Network from {}", srcAddr);
+                            } else {
+                                logger.debug("ignoring network message (type {}) from {}", npdu.getMessageType(), srcAddr.addr);
+                            }
+                            continue;
+                        }
+                        ByteBuffer apdu = bb.slice().asReadOnlyBuffer();
+
+                        ProtocolControlInformation pci = new ProtocolControlInformation(apdu);
+                        int pciSize = apdu.position();
+                        apdu.rewind();
+
+                        apdu.position(pciSize);
+                        apdu.mark();
+
+                        Indication i = new DefaultIndication(srcAddr, pci, apdu.duplicate(), npdu.getPriority(), npdu.isExpectingReply(), this);
+                        receivedPackage(i);
                     }
-                    ByteBuffer apdu = bb.slice().asReadOnlyBuffer();
-
-                    ProtocolControlInformation pci = new ProtocolControlInformation(apdu);
-                    int pciSize = apdu.position();
-                    apdu.rewind();
-
-                    apdu.position(pciSize);
-                    apdu.mark();
-
-                    Indication i = new DefaultIndication(srcAddr, pci, apdu.duplicate(), npdu.getPriority(), npdu.isExpectingReply(), TransportIP.this);
-                    receivedPackage(i);
-
-                    //FIXME: exception handling
-                } catch (SocketException ex) {
-                    if (Thread.interrupted()) {
-                        logger.debug("transport closed");
-                        break;
-                    }
-                    logger.error("exception in UDP receiver", ex);
-                } catch (IOException ex) {
-                    logger.error("exception in UDP receiver", ex);
-                } catch (Exception ex) {
-                    logger.error("exception in UDP receiver", ex);
                 }
-            } //while
-            logger.trace("Finished receive while loop...");
-        } //run
-    };
-    
+                //FIXME: exception handling
+            } catch (SocketException ex) {
+                if (Thread.interrupted()) {
+                    logger.debug("transport closed");
+                    break;
+                }
+                logger.error("exception in UDP receiver", ex);
+            } catch (IOException ex) {
+                logger.error("exception in UDP receiver", ex);
+            } catch (Exception ex) {
+                logger.error("exception in UDP receiver", ex);
+            }
+        }
+        logger.trace("Finished receive while loop...");
+    }
+
     public static DeviceAddress createAddress(InetAddress ip, int port, Npdu npdu) {
         BACnetIpAddress addr = new BACnetIpAddress();
         addr.addr = ip;
@@ -234,30 +253,31 @@ public class TransportIP extends AbstractTransport {
 
         @Override
         public String toString() {
-            if(addr == null)
-            	return null;
+            if (addr == null) {
+                return null;
+            }
             StringBuilder sb = new StringBuilder();
             sb.append(addr.toString()).append(" NPDU:");
             if (npdu.hasSource()) {
                 sb.append(" src: ").append(npdu.getSourceNet())
                         .append("/")
                         .append(Arrays.toString(npdu.getSourceAddress()));
-                        //.append(bytesToString(npdu.getSourceAddress(), npdu.getSourceAddress().length));
+                //.append(bytesToString(npdu.getSourceAddress(), npdu.getSourceAddress().length));
             }
             if (npdu.hasDestination()) {
                 sb.append(" dst: ").append(npdu.getDestinationNet())
                         .append("/")
                         .append(Arrays.toString(npdu.getDestinationAddress()));
-                        //.append(bytesToString(npdu.getDestinationAddress(), npdu.getDestinationAddress().length));
+                //.append(bytesToString(npdu.getDestinationAddress(), npdu.getDestinationAddress().length));
             }
             if (!npdu.hasSource() && !npdu.hasDestination()) {
                 sb.append(" -");
             }
-        	return sb.toString();
+            return sb.toString();
         }
 
     }
-    
+
     public int getPort() {
         return port;
     }
@@ -302,24 +322,30 @@ public class TransportIP extends AbstractTransport {
             }
         }
         DatagramPacket p = new DatagramPacket(packetData, packetData.length, addr.addr, addr.port);
-        
+
         if (offlineMode) {
             return;
         }
-        
+
         //sock.send(p);
-        sendingSocket.send(p);
+        //int sent = sendingSocket.getChannel().send(ByteBuffer.wrap(packetData), new InetSocketAddress(addr.addr, addr.port));
+        int sent = sendChannel.send(ByteBuffer.wrap(packetData), new InetSocketAddress(addr.addr, addr.port));
+        logger.trace("bytes sent: {}", sent);
+        //sendingSocket.send(p);
     }
 
     @Override
     protected void doClose() throws IOException {
         receiverThread.interrupt();
-        if (sock != null) {
-            sock.close();
-        }
-        if (sendingSocket != null) {
-            sendingSocket.close();
-        }
+        channels.forEach((c, k) -> {
+            k.cancel();
+            try {
+                c.close();
+            } catch (IOException ex) {
+                logger.error("close", ex);
+            }
+        });
+        sel.close();
     }
 
     @Override
