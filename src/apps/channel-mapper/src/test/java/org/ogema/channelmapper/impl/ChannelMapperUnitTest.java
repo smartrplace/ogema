@@ -19,9 +19,11 @@ import static org.junit.Assert.assertEquals;
 
 import java.io.File;
 import java.util.List;
+import org.junit.Ignore;
 
 import org.junit.Test;
 
+@Ignore
 public class ChannelMapperUnitTest  {
 
 	@Test

@@ -114,6 +114,8 @@ public abstract class OsgiAppTestBase {
 				CoreOptions.composite(frameworkBundles()),
 				CoreOptions.when(getJavaVersion() >= 11).useOptions(
 						CoreOptions.vmOption("--add-opens=java.base/jdk.internal.loader=ALL-UNNAMED"), //required for extension bundles in felix
+                        CoreOptions.systemProperty("javax.xml.bind.JAXBContextFactory").value("org.eclipse.persistence.jaxb.JAXBContextFactory"),
+                        CoreOptions.vmOption("--add-modules=jdk.unsupported"),
 						CoreOptions.mavenBundle("com.sun.activation", "javax.activation", "1.2.0"),
 						CoreOptions.mavenBundle("javax.annotation", "javax.annotation-api", "1.3.2"),
 						CoreOptions.mavenBundle("javax.xml.bind", "jaxb-api", "2.4.0-b180830.0359"),
