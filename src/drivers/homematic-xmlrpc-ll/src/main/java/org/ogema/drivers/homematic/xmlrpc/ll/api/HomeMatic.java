@@ -60,6 +60,13 @@ public interface HomeMatic {
      */    
     void setInstallMode(boolean on, int time, int mode) throws XmlRpcException;
     
+    /**
+     * Sets install mode on or off. Install mode will remain active for 60
+     * seconds after a call to {@code setInstallMode(true)}.
+     * @param on install mode active state.
+     */
+    void setInstallMode(boolean on) throws XmlRpcException;
+    
     void setValue(String address, String value_key, Object value) throws XmlRpcException;
     
     <T extends Object> T getValue(String address, String value_key) throws XmlRpcException;

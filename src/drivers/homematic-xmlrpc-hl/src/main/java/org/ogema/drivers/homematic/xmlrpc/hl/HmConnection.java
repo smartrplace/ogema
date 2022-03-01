@@ -198,10 +198,10 @@ public class HmConnection implements HomeMaticConnection {
 		}
 		appman.getResourceAccess().addResourceDemand(HmDevice.class, devResourceListener);
 		if (installModePoller == null) {
-			installModePoller = executor.scheduleWithFixedDelay(installModePolling, 0, 60, TimeUnit.SECONDS);
+			installModePoller = executor.scheduleWithFixedDelay(installModePolling, 0, 50, TimeUnit.SECONDS);
 		}
-                baseResource.disablePingCheck().create();
-                baseResource.disablePingCheck().activate(false);
+		baseResource.disablePingCheck().create();
+		baseResource.disablePingCheck().activate(false);
 		if ((!baseResource.disablePingCheck().getValue()) && pingCheck == null) {
 			pingCheck = executor.scheduleWithFixedDelay(new Runnable() {
 				@Override
@@ -300,7 +300,7 @@ public class HmConnection implements HomeMaticConnection {
 			if (t.equals(baseResource.installationMode().stateControl())) {
 				try {
 					boolean onOff = t.getValue();
-					client.setInstallMode(onOff, 900, 1);
+					client.setInstallMode(onOff);
 					int secondsRemaining = client.getInstallMode();
 					baseResource.installationMode().stateFeedback().setValue(secondsRemaining > 0);
 				} catch (XmlRpcException ex) {
@@ -319,6 +319,10 @@ public class HmConnection implements HomeMaticConnection {
 		@Override
 		public void run() {
 			try {
+                if (baseResource.installationMode().stateControl().getValue()) {
+                    logger.debug("installation mode on");
+                    client.setInstallMode(true);
+                }
 				int secondsRemaining = client.getInstallMode();
 				logger.debug("polled installation mode: {}s", secondsRemaining);
 				baseResource.installationMode().stateFeedback().setValue(secondsRemaining > 0);

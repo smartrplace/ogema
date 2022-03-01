@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.SortedSet;
@@ -69,7 +70,8 @@ import org.slf4j.LoggerFactory;
  * @author jlapp
  */
 @Component(service = { Application.class },
-        property = {"osgi.command.scope=hmhl", "osgi.command.function=listDevices"})
+        property = {"osgi.command.scope=hmhl", "osgi.command.function=listDevices",
+        "osgi.command.function=writeCounts"})
 public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 
     private ApplicationManager appman;
@@ -341,6 +343,13 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
                     cd.handler.getClass().getSimpleName(),
                     cd.device.getPath());
         });
+    }
+    
+    public Map<String, Integer> writeCounts(String hmInterface) {
+        return connections.entrySet().stream().filter(e -> e.getKey().getName()
+                .equalsIgnoreCase(hmInterface)).findAny()
+                .map(Entry::getValue).map(c -> c.writer.writeCounts.getCounts())
+                .orElse(null);
     }
 
 }

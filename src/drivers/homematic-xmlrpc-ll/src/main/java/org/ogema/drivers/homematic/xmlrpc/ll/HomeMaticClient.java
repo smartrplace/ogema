@@ -209,12 +209,19 @@ public class HomeMaticClient implements HomeMatic {
     @Override
     public void setInstallMode(boolean on, int time, int mode) throws XmlRpcException {
     	if (type == HomematicType.Ip) {
-            logger.trace("setInstallMode (HmIP) {} {}", on, time);
-    		client.execute("setInstallMode", new Object[]{on, time});
+            //XXX this does not work for HmIP!
+            logger.trace("setInstallMode (HmIP) {} {} {}", on, time, mode);
+    		client.execute("setInstallMode", new Object[]{on, time, mode});
         } else {
             logger.trace("setInstallMode {} {} {}", on, time, mode);
     		client.execute("setInstallMode", new Object[]{on, time, mode});
         }
+    }
+    
+    @Override
+    public void setInstallMode(boolean on) throws XmlRpcException {
+        logger.trace("setInstallMode {}", on);
+        client.execute("setInstallMode", new Object[]{on});
     }
 
     @Override

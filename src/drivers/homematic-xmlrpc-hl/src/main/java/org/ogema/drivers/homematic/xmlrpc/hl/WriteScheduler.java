@@ -16,9 +16,15 @@
 package org.ogema.drivers.homematic.xmlrpc.hl;
 
 import java.io.Closeable;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.drivers.homematic.xmlrpc.hl.events.HomeMaticEventMessages;
 import org.osgi.service.event.EventAdmin;
@@ -31,6 +37,42 @@ import org.slf4j.LoggerFactory;
  */
 public class WriteScheduler implements Closeable {
     
+    class WriteCounts {
+        
+        long nextHourlyReset = setNextResetTime();
+        
+        Map<String, Integer> targetWriteCounts = new ConcurrentHashMap<>();
+        
+        long setNextResetTime() {
+            return nextHourlyReset = Instant.now().truncatedTo(ChronoUnit.HOURS).plus(1, ChronoUnit.HOURS).toEpochMilli();
+        }
+        
+        void reset() {
+            targetWriteCounts.clear();
+            setNextResetTime();
+        }
+        
+        void log() {
+            AtomicLong total = new AtomicLong();
+            StringBuilder sb = new StringBuilder("Homematic write operations for last hour: ");
+            targetWriteCounts.forEach((t, c) -> {
+                sb.append(t).append(": ").append(c).append(", ");
+                total.addAndGet(c);
+            });
+            sb.append("total: ").append(total);
+            logger.info(sb.toString());
+        }
+        
+        public Map<String, Integer> getCounts() {
+            return Collections.unmodifiableMap(targetWriteCounts);
+        }
+        
+        void addAction(WriteAction a) {
+            targetWriteCounts.compute(a.target(), (t,c) -> c == null ? 1 : c + 1);
+        }
+        
+    }
+    
     /** If a write action fails, sleep for this amount of time (ms) before
      the next write operation */
     private final long SLEEP_AFTER_ERROR = Long.getLong("ogema.homematic.xmlrpc.errorsleep", 100L);
@@ -40,6 +82,7 @@ public class WriteScheduler implements Closeable {
     
     private final EventAdmin eventAdmin;
     private final ApplicationManager appman;
+    final WriteCounts writeCounts = new WriteCounts();
 
     final static Comparator<WriteAction> WRITE_ACTION_COMPARATOR = new Comparator<WriteAction>() {
         @Override
@@ -106,7 +149,12 @@ public class WriteScheduler implements Closeable {
                 
                 boolean success = false;
                 try {
+                    if (System.currentTimeMillis() > writeCounts.nextHourlyReset) {
+                        writeCounts.log();
+                        writeCounts.reset();
+                    }
                     success = next.write();
+                    writeCounts.addAction(next);
                 } catch (Throwable t) {
                     logger.warn("WriteAction misbehaved and threw an exception", t);
                 }

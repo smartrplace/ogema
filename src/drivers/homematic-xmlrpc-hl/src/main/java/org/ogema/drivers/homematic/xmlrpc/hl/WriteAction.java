@@ -94,7 +94,9 @@ public abstract class WriteAction {
                     hm.setValue(address, valueKey, value);
                     return true;
                 } catch (XmlRpcException ex) {
-                    LoggerFactory.getLogger(HomeMaticDriver.class).warn("write failed (try {}) for {}@{} := {}", tries(), valueKey, address, value, ex);
+                    LoggerFactory.getLogger(HomeMaticDriver.class)
+                            .warn("write failed (try {}) for {}@{} := {} ({}: {})",
+                                    tries(), valueKey, address, value, ex.getClass().getSimpleName(), ex.getMessage());
                     return false;
                 }
             }
@@ -191,8 +193,8 @@ public abstract class WriteAction {
                     hm.putParamset(address, set, valueStruct);
                     return true;
                 } catch (XmlRpcException ex) {
-                    LoggerFactory.getLogger(HomeMaticDriver.class).warn("putParamset failed (try {}) for [{}]@{}",
-                            tries(), set, address, ex);
+                    LoggerFactory.getLogger(HomeMaticDriver.class).warn("putParamset failed (try {}) for [{}]@{} ({}: {})",
+                            tries(), set, address, ex.getClass().getSimpleName(), ex.getMessage());
                     return false;
                 }
             }

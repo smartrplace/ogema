@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.felix.service.command.Descriptor;
+import org.apache.felix.service.command.Parameter;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HomeMatic;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
@@ -138,16 +139,22 @@ public class HomeMaticClientCli {
         }
     }
     
-    /**
-     * Toggle installation mode.
-     */
     @Descriptor("Toggle installation mode")
     public void tim() throws Exception {
+        tim(900);
+    }
+    
+    /**
+     * Toggle installation mode.
+     * @param duration Install mode duration in seconds.
+     */
+    @Descriptor("Toggle installation mode")
+    public void tim(@Descriptor("duration (seconds)") @Parameter(absentValue = "900", names = "-d") int duration) throws Exception {
         int rem = client.getInstallMode();
         if (rem > 0) {
             client.setInstallMode(false, 0, 1);
         } else {
-            client.setInstallMode(true, 900, 1);
+            client.setInstallMode(true, duration, 1);
         }
         rem = client.getInstallMode();
         if (rem == 0) {
