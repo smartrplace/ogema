@@ -102,6 +102,7 @@ public class HmConnection implements HomeMaticConnection {
 	HomeMaticService hm;
 	// quasi-final: not changed after init() call
 	HomeMatic client;
+    Persistence persistence;
 	final HmLogicInterface baseResource;
 	// quasi-final: not changed after init() call
 	ServiceRegistration<HomeMaticClientCli> commandLineRegistration;
@@ -569,7 +570,7 @@ public class HmConnection implements HomeMaticConnection {
 			config.installationMode().activate(true);
 			config.installationMode().stateControl().addValueListener(installModeListener, true);
 			config.installationMode().stateFeedback().addValueListener(installModeListener, false);
-			Persistence persistence = new Persistence(appman, config);
+			persistence = new Persistence(appman, config);
 			hm.setBackend(persistence);
 
 			hm.addDeviceListener(persistence);

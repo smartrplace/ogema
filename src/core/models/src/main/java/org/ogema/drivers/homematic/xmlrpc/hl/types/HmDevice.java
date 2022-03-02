@@ -20,13 +20,10 @@ import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.array.StringArrayResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.StringResource;
-import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 
 /**
  * OGEMA resource representing a logical device as defined in the HomeMatic
  * XML-RPC specification.
- * 
- * @see DeviceDescription
  * 
  * @author jlapp
  */

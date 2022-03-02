@@ -16,7 +16,9 @@
 package org.ogema.drivers.homematic.xmlrpc.hl;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.core.model.array.StringArrayResource;
 import org.ogema.core.model.simple.IntegerResource;
@@ -38,6 +40,12 @@ class Persistence implements HmBackend, DeviceListener {
     private final ApplicationManager appman;
     private final HmLogicInterface hm;
     private final Logger logger;
+    private final Map<String, DeviceDescription> descriptions = new HashMap<>();
+
+    @Override
+    public DeviceDescription getDeviceDescription(String address) {
+        return descriptions.get(address);
+    }
 
     public Persistence(ApplicationManager appman, HmLogicInterface hm) {
         this.appman = appman;
@@ -82,6 +90,7 @@ class Persistence implements HmBackend, DeviceListener {
     @Override
     public void deviceAdded(String interfaceId, List<DeviceDescription> descriptions) {
         for (DeviceDescription dd : descriptions) {
+            this.descriptions.put(dd.getAddress(), dd);
             String deviceResName = createResourceName(dd.getType(), dd.getAddress());
             if (dd.isDevice()) {
                 HmDevice res = hm.devices().addDecorator(deviceResName, HmDevice.class);

@@ -23,6 +23,8 @@ import java.util.List;
  */
 public interface DeviceListener {
     
+    DeviceDescription getDeviceDescription(String address);
+    
     /** newDevices */
     void deviceAdded(String interfaceId, List<DeviceDescription> descriptions);
     
