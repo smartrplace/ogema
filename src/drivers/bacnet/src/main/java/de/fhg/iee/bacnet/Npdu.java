@@ -17,6 +17,7 @@ package de.fhg.iee.bacnet;
 
 import de.fhg.iee.bacnet.api.Transport;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -314,5 +315,73 @@ public class Npdu implements Cloneable {
             }
         }
     }
+
+    @Override
+    public int hashCode() {
+        int hash = 3;
+        hash = 67 * hash + this.protocolVersion;
+        hash = 67 * hash + (this.expectingReply ? 1 : 0);
+        hash = 67 * hash + (this.hasDestination ? 1 : 0);
+        hash = 67 * hash + Arrays.hashCode(this.dnet);
+        hash = 67 * hash + Arrays.hashCode(this.dadr);
+        hash = 67 * hash + this.hopCount;
+        hash = 67 * hash + (this.hasSource ? 1 : 0);
+        hash = 67 * hash + Arrays.hashCode(this.snet);
+        hash = 67 * hash + Arrays.hashCode(this.sadr);
+        hash = 67 * hash + this.messageType;
+        hash = 67 * hash + this.vendorId;
+        hash = 67 * hash + Objects.hashCode(this.prio);
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final Npdu other = (Npdu) obj;
+        if (this.protocolVersion != other.protocolVersion) {
+            return false;
+        }
+        if (this.expectingReply != other.expectingReply) {
+            return false;
+        }
+        if (this.hasDestination != other.hasDestination) {
+            return false;
+        }
+        if (this.hopCount != other.hopCount) {
+            return false;
+        }
+        if (this.hasSource != other.hasSource) {
+            return false;
+        }
+        if (this.messageType != other.messageType) {
+            return false;
+        }
+        if (this.vendorId != other.vendorId) {
+            return false;
+        }
+        if (!Arrays.equals(this.dnet, other.dnet)) {
+            return false;
+        }
+        if (!Arrays.equals(this.dadr, other.dadr)) {
+            return false;
+        }
+        if (!Arrays.equals(this.snet, other.snet)) {
+            return false;
+        }
+        if (!Arrays.equals(this.sadr, other.sadr)) {
+            return false;
+        }
+        return this.prio == other.prio;
+    }
+    
+    
 
 }

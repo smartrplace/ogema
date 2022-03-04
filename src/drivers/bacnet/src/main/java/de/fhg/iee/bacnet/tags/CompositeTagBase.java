@@ -6,8 +6,10 @@ import java.util.List;
 public interface CompositeTagBase {
 	int getOidInstanceNumber();
 	int getOidType();
+    <T extends CompositeTagBase> Collection<T> getSubTags();
+    
+    //XXX EDE-specific information used in high level driver, none of this actually belongs here...
 	default String description() {return null;}
-	<T extends CompositeTagBase> Collection<T> getSubTags();
 	default String getName() {return null;}
 	default List<String> getStates() {return null;}
 	default Boolean isSettable() {return null;}

@@ -145,7 +145,7 @@ public class SegmentationSender {
             //FIXME
             transport.logger.warn("error", t);
         } finally {
-            transport.invokeIds.release(segments.get(0).pci.getInvokeId());
+            transport.getInvokeIds(destination).release(segments.get(0).pci.getInvokeId());
         }
     }
 

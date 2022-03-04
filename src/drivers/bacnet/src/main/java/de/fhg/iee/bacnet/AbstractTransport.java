@@ -25,7 +25,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.BitSet;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
@@ -37,7 +39,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,10 +55,10 @@ public abstract class AbstractTransport implements Transport {
 
     Collection<IndicationListener<?>> listeners = new ConcurrentLinkedQueue<>();
     final PriorityQueue<PendingReply> pendingReplies = new PriorityQueue<>();
-    InvokeIds invokeIds = new InvokeIds();
 
     final Logger logger = LoggerFactory.getLogger(getClass());
     final Thread timeoutThread;
+    private final Map<DeviceAddress, InvokeIds> invokeIds = new HashMap<>();
 
     private long messageTimeout = 350;
     private long segmentTimeout = 350;
@@ -80,17 +81,26 @@ public abstract class AbstractTransport implements Transport {
     protected class InvokeIds {
 
         BitSet ids = new BitSet(256);
-        int lastId = 42;
+        int lastId = 0;
         int inUse = 0;
+        final DeviceAddress destination;
 
+        public InvokeIds(DeviceAddress destination) {
+            this.destination = destination;
+        }
+        
         synchronized int getId() {
             inUse++;
-            //FIXME stupid way to prevent running out of invoke IDs
-            if (inUse > 150) {
-                logger.debug("running out of invoke IDs?");
+            //FIXME stupid way to prevent running out of invoke IDs, OTOH reduces load on slow devices
+            int slowDownCount = 5;
+            int slowDownAmount = 200;
+            int slowDownMax = 1500;
+            if (inUse > slowDownCount) {
+                //logger.debug("running out of invoke IDs for destination={}, all destinations={}", destination, invokeIds.keySet());
                 try {
-                    logger.debug("sleeping...");
-                    Thread.sleep((inUse / 50) * 100);
+                    int sleep = Math.min(slowDownMax, (inUse / slowDownCount) * slowDownAmount);
+                    //logger.debug("sleeping {}ms...", sleep);
+                    Thread.sleep(sleep);
                 } catch (InterruptedException ex) {
                     logger.debug("", ex);
                 }
@@ -111,6 +121,10 @@ public abstract class AbstractTransport implements Transport {
             ids.clear(id & 255);
         }
 
+    }
+    
+    protected InvokeIds getInvokeIds(DeviceAddress destination) {
+        return invokeIds.computeIfAbsent(destination, InvokeIds::new);
     }
 
     private class PendingReply implements Comparable<PendingReply> {
@@ -201,7 +215,7 @@ public abstract class AbstractTransport implements Transport {
                             //TODO: notify listener
                             logger.warn("no reply from {} for invoke ID {}", next.destination, next.invokeId);
                             next.f.cancel(true);
-                            invokeIds.release(next.invokeId);
+                            getInvokeIds(next.destination).release(next.invokeId);
                         } else {
                             next.tryNumber++;
                             next.increaseExpiryTime();
@@ -283,7 +297,7 @@ public abstract class AbstractTransport implements Transport {
                         break;
                     }
                 }
-                invokeIds.release(invokeId);
+                getInvokeIds(indication.getSource().toDestinationAddress()).release(invokeId);
                 pendingReplies.notifyAll();
             }
         } else {
@@ -338,7 +352,7 @@ public abstract class AbstractTransport implements Transport {
         }
         
         if (pci.getPduType() == ApduConstants.TYPE_CONFIRMED_REQ) {
-            int invokeId = invokeIds.getId();
+            int invokeId = getInvokeIds(destination).getId();
             
             PendingReply r = new PendingReply(false, invokeId, destination, data, prio, l, f);
             synchronized (pendingReplies) {

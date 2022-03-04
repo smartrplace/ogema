@@ -21,6 +21,7 @@ import de.fhg.iee.bacnet.api.DeviceAddress;
 import de.fhg.iee.bacnet.api.Indication;
 import de.fhg.iee.bacnet.api.IndicationListener;
 import de.fhg.iee.bacnet.api.Transport;
+import de.fhg.iee.bacnet.enumerations.BACnetAbortReason;
 import de.fhg.iee.bacnet.enumerations.BACnetConfirmedServiceChoice;
 import de.fhg.iee.bacnet.enumerations.BACnetErrorClass;
 import de.fhg.iee.bacnet.enumerations.BACnetErrorCode;
@@ -257,17 +258,6 @@ public class CovSubscriber implements Closeable {
                 //TODO: handle failure (COV_SUBSCRIPTION_FAILED)
                 // BACnetErrorClass.services + BACnetErrorCode.cov_subscription_failed
                 ProtocolControlInformation pci = i.getProtocolControlInfo();
-                /*
-                if (pci.getPduType() == ApduConstants.TYPE_SIMPLE_ACK) {
-                    logger.trace("subscription confirmed for {}@{}", object, device);
-                    subscriptions.put(sub.id, sub);
-                    scheduleRefresh(sub);
-                } else {
-                    logger.error("subscription failed (type {}) for {}@{}",
-                            pci.getPduType(), sub.object, sub.destination);
-                }
-                return sub;
-                 */
                 switch (pci.getPduType()) {
                     case ApduConstants.TYPE_SIMPLE_ACK:
                         logger.trace("subscription confirmed for {}@{}", object, device);

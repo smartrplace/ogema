@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  *
@@ -274,6 +275,36 @@ public class TransportIP extends AbstractTransport {
                 sb.append(" -");
             }
             return sb.toString();
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 5;
+            hash = 67 * hash + Objects.hashCode(this.npdu);
+            hash = 67 * hash + Objects.hashCode(this.addr);
+            hash = 67 * hash + this.port;
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final BACnetIpAddress other = (BACnetIpAddress) obj;
+            if (this.port != other.port) {
+                return false;
+            }
+            if (!Objects.equals(this.npdu, other.npdu)) {
+                return false;
+            }
+            return Objects.equals(this.addr, other.addr);
         }
 
     }
