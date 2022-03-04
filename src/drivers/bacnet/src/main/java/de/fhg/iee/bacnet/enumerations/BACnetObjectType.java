@@ -97,7 +97,7 @@ public enum BACnetObjectType implements BACnetEnumeration {
 	component(201)
     ;
 
-    private final int code;
+    public final int code;
     
     private BACnetObjectType(int code) {
         this.code = code;

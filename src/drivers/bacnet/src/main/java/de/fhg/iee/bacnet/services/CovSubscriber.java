@@ -278,6 +278,10 @@ public class CovSubscriber implements Closeable {
                         logger.warn("subscription attempt returned REJECT");
                         return sub;
                     }
+                    case ApduConstants.TYPE_ABORT: {
+                        logger.warn("subscription attempt returned ABORT");
+                        return sub;
+                    }
                     case ApduConstants.TYPE_ERROR: {
                         ByteBuffer apdu = i.getData();
                         CompositeTag errorClass = new CompositeTag(apdu);

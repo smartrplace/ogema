@@ -200,6 +200,7 @@ public abstract class AbstractTransport implements Transport {
                         if (next.tryNumber >= messageRetries) {
                             //TODO: notify listener
                             logger.warn("no reply from {} for invoke ID {}", next.destination, next.invokeId);
+                            next.f.cancel(true);
                             invokeIds.release(next.invokeId);
                         } else {
                             next.tryNumber++;
@@ -386,6 +387,7 @@ public abstract class AbstractTransport implements Transport {
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
             cancelled.set(true);
+            done.countDown();
             return result == null;
         }
 
@@ -396,11 +398,14 @@ public abstract class AbstractTransport implements Transport {
 
         @Override
         public boolean isDone() {
-            return result != null;
+            return cancelled.get() || result != null;
         }
         
         @SuppressWarnings("unchecked")
         private void resolve(Object result, Throwable t) {
+            if (isDone()) {
+                return;
+            }
             this.result = (V) result;
             this.t = t;
             done.countDown();
