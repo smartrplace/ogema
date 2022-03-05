@@ -104,4 +104,13 @@ public class CountDownAbsoluteTimer implements TimerListener {
 	public boolean isRunning() {
 		return timer.isRunning();
 	}
+	
+	/**
+	 * Returns the execution time of the timer.
+	 * @return
+	 */
+	public long getNextRunTime() {
+		return timer.getNextRunTime();
+	}
+
 }
