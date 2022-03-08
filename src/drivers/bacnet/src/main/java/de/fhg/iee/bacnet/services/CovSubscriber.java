@@ -25,6 +25,7 @@ import de.fhg.iee.bacnet.enumerations.BACnetAbortReason;
 import de.fhg.iee.bacnet.enumerations.BACnetConfirmedServiceChoice;
 import de.fhg.iee.bacnet.enumerations.BACnetErrorClass;
 import de.fhg.iee.bacnet.enumerations.BACnetErrorCode;
+import de.fhg.iee.bacnet.enumerations.BACnetRejectReason;
 import de.fhg.iee.bacnet.enumerations.BACnetUnconfirmedServiceChoice;
 import de.fhg.iee.bacnet.tags.CompositeTag;
 import de.fhg.iee.bacnet.tags.ObjectIdentifierTag;
@@ -57,14 +58,15 @@ import org.slf4j.LoggerFactory;
  */
 public class CovSubscriber implements Closeable {
 
-    final Transport transport;
-    final ObjectIdentifierTag subscribingObject;
+    private final Transport transport;
+    private final ObjectIdentifierTag subscribingObject;
 
-    final AtomicInteger subscriptionID = new AtomicInteger();
-    final Map<Integer, Subscription> subscriptions = new ConcurrentHashMap<>();
-    final ScheduledExecutorService subscriptionRefresher = Executors.newSingleThreadScheduledExecutor();
+    private final AtomicInteger subscriptionID = new AtomicInteger();
+    private final Map<Integer, Subscription> activeSubscriptions = new ConcurrentHashMap<>();
+    private final Map<Integer, Subscription> failedSubscriptions = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService subscriptionRefresher = Executors.newSingleThreadScheduledExecutor();
 
-    final Logger logger = LoggerFactory.getLogger(getClass());
+    private final Logger logger = LoggerFactory.getLogger(getClass());
 
     public static class CovNotification {
 
@@ -142,7 +144,7 @@ public class CovSubscriber implements Closeable {
         }
 
         public boolean isSubscribed() {
-            return subscriptions.containsKey(id);
+            return activeSubscriptions.containsKey(id);
         }
 
     }
@@ -151,10 +153,7 @@ public class CovSubscriber implements Closeable {
         this.transport = transport;
         this.subscribingObject = subscribingObject;
         transport.addListener(covNotificationListener);
-    }
-
-    private ByteBuffer createCancellationMessage(Subscription sub) {
-        return createCancellationMessage(sub.object, sub.id);
+        subscriptionRefresher.scheduleWithFixedDelay(this::checkFailedSubsriptions, 3, 3, TimeUnit.MINUTES);
     }
 
     private ByteBuffer createCancellationMessage(ObjectIdentifierTag oid, int subId) {
@@ -180,7 +179,7 @@ public class CovSubscriber implements Closeable {
                 public Boolean event(Indication ind) {
                     ProtocolControlInformation pci = ind.getProtocolControlInfo();
                     if (pci.getPduType() == ApduConstants.TYPE_SIMPLE_ACK) {
-                        subscriptions.remove(subId);
+                        activeSubscriptions.remove(subId);
                         return true;
                     }
                     return false;
@@ -215,61 +214,35 @@ public class CovSubscriber implements Closeable {
 
     private void scheduleRefresh(final Subscription sub) {
         if (sub.lifetime > 0) {
-            Runnable refresh = new Runnable() {
-                @Override
-                public void run() {
-                    ByteBuffer bb = createSubscriptionMessage(sub.id, sub.object, sub.confirmed, sub.lifetime);
-                    try {
-                        IndicationListener<Void> refreshConfirmedListener = new IndicationListener<Void>() {
-                            @Override
-                            public Void event(Indication ind) {
-                                //TODO: check for error result
-                                ProtocolControlInformation pci = ind.getProtocolControlInfo();
-                                if (pci.getPduType() == ApduConstants.TYPE_SIMPLE_ACK) {
-                                    logger.trace("subscription confirmed for {}@{}", sub.object, sub.destination);
-                                } else {
-                                    logger.error("subscription refresh failed (type {}) for {}@{}",
-                                            pci.getPduType(), sub.object, sub.destination);
-                                }
-                                return null;
-                            }
-                        };
-                        logger.debug("request refresh for subscription on {}@{}", sub.object, sub.destination);
-                        transport.request(sub.destination, bb, Transport.Priority.Normal, true, refreshConfirmedListener);
-                    } catch (IOException ex) {
-                        logger.error("could not refresh subscription for {}@{}: {}", sub.object, sub.destination, ex);
-                    }
-                }
-            };
-            sub.refreshHandle = subscriptionRefresher.scheduleAtFixedRate(refresh, sub.lifetime, sub.lifetime, TimeUnit.SECONDS);
+            sub.refreshHandle = subscriptionRefresher.scheduleAtFixedRate(
+                    () -> resubscribe(sub), sub.lifetime, sub.lifetime, TimeUnit.SECONDS);
         }
     }
-
-    public Future<Subscription> subscribe(DeviceAddress device, ObjectIdentifierTag object, boolean confirmed, int lifetime, CovListener l) throws IOException {
-        logger.trace("Send Subscribe to " + device + " for " + object.getObjectType() + " / " + object.getInstanceNumber());
-        Objects.requireNonNull(object);
-        Objects.requireNonNull(l);
-        int id = subscriptionID.incrementAndGet();
-        ByteBuffer bb = createSubscriptionMessage(id, object, confirmed, lifetime);
-        final Subscription sub = new Subscription(id, device, object, confirmed, lifetime, l);
-        final IndicationListener<Subscription> subAckListener = new IndicationListener<Subscription>() {
+    
+    private IndicationListener<Subscription> subscribeResponseListener(Subscription sub) {
+        return new IndicationListener<Subscription>() {
             @Override
             public Subscription event(Indication i) {
-                //TODO: handle failure (COV_SUBSCRIPTION_FAILED)
-                // BACnetErrorClass.services + BACnetErrorCode.cov_subscription_failed
                 ProtocolControlInformation pci = i.getProtocolControlInfo();
                 switch (pci.getPduType()) {
                     case ApduConstants.TYPE_SIMPLE_ACK:
-                        logger.trace("subscription confirmed for {}@{}", object, device);
-                        subscriptions.put(sub.id, sub);
+                        logger.trace("subscription confirmed for {}@{}", sub.object, sub.destination);
+                        activeSubscriptions.put(sub.id, sub);
+                        failedSubscriptions.remove(sub.id);
                         scheduleRefresh(sub);
                         return sub;
                     case ApduConstants.TYPE_REJECT: {
-                        logger.warn("subscription attempt returned REJECT");
+                        logger.warn("subscription attempt returned REJECT: {}",
+                                BACnetRejectReason.getReasonString(pci.getServiceChoice()));
+                        activeSubscriptions.remove(sub.id);
+                        failedSubscriptions.put(sub.id, sub);
                         return sub;
                     }
                     case ApduConstants.TYPE_ABORT: {
-                        logger.warn("subscription attempt returned ABORT");
+                        logger.warn("subscription attempt returned ABORT: {}",
+                                BACnetAbortReason.getReasonString(pci.getServiceChoice()));
+                        activeSubscriptions.remove(sub.id);
+                        failedSubscriptions.put(sub.id, sub);
                         return sub;
                     }
                     case ApduConstants.TYPE_ERROR: {
@@ -280,20 +253,52 @@ public class CovSubscriber implements Closeable {
                         Optional<BACnetErrorCode> eCode = Stream.of(BACnetErrorCode.values()).filter(bec -> bec.getBACnetEnumValue() == errorCode.getUnsignedInt().intValue()).findAny();
                         apdu.reset();
                         logger.warn("subscription attempt for {} on {} returned error {} / {}",
-                                object, device,
+                                sub.object, sub.destination,
                                 eClass.map(BACnetErrorClass::toString).orElse("unknown:" + errorClass.getUnsignedInt()),
                                 eCode.map(BACnetErrorCode::toString).orElse("unknown:" + errorCode.getUnsignedInt()));
+                        activeSubscriptions.remove(sub.id);
+                        failedSubscriptions.put(sub.id, sub);
                         return sub;
                     }
                     default: {
                         logger.warn("subscription attempt for {} on {} returned unsupported response type {}",
-                                object, device, pci.getPduType());
+                                sub.object, sub.destination, pci.getPduType());
                         return sub;
                     }
                 }
             }
         };
+    }
+    
+    private void checkFailedSubsriptions() {
+        if (failedSubscriptions.isEmpty()) {
+            logger.trace("no failed subscriptions");
+        }
+        failedSubscriptions.forEach((id, sub) -> {
+            logger.trace("retrying subscription for {}@{}", sub.object, sub.destination);
+            resubscribe(sub);
+        });
+    }
+    
+    private void resubscribe(Subscription sub) {
+        ByteBuffer bb = createSubscriptionMessage(sub.id, sub.object, sub.confirmed, sub.lifetime);
+        try {
+            IndicationListener<Subscription> refreshConfirmedListener = subscribeResponseListener(sub);
+            logger.debug("request refresh for subscription on {}@{}", sub.object, sub.destination);
+            transport.request(sub.destination, bb, Transport.Priority.Normal, true, refreshConfirmedListener);
+        } catch (IOException ex) {
+            logger.error("could not refresh subscription for {}@{}: {}", sub.object, sub.destination, ex);
+        }
+    }
 
+    public Future<Subscription> subscribe(DeviceAddress device, ObjectIdentifierTag object, boolean confirmed, int lifetime, CovListener l) throws IOException {
+        logger.trace("Send Subscribe to " + device + " for " + object.getObjectType() + " / " + object.getInstanceNumber());
+        Objects.requireNonNull(object);
+        Objects.requireNonNull(l);
+        int id = subscriptionID.incrementAndGet();
+        ByteBuffer bb = createSubscriptionMessage(id, object, confirmed, lifetime);
+        final Subscription sub = new Subscription(id, device, object, confirmed, lifetime, l);
+        final IndicationListener<Subscription> subAckListener = subscribeResponseListener(sub);
         return transport.request(device, bb, Transport.Priority.Normal, true, subAckListener);
         //return id;
     }
@@ -309,7 +314,7 @@ public class CovSubscriber implements Closeable {
                 int id = new UnsignedIntTag(i.getData()).getValue().intValue();
                 ObjectIdentifierTag device = new ObjectIdentifierTag(i.getData());
                 ObjectIdentifierTag object = new ObjectIdentifierTag(i.getData());
-                Subscription sub = subscriptions.get(id);
+                Subscription sub = activeSubscriptions.get(id);
                 if (sub == null) {
                     logger.debug("received COVNotification for unknown ID {}, sending cancellation", id);
                     cancel(i.getSource().toDestinationAddress(), object, id);
@@ -372,14 +377,14 @@ public class CovSubscriber implements Closeable {
     public void close() throws IOException {
         transport.removeListener(covNotificationListener);
         subscriptionRefresher.shutdown();
-        for (Subscription sub : subscriptions.values()) {
+        for (Subscription sub : activeSubscriptions.values()) {
             try {
                 sub.cancel().get();
             } catch (InterruptedException | ExecutionException ex) {
                 logger.warn("could not cancel subscription {} to {}: {}", sub.id, sub.destination, ex);
             }
         }
-        subscriptions.clear();
+        activeSubscriptions.clear();
     }
 
 }

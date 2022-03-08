@@ -44,5 +44,14 @@ public enum BACnetRejectReason implements BACnetEnumeration {
     public int getBACnetEnumValue() {
         return code;
     }
+    
+    public static String getReasonString(int enumVal) {
+        for (BACnetRejectReason o : values()) {
+            if (enumVal == o.code) {
+                return o.name().replace('_', '-');
+            }
+        }
+        return String.format("unknown reason (%d)", enumVal);
+    }
 
 }
