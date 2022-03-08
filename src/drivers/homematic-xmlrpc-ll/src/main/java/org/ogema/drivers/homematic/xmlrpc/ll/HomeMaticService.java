@@ -25,6 +25,8 @@ import java.util.Dictionary;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
@@ -61,6 +63,7 @@ public class HomeMaticService {
     private final ServiceRegistration<Servlet> registration;
     private final HomeMaticXmlRpcServlet servlet;
     private ServletWebServer server;
+    private ExecutorService executor = Executors.newCachedThreadPool();
     
     private HmBackend backend;
     
@@ -106,6 +109,7 @@ public class HomeMaticService {
                 server.shutdown();
             }
     		servlet.destroy();
+            executor.shutdown();
     	} catch (Exception e) {
     		logger.error("Error removing HomeMatic servlet",e);
     	}
@@ -233,7 +237,7 @@ public class HomeMaticService {
             if (!events.isEmpty()) {
             	logger.debug("Processing "+events.size()+" for "+eventListeners.size()+" event listeners. First address:"+events.get(0).getAddress());
                 for (HmEventListener l : eventListeners) {
-                    l.event(Collections.unmodifiableList(events));
+                    executor.submit(() -> l.event(Collections.unmodifiableList(events)));
                 }
             }
             Object[] result = new Object[calls.length];
