@@ -15,6 +15,7 @@
  */
 package org.ogema.drivers.homematic.xmlrpc.hl;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -282,12 +283,21 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
             DeviceDescription channelDesc = conn.persistence.getDeviceDescription(address);
             if (channelDesc == null) {
                 logger.debug("requesting device description for {}", address);
+                int maxRetries = 10;
+                int retry = 0;
                 while (true) {
+                    if (retry++ > maxRetries) {
+                        // handled by enclosing try, device will be added to failedSetup:
+                        throw new XmlRpcException("too many retries");
+                    }
                     try {
                         channelDesc = conn.client.getDeviceDescription(address);
                         break;
                     } catch (XmlRpcException ex) {
                         if (ex.getMessage().equals("Unknown instance")) {
+                            throw ex;
+                        }
+                        if (ex.getMessage().contains("Invalid device")) {
                             throw ex;
                         }
                         logger.warn("could not get device description for {}, retrying ({})", address, ex.getMessage());

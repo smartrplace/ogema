@@ -336,24 +336,36 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
         try {
             if (m.rssiDevice().exists()) { // available resources should be created in setup()
                 logger.trace("reading RSSI_DEVICE for {} / {}", m, channelAddress);
-                int rssiDevice = conn.getValue(channelAddress, PARAMS.RSSI_DEVICE.name());
-                if (rssiDevice == 0) {
-                    logger.debug("read returned RSSI_DEVICE=0 for {}", channelAddress);
+                Object rssiVal = conn.getValue(channelAddress, PARAMS.RSSI_DEVICE.name());
+                if (!(rssiVal instanceof Number)) {
+                    //XXX the CCU/Homematic receiver channel will just return crap here...
+                    logger.warn("unexpected return value for {} on {}: {}", PARAMS.RSSI_DEVICE, channelAddress, rssiVal);
                 } else {
-                    m.rssiDevice().setValue(rssiDevice);
-                    m.rssiDevice().activate(false);
-                    updated = true;
+                    int rssiDevice = ((Number) rssiVal).intValue();
+                    if (rssiDevice == 0) {
+                        logger.debug("read returned RSSI_DEVICE=0 for {}", channelAddress);
+                    } else {
+                        m.rssiDevice().setValue(rssiDevice);
+                        m.rssiDevice().activate(false);
+                        updated = true;
+                    }
                 }
             }
             if (m.rssiPeer().exists()) {
                 logger.trace("reading RSSI_PEER for {} / {}", m, channelAddress);
-                int rssiPeer = conn.getValue(channelAddress, PARAMS.RSSI_PEER.name());
-                if (rssiPeer == 0) {
-                    logger.debug("read returned RSSI_PEER=0 for {}", channelAddress);
+                Object rssiVal = conn.getValue(channelAddress, PARAMS.RSSI_PEER.name());
+                if (!(rssiVal instanceof Number)) {
+                    //XXX the CCU/Homematic receiver channel will just return crap here...
+                    logger.warn("unexpected return value for {} on {}: {}", PARAMS.RSSI_PEER, channelAddress, rssiVal);
                 } else {
-                    m.rssiPeer().setValue(rssiPeer);
-                    m.rssiPeer().activate(false);
-                    updated = true;
+                    int rssiPeer = ((Number) rssiVal).intValue();
+                    if (rssiPeer == 0) {
+                        logger.debug("read returned RSSI_PEER=0 for {}", channelAddress);
+                    } else {
+                        m.rssiPeer().setValue(rssiPeer);
+                        m.rssiPeer().activate(false);
+                        updated = true;
+                    }
                 }
             }
             return updated;
