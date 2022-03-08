@@ -338,6 +338,8 @@ public abstract class AbstractTransport implements Transport {
     @Override
     public final <V> Future<V> request(DeviceAddress destination, ByteBuffer data, Priority prio, boolean expectingReply, IndicationListener<V> l) throws IOException {
         ProtocolControlInformation pci = new ProtocolControlInformation(data);
+        //FIXME: segmentation parameters...
+        pci = pci.withAcceptanceInfo(true, ApduConstants.MAX_SEGMENTS.SIXTYFOUR, ApduConstants.RESPONSE_SIZE.UPTO_1476);
         IndicationFuture<V> f = new IndicationFuture<>();
         
         if (pci.isSegmented()) {

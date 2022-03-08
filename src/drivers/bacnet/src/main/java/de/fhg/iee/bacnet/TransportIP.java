@@ -33,10 +33,14 @@ import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  *
@@ -45,8 +49,10 @@ import java.util.Objects;
 public class TransportIP extends AbstractTransport {
 
     public final static int MAX_APDU_SIZE = 1476;
+    final static int RECEIVE_BUFFER_SIZE = 2048;
 
-    private final boolean offlineMode = Boolean.getBoolean("org.ogema.driver.bacnet.testwithoutconnection");
+    private final boolean offlineMode =
+            Boolean.getBoolean("org.ogema.driver.bacnet.testwithoutconnection");
 
     private int port;
     
@@ -57,6 +63,9 @@ public class TransportIP extends AbstractTransport {
     private InetAddress broadcast;
     private InetAddress localAddress;
     private Thread receiverThread;
+    
+    private final Map<DeviceAddress, Map<Integer, SortedMap<Integer, ByteBuffer>>>
+            receivedSegments = new ConcurrentHashMap<>();
 
     public TransportIP(InetAddress localAddress, InetAddress broadcast, int port) throws IOException {
         this.localAddress = localAddress;
@@ -109,7 +118,8 @@ public class TransportIP extends AbstractTransport {
         logger.debug("opened UDP port {}:{}, broadcast={} ({})", localAddress, port,
                 sendChannel.socket().getBroadcast(), broadcast);
         
-        receiverThread = new Thread(this::receive, getClass().getSimpleName() + " UDP receiver " + localAddress + ":" + port);
+        receiverThread = new Thread(this::receive,
+                getClass().getSimpleName() + " UDP receiver " + localAddress + ":" + port);
     }
 
     static String bytesToString(byte[] bytes, int l) {
@@ -129,10 +139,49 @@ public class TransportIP extends AbstractTransport {
         }
         return sb.toString();
     }
+    
+    SortedMap<Integer, ByteBuffer> getSegmentMap(DeviceAddress src, int invokeId) {
+        return receivedSegments.computeIfAbsent(src, addr -> new ConcurrentHashMap<>())
+                .computeIfAbsent(invokeId, id -> new TreeMap<>());
+    }
+    
+    void clearSegmentMap(DeviceAddress src, int invokeId) {
+        receivedSegments.getOrDefault(src, Collections.emptyMap()).remove(invokeId);
+    }
+    
+    void confirmSegment(DeviceAddress scr, ProtocolControlInformation pci) {
+        /*
+        20.1.6.6 Format of the BACnet-SegmentACK-PDU
+        The format of the BACnet-SegmentACK-PDU is:
+        Bit Number:
+          7   6   5   4   3   2   1   0
+        |---|---|---|---|---|---|---|---|
+        | PDU-Type (4)  | 0 | 0 |NAK|SRV|
+        |---|---|---|---|---|---|---|---|
+        |      Original Invoke ID       |
+        |---|---|---|---|---|---|---|---|
+        |        Sequence Number        |
+        |---|---|---|---|---|---|---|---|
+        |      Actual Window Size       |
+        |---|---|---|---|---|---|---|---|
+         */
+        byte control = 0x40;
+        byte[] bytes = new byte[4];
+        bytes[0] = control;
+        bytes[1] = (byte) pci.getInvokeId();
+        //XXX: if we use window size 1, this should be enough(?)
+        bytes[2] = (byte) pci.getSequenceNumber();
+        bytes[3] = 1;
+        try {
+            request(scr.toDestinationAddress(), ByteBuffer.wrap(bytes), Priority.Normal, false, null);
+        } catch (IOException ioex) {
+            logger.warn("segment ack failed", ioex);
+        }
+    }
 
     void receive() {
         logger.trace("starting UDP receiver thread");
-        ByteBuffer recbuf = ByteBuffer.allocate(2048);
+        ByteBuffer recbuf = ByteBuffer.allocate(RECEIVE_BUFFER_SIZE);
         recbuf.order(ByteOrder.BIG_ENDIAN); 
         while (!Thread.interrupted()) {
             try {
@@ -199,6 +248,32 @@ public class TransportIP extends AbstractTransport {
 
                         apdu.position(pciSize);
                         apdu.mark();
+                        
+                        if (pci.isSegmented()) {
+                            getSegmentMap(srcAddr, pci.getInvokeId()).put(pci.getSequenceNumber(), apdu);
+                            confirmSegment(srcAddr, pci);
+                            if (pci.isMoreFollows()) {
+                                continue;
+                            }
+                            int totalSize = 0;
+                            int segmentCount = 0;
+                            for (Map.Entry<Integer, ByteBuffer> e: getSegmentMap(srcAddr, pci.getInvokeId()).entrySet()) {
+                                segmentCount++;
+                                totalSize += e.getValue().remaining();
+                            }
+                            logger.info("received {} segments, total size {} from {} for invoke ID {}",
+                                    segmentCount, totalSize, srcAddr, pci.getInvokeId());
+                            ByteBuffer full = ByteBuffer.allocate(totalSize);
+                            for (Map.Entry<Integer, ByteBuffer> e: getSegmentMap(srcAddr, pci.getInvokeId()).entrySet()) {
+                                System.out.printf("%2d: %5d%n", e.getKey(), e.getValue().remaining());
+                                full.put(e.getValue());
+                            }
+                            System.out.println("transfered: " + full.position());
+                            full.rewind();
+                            System.out.println("remaining: " + full.remaining());
+                            apdu = full;
+                            clearSegmentMap(srcAddr, pci.getInvokeId());
+                        }
 
                         Indication i = new DefaultIndication(srcAddr, pci, apdu.duplicate(), npdu.getPriority(), npdu.isExpectingReply(), this);
                         receivedPackage(i);
@@ -315,7 +390,11 @@ public class TransportIP extends AbstractTransport {
 
     @Override
     public DeviceAddress getLocalAddress() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        BACnetIpAddress addr = new BACnetIpAddress();
+        addr.addr = broadcast;
+        addr.port = this.port;
+        addr.npdu = new Npdu().withoutSource().withoutDestination();
+        return addr;
     }
 
     @Override
@@ -357,17 +436,15 @@ public class TransportIP extends AbstractTransport {
         if (offlineMode) {
             return;
         }
-
-        //sock.send(p);
-        //int sent = sendingSocket.getChannel().send(ByteBuffer.wrap(packetData), new InetSocketAddress(addr.addr, addr.port));
         int sent = sendChannel.send(ByteBuffer.wrap(packetData), new InetSocketAddress(addr.addr, addr.port));
         logger.trace("bytes sent: {}", sent);
-        //sendingSocket.send(p);
     }
 
     @Override
     protected void doClose() throws IOException {
-        receiverThread.interrupt();
+        if (receiverThread != null) {
+            receiverThread.interrupt();
+        }
         channels.forEach((c, k) -> {
             k.cancel();
             try {
