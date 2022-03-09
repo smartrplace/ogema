@@ -261,16 +261,13 @@ public class TransportIP extends AbstractTransport {
                                 segmentCount++;
                                 totalSize += e.getValue().remaining();
                             }
-                            logger.info("received {} segments, total size {} from {} for invoke ID {}",
+                            logger.debug("received {} segments, total size {} from {} for invoke ID {}",
                                     segmentCount, totalSize, srcAddr, pci.getInvokeId());
                             ByteBuffer full = ByteBuffer.allocate(totalSize);
                             for (Map.Entry<Integer, ByteBuffer> e: getSegmentMap(srcAddr, pci.getInvokeId()).entrySet()) {
-                                System.out.printf("%2d: %5d%n", e.getKey(), e.getValue().remaining());
                                 full.put(e.getValue());
                             }
-                            System.out.println("transfered: " + full.position());
                             full.rewind();
-                            System.out.println("remaining: " + full.remaining());
                             apdu = full;
                             clearSegmentMap(srcAddr, pci.getInvokeId());
                         }

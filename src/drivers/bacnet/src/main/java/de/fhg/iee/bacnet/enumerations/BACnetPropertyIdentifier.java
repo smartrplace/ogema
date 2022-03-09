@@ -245,7 +245,7 @@ public enum BACnetPropertyIdentifier implements BACnetEnumeration {
     window_samples(148),
     zone_members(165);
 
-    private final int code;
+    public final int code;
 
     private BACnetPropertyIdentifier(int code) {
         this.code = code;

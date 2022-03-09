@@ -34,8 +34,10 @@ import de.fhg.iee.bacnet.tags.UnsignedIntTag;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -48,6 +50,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,8 +65,7 @@ public class CovSubscriber implements Closeable {
     private final ObjectIdentifierTag subscribingObject;
 
     private final AtomicInteger subscriptionID = new AtomicInteger();
-    private final Map<Integer, Subscription> activeSubscriptions = new ConcurrentHashMap<>();
-    private final Map<Integer, Subscription> failedSubscriptions = new ConcurrentHashMap<>();
+    private final Map<SubscriptionKey, List<Subscription>> subscriptions = new ConcurrentHashMap<>();
     private final ScheduledExecutorService subscriptionRefresher = Executors.newSingleThreadScheduledExecutor();
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
@@ -115,7 +117,55 @@ public class CovSubscriber implements Closeable {
         void receivedNotification(CovNotification n);
 
     }
+    
+    private static class SubscriptionKey {
+        final int id;
+        final DeviceAddress destination;
+        final ObjectIdentifierTag object;
 
+        public SubscriptionKey(int id, DeviceAddress destination, ObjectIdentifierTag object) {
+            this.id = id;
+            this.destination = destination;
+            this.object = object;
+        }
+
+        public SubscriptionKey(Subscription sub) {
+            this.id = sub.id;
+            this.destination = sub.destination;
+            this.object = sub.object;
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 5;
+            hash = 89 * hash + this.id;
+            hash = 89 * hash + Objects.hashCode(this.destination);
+            hash = 89 * hash + Objects.hashCode(this.object);
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final SubscriptionKey other = (SubscriptionKey) obj;
+            if (this.id != other.id) {
+                return false;
+            }
+            if (!Objects.equals(this.destination, other.destination)) {
+                return false;
+            }
+            return Objects.equals(this.object, other.object);
+        }
+    }
+    
     public class Subscription {
 
         public final int id;
@@ -125,6 +175,7 @@ public class CovSubscriber implements Closeable {
         public final int lifetime;
         public final CovListener listener;
         private ScheduledFuture<?> refreshHandle;
+        private volatile boolean subscribed = false;
 
         public Subscription(int id, DeviceAddress destination, ObjectIdentifierTag object, boolean confirmed, int lifetime, CovListener listener) {
             this.id = id;
@@ -135,16 +186,52 @@ public class CovSubscriber implements Closeable {
             this.listener = listener;
         }
 
+        @Override
+        public int hashCode() {
+            int hash = 3;
+            hash = 29 * hash + this.id;
+            hash = 29 * hash + Objects.hashCode(this.destination);
+            hash = 29 * hash + Objects.hashCode(this.object);
+            hash = 29 * hash + (this.confirmed ? 1 : 0);
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final Subscription other = (Subscription) obj;
+            if (this.id != other.id) {
+                return false;
+            }
+            if (this.confirmed != other.confirmed) {
+                return false;
+            }
+            if (!Objects.equals(this.destination, other.destination)) {
+                return false;
+            }
+            return Objects.equals(this.object, other.object);
+        }
+        
+        
+
         public Future<Boolean> cancel() {
             logger.debug("Cancel subscription on {} / {}", object.getObjectType(), object.getInstanceNumber());
             if (refreshHandle != null) {
                 refreshHandle.cancel(false);
             }
-            return CovSubscriber.this.cancel(destination, object, id);
+            return CovSubscriber.this.cancel(this);
         }
 
         public boolean isSubscribed() {
-            return activeSubscriptions.containsKey(id);
+            return subscribed;
         }
 
     }
@@ -171,21 +258,21 @@ public class CovSubscriber implements Closeable {
         return bb;
     }
 
-    private Future<Boolean> cancel(DeviceAddress dest, ObjectIdentifierTag oid, int subId) {
-        logger.debug("Cancel subscription {} on {} / {}", subId, oid.getObjectType(), oid.getInstanceNumber());
+    private Future<Boolean> cancel(Subscription sub) {
+        logger.debug("Cancel subscription {} on {} / {} @ {}", sub.id, sub.object.getObjectType(), sub.object.getInstanceNumber(), sub.destination);
         try {
             IndicationListener<Boolean> simpleAckListener = new IndicationListener<Boolean>() {
                 @Override
                 public Boolean event(Indication ind) {
                     ProtocolControlInformation pci = ind.getProtocolControlInfo();
                     if (pci.getPduType() == ApduConstants.TYPE_SIMPLE_ACK) {
-                        activeSubscriptions.remove(subId);
+                        subscriptions.remove(sub);
                         return true;
                     }
                     return false;
                 }
             };
-            return transport.request(dest, createCancellationMessage(oid, subId), Transport.Priority.Normal, true, simpleAckListener);
+            return transport.request(sub.destination, createCancellationMessage(sub.object, sub.id), Transport.Priority.Normal, true, simpleAckListener);
         } catch (IOException ex) {
             logger.error("sending of cancellation message failed", ex);
             CompletableFuture<Boolean> rval = new CompletableFuture<>();
@@ -227,22 +314,19 @@ public class CovSubscriber implements Closeable {
                 switch (pci.getPduType()) {
                     case ApduConstants.TYPE_SIMPLE_ACK:
                         logger.trace("subscription confirmed for {}@{}", sub.object, sub.destination);
-                        activeSubscriptions.put(sub.id, sub);
-                        failedSubscriptions.remove(sub.id);
+                        subscriptions.getOrDefault(new SubscriptionKey(sub), Collections.emptyList()).forEach(s -> { s.subscribed = true; });
                         scheduleRefresh(sub);
                         return sub;
                     case ApduConstants.TYPE_REJECT: {
                         logger.warn("subscription attempt returned REJECT: {}",
                                 BACnetRejectReason.getReasonString(pci.getServiceChoice()));
-                        activeSubscriptions.remove(sub.id);
-                        failedSubscriptions.put(sub.id, sub);
+                        subscriptions.getOrDefault(new SubscriptionKey(sub), Collections.emptyList()).forEach(s -> { s.subscribed = false; });
                         return sub;
                     }
                     case ApduConstants.TYPE_ABORT: {
                         logger.warn("subscription attempt returned ABORT: {}",
                                 BACnetAbortReason.getReasonString(pci.getServiceChoice()));
-                        activeSubscriptions.remove(sub.id);
-                        failedSubscriptions.put(sub.id, sub);
+                        subscriptions.getOrDefault(new SubscriptionKey(sub), Collections.emptyList()).forEach(s -> { s.subscribed = false; });
                         return sub;
                     }
                     case ApduConstants.TYPE_ERROR: {
@@ -256,8 +340,7 @@ public class CovSubscriber implements Closeable {
                                 sub.object, sub.destination,
                                 eClass.map(BACnetErrorClass::toString).orElse("unknown:" + errorClass.getUnsignedInt()),
                                 eCode.map(BACnetErrorCode::toString).orElse("unknown:" + errorCode.getUnsignedInt()));
-                        activeSubscriptions.remove(sub.id);
-                        failedSubscriptions.put(sub.id, sub);
+                        subscriptions.getOrDefault(new SubscriptionKey(sub), Collections.emptyList()).forEach(s -> { s.subscribed = false; });
                         return sub;
                     }
                     default: {
@@ -271,10 +354,11 @@ public class CovSubscriber implements Closeable {
     }
     
     private void checkFailedSubsriptions() {
-        if (failedSubscriptions.isEmpty()) {
-            logger.trace("no failed subscriptions");
-        }
-        failedSubscriptions.forEach((id, sub) -> {
+        logger.trace("retrying failed subscriptions");
+        subscriptions.entrySet().stream()
+                .filter(e -> e.getValue().stream().anyMatch(Predicate.not(Subscription::isSubscribed)))
+                .map(Map.Entry::getValue).filter(Predicate.not(List::isEmpty))
+                .map(l -> l.get(0)).forEach(sub -> {
             logger.trace("retrying subscription for {}@{}", sub.object, sub.destination);
             resubscribe(sub);
         });
@@ -295,10 +379,14 @@ public class CovSubscriber implements Closeable {
         logger.trace("Send Subscribe to " + device + " for " + object.getObjectType() + " / " + object.getInstanceNumber());
         Objects.requireNonNull(object);
         Objects.requireNonNull(l);
-        int id = subscriptionID.incrementAndGet();
+        //int id = subscriptionID.incrementAndGet();
+        int id = subscribingObject.getInstanceNumber();
         ByteBuffer bb = createSubscriptionMessage(id, object, confirmed, lifetime);
-        final Subscription sub = new Subscription(id, device, object, confirmed, lifetime, l);
+        final Subscription sub = new Subscription(id, device.toDestinationAddress(), object, confirmed, lifetime, l);
         final IndicationListener<Subscription> subAckListener = subscribeResponseListener(sub);
+        synchronized (subscriptions) { //FIXME: values list needs synchronization...
+            subscriptions.computeIfAbsent(new SubscriptionKey(sub), _s -> new ArrayList<>()).add(sub);
+        }
         return transport.request(device, bb, Transport.Priority.Normal, true, subAckListener);
         //return id;
     }
@@ -314,17 +402,21 @@ public class CovSubscriber implements Closeable {
                 int id = new UnsignedIntTag(i.getData()).getValue().intValue();
                 ObjectIdentifierTag device = new ObjectIdentifierTag(i.getData());
                 ObjectIdentifierTag object = new ObjectIdentifierTag(i.getData());
-                Subscription sub = activeSubscriptions.get(id);
-                if (sub == null) {
-                    logger.debug("received COVNotification for unknown ID {}, sending cancellation", id);
-                    cancel(i.getSource().toDestinationAddress(), object, id);
+                DeviceAddress src = i.getSource().toDestinationAddress();
+                List<Subscription> subs = subscriptions.get(new SubscriptionKey(id, src, object));
+                if (subs == null || subs.isEmpty()) {
+                    logger.debug("have no subscriptions for ID {}, object {} @ {}", id, object, src);
+                    //logger.debug("received COVNotification for unknown ID {}, sending cancellation", id);
+                    //cancel(i.getSource().toDestinationAddress(), object, id);
                     return null;
                 }
+                /*
                 if (!object.equals(sub.object)) {
                     logger.warn("received COV event for {} on subscription ID {} for {}",
                             object, id, sub.object);
                     return null;
                 }
+                */
                 UnsignedIntTag timeRemaining = new UnsignedIntTag(i.getData());
                 CompositeTag values = new CompositeTag(i.getData());
                 Map<Integer, CompositeTag> valueMap = new HashMap<>();
@@ -349,7 +441,8 @@ public class CovSubscriber implements Closeable {
                 CovNotification n = new CovNotification(id, device, object,
                         timeRemaining.getValue().intValue(), Collections.unmodifiableMap(valueMap));
                 //already on an event thread, call listener directly
-                sub.listener.receivedNotification(n);
+                subs.forEach(sub -> sub.listener.receivedNotification(n));
+                
             }
             return null;
         }
@@ -377,7 +470,17 @@ public class CovSubscriber implements Closeable {
     public void close() throws IOException {
         transport.removeListener(covNotificationListener);
         subscriptionRefresher.shutdown();
-        for (Subscription sub : activeSubscriptions.values()) {
+        subscriptions.values().stream().filter(Predicate.not(List::isEmpty))
+                .map(l -> l.get(0)).forEach(sub -> {
+                try {
+                sub.cancel().get();
+            } catch (InterruptedException | ExecutionException ex) {
+                logger.warn("could not cancel subscription {} to {}: {}", sub.id, sub.destination, ex);
+            }
+                });
+        subscriptions.clear();
+        /*
+        for (Subscription sub : subscriptions.values()) {
             try {
                 sub.cancel().get();
             } catch (InterruptedException | ExecutionException ex) {
@@ -385,6 +488,7 @@ public class CovSubscriber implements Closeable {
             }
         }
         activeSubscriptions.clear();
+        */
     }
 
 }
