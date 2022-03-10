@@ -220,8 +220,6 @@ public class CovSubscriber implements Closeable {
             return Objects.equals(this.object, other.object);
         }
         
-        
-
         public Future<Boolean> cancel() {
             logger.debug("Cancel subscription on {} / {}", object.getObjectType(), object.getInstanceNumber());
             if (refreshHandle != null) {
@@ -300,7 +298,7 @@ public class CovSubscriber implements Closeable {
     }
 
     private void scheduleRefresh(final Subscription sub) {
-        if (sub.lifetime > 0) {
+        if (sub.lifetime > 0 && (sub.refreshHandle == null || !sub.refreshHandle.isDone())) {
             sub.refreshHandle = subscriptionRefresher.scheduleAtFixedRate(
                     () -> resubscribe(sub), sub.lifetime, sub.lifetime, TimeUnit.SECONDS);
         }
