@@ -77,7 +77,7 @@ public enum BACnetServicesSupported implements BACnetEnumeration {
     getEventInformation(39) // Alarm and Event Service 
     ;
 
-    private final int code;
+    public final int code;
 
     private BACnetServicesSupported(int code) {
         this.code = code;

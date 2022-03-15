@@ -32,7 +32,7 @@ public enum BACnetErrorClass implements BACnetEnumeration {
     vt(6),
     communication(7),;
 
-    private final int code;
+    public final int code;
 
     private BACnetErrorClass(int code) {
         this.code = code;

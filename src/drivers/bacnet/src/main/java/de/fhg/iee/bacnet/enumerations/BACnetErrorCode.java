@@ -100,7 +100,7 @@ public enum BACnetErrorCode implements BACnetEnumeration {
     cov_subscription_failed(43),
     not_cov_property(44);
 
-    private final int code;
+    public final int code;
 
     private BACnetErrorCode(int code) {
         this.code = code;

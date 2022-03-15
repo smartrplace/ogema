@@ -264,7 +264,8 @@ public class CovSubscriber implements Closeable {
                 public Boolean event(Indication ind) {
                     ProtocolControlInformation pci = ind.getProtocolControlInfo();
                     if (pci.getPduType() == ApduConstants.TYPE_SIMPLE_ACK) {
-                        subscriptions.remove(sub);
+                        subscriptions.getOrDefault(new SubscriptionKey(sub), Collections.emptyList()).remove(sub);
+                        sub.subscribed = false;
                         return true;
                     }
                     return false;
@@ -338,6 +339,12 @@ public class CovSubscriber implements Closeable {
                                 sub.object, sub.destination,
                                 eClass.map(BACnetErrorClass::toString).orElse("unknown:" + errorClass.getUnsignedInt()),
                                 eCode.map(BACnetErrorCode::toString).orElse("unknown:" + errorCode.getUnsignedInt()));
+                        if (BACnetErrorClass.object.code == errorClass.getUnsignedInt().intValue()
+                                && BACnetErrorCode.unknown_object.code == errorCode.getUnsignedInt().intValue()) {
+                            logger.warn("disabling supbscription for unknown object {}@{}", sub.object, sub.destination);
+                            subscriptions.remove(new SubscriptionKey(sub));
+                            return sub;
+                        }
                         subscriptions.getOrDefault(new SubscriptionKey(sub), Collections.emptyList()).forEach(s -> { s.subscribed = false; });
                         return sub;
                     }
