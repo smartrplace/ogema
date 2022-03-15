@@ -298,7 +298,7 @@ public class CovSubscriber implements Closeable {
     }
 
     private void scheduleRefresh(final Subscription sub) {
-        if (sub.lifetime > 0 && (sub.refreshHandle == null || !sub.refreshHandle.isDone())) {
+        if (sub.lifetime > 0 && (sub.refreshHandle == null || sub.refreshHandle.isDone())) {
             sub.refreshHandle = subscriptionRefresher.scheduleAtFixedRate(
                     () -> resubscribe(sub), sub.lifetime, sub.lifetime, TimeUnit.SECONDS);
         }
