@@ -297,8 +297,11 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
                         if (ex.getMessage().equals("Unknown instance")) {
                             throw ex;
                         }
-                        if (ex.getMessage().contains("Invalid device")) {
-                            throw ex;
+                        if (ex.getMessage().toLowerCase().contains("invalid device")) {
+                            logger.warn("Device {} no longer on CCU @ {}, deactivating resource {}",
+                                    dev.address().getValue(), conn.client.getServerUrl(), dev.getPath());
+                            dev.deactivate(true);
+                            return;
                         }
                         logger.warn("could not get device description for {}, retrying ({})", address, ex.getMessage());
                     }
