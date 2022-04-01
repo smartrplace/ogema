@@ -228,7 +228,12 @@ public class DefaultVirtualResourceDB implements VirtualResourceDB {
 	            elements.put(path, vEl);
 	        } else if (vEl.getEl() != el) {  // FIXME it is unclear here which element is new
 	        	//System.out.printf("REPLACE ELEMENT at %s: %s%n", path, el);
-	            vEl.setEl(el);
+				// let's not use TreeElements that are actually deleted...
+				if (el instanceof VirtualTreeElement || realResources.getByID(el.getResID()) != null) {
+					vEl.setEl(el);
+				} else { //how?
+					System.err.printf("getElement called for deleted TreeElement: " + el);
+				}
 	        }
 	        return vEl;
 		}
