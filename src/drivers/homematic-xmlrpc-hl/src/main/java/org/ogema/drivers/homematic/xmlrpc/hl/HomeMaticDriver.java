@@ -314,7 +314,7 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
                 if (h.accept(channelDesc)) {
                     logger.debug("handler available for {}: {}", address, h.getClass().getCanonicalName());
                     Map<String, Map<String, ParameterDescription<?>>> paramSets;
-                    String parametersKey = channelDesc.getType() + "_" + channelDesc.getVersion();
+                    String parametersKey = channelDesc.getParentType() + "/" + channelDesc.getType() + "/" + channelDesc.getVersion();
                     paramSets = deviceParameterSetCache.get(parametersKey);
                     if (paramSets == null) {
                         paramSets = new HashMap<>();
@@ -325,7 +325,9 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
                                     paramSets.put(set, conn.client.getParamsetDescription(address, set));
                                     break;
                                 } catch (XmlRpcException ex) {
-                                    if (ex.getMessage().equals("Unknown instance") || i > 20) {
+                                    if (ex.getMessage().equals("Unknown instance")
+                                            || ex.getMessage().equals("Invalid device")
+                                            || i > 20) {
                                         throw ex;
                                     }
                                     logger.warn("could not get parameter set {}/{} from {}, retrying ({})", parametersKey, set, address, ex.getMessage());
