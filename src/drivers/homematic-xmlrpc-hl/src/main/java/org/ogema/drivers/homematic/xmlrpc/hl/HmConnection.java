@@ -72,6 +72,7 @@ import org.ogema.drivers.homematic.xmlrpc.hl.types.HmLogicInterface;
 import org.ogema.drivers.homematic.xmlrpc.ll.HomeMaticClient;
 import org.ogema.drivers.homematic.xmlrpc.ll.HomeMaticClientCli;
 import org.ogema.drivers.homematic.xmlrpc.ll.HomeMaticService;
+import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEventListener;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HomeMatic;
@@ -97,11 +98,13 @@ public class HmConnection implements HomeMaticConnection {
 	protected long reInitTryTime = 2 * 60_000;
 	public static final long MAX_REINITTRYTIME = 15 * 60_000;
 	private Thread connectionThread;
+	private volatile boolean connected = false;
 
 	// quasi-final: not changed after init() call
 	HomeMaticService hm;
 	// quasi-final: not changed after init() call
 	HomeMatic client;
+	String clientUrl;
     Persistence persistence;
 	final HmLogicInterface baseResource;
 	// quasi-final: not changed after init() call
@@ -220,8 +223,23 @@ public class HmConnection implements HomeMaticConnection {
 			}, 30, 60, TimeUnit.SECONDS);
 		}
 		logger.info("HomeMatic driver configured and registered according to config {}", baseResource.getPath());
+		connected = true;
+	}
+	
+	@Override
+	public List<DeviceDescription> listRemoteDevices() throws IOException {
+		try {
+			return client.listDevices();
+		} catch (XmlRpcException ex) {
+			throw new IOException(ex.getMessage());
+		}
 	}
 
+	@Override
+	public boolean isConnected() {
+		return connected;
+	}
+	
 	@Override
 	public void addEventListener(HmEventListener l) {
 		hm.addEventListener(l);
@@ -561,6 +579,7 @@ public class HmConnection implements HomeMaticConnection {
             
     		logger.info("New Homematic XML_RPC connection to {}, servlet URL {}{}", xmlRpcServiceUrl, serverUrl, alias);
 			client = new HomeMaticClient(xmlRpcServiceUrl, config.ccuUser().isActive() ? config.ccuUser().getValue() : null, config.ccuPw().isActive() ? config.ccuPw().getValue() : null);
+			clientUrl = xmlRpcServiceUrl;
             commandLine = new HomeMaticClientCli(client);
 			commandLineRegistration = commandLine.register(ctx.getBundleContext(), config.getName());
 			//hm = new HomeMaticService(ctx.getBundleContext(), serverUrl, alias);
@@ -803,6 +822,7 @@ public class HmConnection implements HomeMaticConnection {
                                 baseResource.serialNumber().getValue(), xmlRpcServiceUrl);
                     }
                     client = new HomeMaticClient(xmlRpcServiceUrl, baseResource.ccuUser().isActive() ? baseResource.ccuUser().getValue() : null, baseResource.ccuPw().isActive() ? baseResource.ccuPw().getValue() : null);
+					clientUrl = xmlRpcServiceUrl;
                     commandLine.setClient(client);
                 } catch (IOException ioex) {
                     logger.debug("exception in discovery on reconnect: {} ({})", ioex.getMessage(), ioex.getClass().getSimpleName());
@@ -853,7 +873,7 @@ public class HmConnection implements HomeMaticConnection {
 			}
             //deregister logic interface
             hm.init(client, null);
-		} catch (Exception e) {
+		} catch (XmlRpcException | RuntimeException e) {
 			if (logger != null) {
 				logger.error("HomeMatic XmlRpc driver shutdown failed", e);
 			}
@@ -940,4 +960,9 @@ public class HmConnection implements HomeMaticConnection {
 				|| clientUrl.contains("0:0:0:0:0:0:0:1") || clientUrl.contains("::1");
 	}
 
+	@Override
+	public String getConnectionUrl() {
+		return clientUrl;
+	}
+	
 }
