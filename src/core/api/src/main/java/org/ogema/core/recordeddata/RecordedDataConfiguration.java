@@ -16,6 +16,7 @@
 package org.ogema.core.recordeddata;
 
 import java.io.Serializable;
+import java.util.Objects;
 
 /**
  * Defines the configuration for one RecordedData database
@@ -97,4 +98,31 @@ public class RecordedDataConfiguration implements Serializable {
 	public void setFixedInterval(long fixedInterval) {
 		this.fixedInterval = fixedInterval;
 	}
+
+	@Override
+	public int hashCode() {
+		int hash = 3;
+		hash = 79 * hash + Objects.hashCode(this.storageType);
+		hash = 79 * hash + (int) (this.fixedInterval ^ (this.fixedInterval >>> 32));
+		return hash;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj) {
+			return true;
+		}
+		if (obj == null) {
+			return false;
+		}
+		if (getClass() != obj.getClass()) {
+			return false;
+		}
+		final RecordedDataConfiguration other = (RecordedDataConfiguration) obj;
+		if (this.fixedInterval != other.fixedInterval) {
+			return false;
+		}
+		return this.storageType == other.storageType;
+	}
+	
 }

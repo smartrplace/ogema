@@ -190,7 +190,7 @@ public class DefaultRecordedData implements RecordedData {
 		});
 	}
 
-	private synchronized final void setConfigurationPrivileged(RecordedDataConfiguration configuration) {
+	private synchronized void setConfigurationPrivileged(RecordedDataConfiguration configuration) {
 		if (configuration != null) {
 			setNewConfig(configuration);
 		}
@@ -207,7 +207,9 @@ public class DefaultRecordedData implements RecordedData {
 					data = dataAccess.createRecordedDataStorage(id, configuration);
 				}
 			}
-			data.setConfiguration(configuration);
+			if (!configuration.equals(data.getConfiguration())) {
+				data.setConfiguration(configuration);
+			}
 			config = data.getConfiguration();
 			createUpdater();
 			setupTimer();
