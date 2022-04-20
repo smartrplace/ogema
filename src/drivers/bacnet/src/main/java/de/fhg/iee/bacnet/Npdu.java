@@ -109,11 +109,11 @@ public class Npdu implements Cloneable {
     }
     
     public int getDestinationNet() {
-        return dnet != null ? (dnet[0] << 8 | dnet[1]) : 0;
+        return dnet != null ? (dnet[0] << 8 | dnet[1]) & 0xFFFF : 0;
     }
     
     public int getSourceNet() {
-        return snet != null ? (snet[0] << 8 | snet[1]) : 0;
+        return snet != null ? (snet[0] << 8 | snet[1]) & 0xFFFF : 0;
     }
     
     public int getMessageType() {
