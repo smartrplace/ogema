@@ -25,6 +25,8 @@ import de.fhg.iee.bacnet.enumerations.BACnetAbortReason;
 import de.fhg.iee.bacnet.enumerations.BACnetConfirmedServiceChoice;
 import de.fhg.iee.bacnet.enumerations.BACnetErrorClass;
 import de.fhg.iee.bacnet.enumerations.BACnetErrorCode;
+import de.fhg.iee.bacnet.enumerations.BACnetObjectType;
+import de.fhg.iee.bacnet.enumerations.BACnetPropertyIdentifier;
 import de.fhg.iee.bacnet.enumerations.BACnetRejectReason;
 import de.fhg.iee.bacnet.enumerations.BACnetUnconfirmedServiceChoice;
 import de.fhg.iee.bacnet.tags.CompositeTag;
@@ -37,10 +39,12 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -49,7 +53,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
@@ -64,7 +68,8 @@ public class CovSubscriber implements Closeable {
     private final Transport transport;
     private final ObjectIdentifierTag subscribingObject;
 
-    private final AtomicInteger subscriptionID = new AtomicInteger();
+    //private final AtomicInteger subscriptionID = new AtomicInteger();
+	private final Set<DeviceAddress> knownDevices = new HashSet<>();
     private final Map<SubscriptionKey, List<Subscription>> subscriptions = new ConcurrentHashMap<>();
     private final ScheduledExecutorService subscriptionRefresher = Executors.newSingleThreadScheduledExecutor();
 
@@ -122,6 +127,7 @@ public class CovSubscriber implements Closeable {
         final int id;
         final DeviceAddress destination;
         final ObjectIdentifierTag object;
+		volatile long nextRefresh;
 
         public SubscriptionKey(int id, DeviceAddress destination, ObjectIdentifierTag object) {
             this.id = id;
@@ -298,12 +304,22 @@ public class CovSubscriber implements Closeable {
         return bb;
     }
 
-    private void scheduleRefresh(final Subscription sub) {
+    private void scheduleRefresh(final Subscription sub, long initialDelayS) {
         if (sub.lifetime > 0 && (sub.refreshHandle == null || sub.refreshHandle.isDone())) {
+			long interval = sub.lifetime; // delayJitter(sub.lifetime);
+			//initialDelayS = delayJitter(initialDelayS);
+			try {
             sub.refreshHandle = subscriptionRefresher.scheduleAtFixedRate(
-                    () -> resubscribe(sub), sub.lifetime, sub.lifetime, TimeUnit.SECONDS);
+                    () -> resubscribe(sub), initialDelayS, interval, TimeUnit.SECONDS);
+			} catch (IllegalArgumentException iae) {
+				logger.error("delay={}, interval={}", initialDelayS, interval, iae);
+			}
         }
     }
+	
+	private long delayJitter(long l) {
+		return (long) (1d - (Math.random() / 10d)) * l;
+	}
     
     private IndicationListener<Subscription> subscribeResponseListener(Subscription sub) {
         return new IndicationListener<Subscription>() {
@@ -314,7 +330,7 @@ public class CovSubscriber implements Closeable {
                     case ApduConstants.TYPE_SIMPLE_ACK:
                         logger.trace("subscription confirmed for {}@{}", sub.object, sub.destination);
                         subscriptions.getOrDefault(new SubscriptionKey(sub), Collections.emptyList()).forEach(s -> { s.subscribed = true; });
-                        scheduleRefresh(sub);
+                        scheduleRefresh(sub, sub.lifetime);
                         return sub;
                     case ApduConstants.TYPE_REJECT: {
                         logger.warn("subscription attempt returned REJECT: {}",
@@ -379,6 +395,112 @@ public class CovSubscriber implements Closeable {
             logger.error("could not refresh subscription for {}@{}: {}", sub.object, sub.destination, ex);
         }
     }
+	
+	public void resumeSubscriptions(DeviceAddress addr, int device) {
+		//FIXME
+		if (1 == 2) {
+			return;
+		}
+		if (knownDevices.contains(addr.toDestinationAddress())) {
+			return;
+		}
+		knownDevices.add(addr.toDestinationAddress());
+		synchronized (subscriptions) {
+			logger.debug("requesting active cov subscriptions from {} ({})",
+					addr.toDestinationAddress(), device);
+			ByteBuffer data = ConfirmedServices.buildReadPropertyApdu(BACnetObjectType.device.code,
+					device, BACnetPropertyIdentifier.active_cov_subscriptions.code);
+			try {
+				transport.request(addr.toDestinationAddress(), data, Transport.Priority.Normal,
+						true, this::activeCovSubscriptionListener).get(3, TimeUnit.SECONDS);
+			} catch (IOException | InterruptedException | ExecutionException | TimeoutException ex) {
+				logger.warn("could not get active subscriptions from {}: {}",
+						addr.toDestinationAddress(), ex.getMessage());
+			}
+		}
+	}
+	
+	private Void activeCovSubscriptionListener(Indication i) {
+		ByteBuffer apdu = i.getData();
+        ProtocolControlInformation pci = i.getProtocolControlInfo();
+		if (pci.getPduType() == ApduConstants.APDU_TYPES.ERROR.getBACnetEnumValue()) {
+            CompositeTag errorClass = new CompositeTag(apdu);
+            BACnetErrorClass eClass = Stream.of(BACnetErrorClass.values())
+					.filter(bec -> bec.getBACnetEnumValue() == errorClass.getUnsignedInt().intValue())
+					.findAny().orElse(null);
+            CompositeTag errorCode = new CompositeTag(apdu);
+            BACnetErrorCode eCode = Stream.of(BACnetErrorCode.values())
+					.filter(bec -> bec.getBACnetEnumValue() == errorCode.getUnsignedInt().intValue())
+					.findAny().orElse(null);
+			logger.debug("request for active COV subscriptions from {} failed: {} / {}",
+					i.getSource().toDestinationAddress(), eClass, eCode);
+            return null;
+        }
+		long now = System.currentTimeMillis();
+		
+        //object-id
+        ObjectIdentifierTag _oid = new ObjectIdentifierTag(apdu);
+        //property-id
+        CompositeTag _propId = new CompositeTag(apdu);
+        //property-values
+        CompositeTag valueTagMulti = new CompositeTag(apdu);
+		
+		int myProcessIdentifier = subscribingObject.getInstanceNumber();
+		int total = 0;
+		int resumed = 0;
+		CompositeTag recipient = null;
+		CompositeTag processIdentifier = null;
+		CompositeTag subscriptionOid = null;
+		CompositeTag propRef = null;
+		boolean confirmed;
+		int timeRemaining = 0;
+		Float covIncrement = null; //optional value
+
+        for (CompositeTag t : valueTagMulti.getSubTags()) {
+            switch (t.getTagNumber()) {
+                case 0:
+					if (recipient != null) {
+						total++;
+						//... build
+						//XXX this will miss the last entry
+						if (myProcessIdentifier == processIdentifier.getUnsignedInt().intValue()) {
+							SubscriptionKey sk = new SubscriptionKey(
+									processIdentifier.getUnsignedInt().intValue(),
+									i.getSource().toDestinationAddress(),
+									new ObjectIdentifierTag(subscriptionOid.getOidType(), subscriptionOid.getOidInstanceNumber()));
+							sk.nextRefresh = now + (1000 * timeRemaining);
+							synchronized (subscriptions) {
+								subscriptions.computeIfAbsent(sk, __ -> new ArrayList<>());
+							}
+							resumed++;
+						}
+						//recipient = null;
+						covIncrement = null;
+					}
+					List<CompositeTag> recipientFields = new ArrayList<>(t.getSubTags());
+					recipient = recipientFields.get(0);
+					processIdentifier = recipientFields.get(1);
+                    break;
+                case 1:
+                    List<CompositeTag> objectPropRefFields = new ArrayList<>(t.getSubTags());
+					subscriptionOid = objectPropRefFields.get(0);
+					propRef = objectPropRefFields.get(1);
+                    break;
+                case 2:
+					confirmed = t.getBooleanValue();
+                    break;
+                case 3:
+                    timeRemaining = t.getUnsignedInt().intValue();
+                    break;
+                case 4:
+					covIncrement = t.getFloat();
+					break;
+            }
+        }
+		logger.debug("read {} subscriptions from {} ({}), resumed {}, total subs {}",
+				total, i.getSource().toDestinationAddress(), _oid.getInstanceNumber(), resumed, subscriptions.size());
+		return null;
+	}
 
     public Future<Subscription> subscribe(DeviceAddress device, ObjectIdentifierTag object, boolean confirmed, int lifetime, CovListener l) throws IOException {
         logger.trace("Send Subscribe to " + device + " for " + object.getObjectType() + " / " + object.getInstanceNumber());
@@ -388,10 +510,29 @@ public class CovSubscriber implements Closeable {
         int id = subscribingObject.getInstanceNumber();
         ByteBuffer bb = createSubscriptionMessage(id, object, confirmed, lifetime);
         final Subscription sub = new Subscription(id, device.toDestinationAddress(), object, confirmed, lifetime, l);
-        final IndicationListener<Subscription> subAckListener = subscribeResponseListener(sub);
+		
         synchronized (subscriptions) { //FIXME: values list needs synchronization...
-            subscriptions.computeIfAbsent(new SubscriptionKey(sub), _s -> new ArrayList<>()).add(sub);
+			SubscriptionKey key = new SubscriptionKey(sub);
+			if (subscriptions.containsKey(key)) {
+				SubscriptionKey existingKey = subscriptions.entrySet().stream()
+						.filter(e -> e.getKey().equals(key)).findFirst().get().getKey();
+				logger.trace("adding listener to existing subscription for {}, {}, {}",
+						device.toDestinationAddress(), object.getObjectType(), object.getInstanceNumber());
+				subscriptions.get(existingKey).add(sub);
+				//XXX will create unnecessary refreshs / refresh should be based on SubscriptionKey
+				long initialDelay = lifetime;
+				if (existingKey.nextRefresh > 0) {
+					initialDelay = Math.max(0, (existingKey.nextRefresh - System.currentTimeMillis())/1000);
+				}
+				scheduleRefresh(sub, initialDelay);
+				CompletableFuture<Subscription> rval = new CompletableFuture<>();
+				rval.complete(sub);
+				return rval;
+			} else {
+				subscriptions.computeIfAbsent(key, _s -> new ArrayList<>()).add(sub);
+			}
         }
+		final IndicationListener<Subscription> subAckListener = subscribeResponseListener(sub);
         return transport.request(device, bb, Transport.Priority.Normal, true, subAckListener);
         //return id;
     }

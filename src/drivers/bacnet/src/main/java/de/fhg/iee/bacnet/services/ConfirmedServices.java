@@ -69,6 +69,7 @@ public abstract class ConfirmedServices {
     public static ByteBuffer buildWritePropertyApdu(ObjectIdentifierTag object, int propertyId, Tag value) {
     	return buildWritePropertyApdu(object.getObjectType(), object.getInstanceNumber(), propertyId, value);
     }
+	
     public static ByteBuffer buildWritePropertyApdu(int objectType, int instanceNumber, int propertyId, Tag value) {
         ByteBuffer buf = ByteBuffer.allocate(100);
         ProtocolControlInformation pciRequestProperty
@@ -84,8 +85,50 @@ public abstract class ConfirmedServices {
         buf.flip();
         return buf;
     }
+	
+	public static ByteBuffer buildWritePropertyApdu(int objectType, int instanceNumber, int propertyId, Tag value, int priority) {
+        ByteBuffer buf = ByteBuffer.allocate(100);
+        ProtocolControlInformation pciRequestProperty
+                = new ProtocolControlInformation(ApduConstants.APDU_TYPES.CONFIRMED_REQUEST, BACnetConfirmedServiceChoice.writeProperty.getBACnetEnumValue());
+        pciRequestProperty = pciRequestProperty.withAcceptanceInfo(false, ApduConstants.MAX_SEGMENTS.UNSPECIFIED, ApduConstants.RESPONSE_SIZE.UPTO_1476);
+        pciRequestProperty.write(buf);
+
+        new ObjectIdentifierTag(0, Tag.TagClass.Context, objectType, instanceNumber).write(buf);
+        new UnsignedIntTag(1, Tag.TagClass.Context, propertyId).write(buf);
+        Tag.createOpeningTag(3).write(buf);
+        value.write(buf);
+        Tag.createClosingTag(3).write(buf);
+		if (priority != 0) {
+			new UnsignedIntTag(4, Tag.TagClass.Context, priority).write(buf);
+		}
+        buf.flip();
+        return buf;
+    }
+	
+	public static ByteBuffer buildWritePropertyRelinquishApdu(int objectType, int instanceNumber, int propertyId, int priority) {
+		ByteBuffer buf = ByteBuffer.allocate(100);
+        ProtocolControlInformation pciRequestProperty
+                = new ProtocolControlInformation(ApduConstants.APDU_TYPES.CONFIRMED_REQUEST, BACnetConfirmedServiceChoice.writeProperty.getBACnetEnumValue());
+        pciRequestProperty = pciRequestProperty.withAcceptanceInfo(false, ApduConstants.MAX_SEGMENTS.UNSPECIFIED, ApduConstants.RESPONSE_SIZE.UPTO_1476);
+        pciRequestProperty.write(buf);
+
+        new ObjectIdentifierTag(0, Tag.TagClass.Context, objectType, instanceNumber).write(buf);
+        new UnsignedIntTag(1, Tag.TagClass.Context, propertyId).write(buf);
+        Tag.createOpeningTag(3).write(buf);
+        Tag.createNullTag(Tag.TagClass.Application).write(buf);
+        Tag.createClosingTag(3).write(buf);
+		if (priority != 0) {
+			new UnsignedIntTag(4, Tag.TagClass.Context, priority).write(buf);
+		}
+        buf.flip();
+        return buf;
+	}
+	
+	public static ByteBuffer buildWritePropertyApdu(int objectType, int instanceNumber, int propertyId, int index, List<Tag> valueTags) {
+		return buildWritePropertyApdu(objectType, instanceNumber, propertyId, index, valueTags, 0);
+	}
     
-    public static ByteBuffer buildWritePropertyApdu(int objectType, int instanceNumber, int propertyId, int index, List<Tag> valueTags) {
+    public static ByteBuffer buildWritePropertyApdu(int objectType, int instanceNumber, int propertyId, int index, List<Tag> valueTags, int priority) {
         ByteBuffer buf = ByteBuffer.allocate(100);
         ProtocolControlInformation pciRequestProperty
                 = new ProtocolControlInformation(ApduConstants.APDU_TYPES.CONFIRMED_REQUEST, BACnetConfirmedServiceChoice.writeProperty.getBACnetEnumValue());
@@ -101,12 +144,15 @@ public abstract class ConfirmedServices {
  		for(Tag value: valueTags)
         	value.write(buf);
         Tag.createClosingTag(3).write(buf);
+		if (priority > 0) {
+			new UnsignedIntTag(4, Tag.TagClass.Context, priority).write(buf);
+		}
         buf.flip();
         return buf;
     }
     
     public static ByteBuffer buildWritePropertyApdu(int objectType, int instanceNumber, int propertyId, List<Tag> valueTags) {
-        return buildWritePropertyApdu(objectType, instanceNumber, propertyId, -1, valueTags);
+        return buildWritePropertyApdu(objectType, instanceNumber, propertyId, -1, valueTags, 0);
     }
     
 }

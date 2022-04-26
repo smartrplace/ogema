@@ -92,19 +92,21 @@ public abstract class AbstractTransport implements Transport {
         synchronized int getId() {
             inUse++;
             //FIXME stupid way to prevent running out of invoke IDs, OTOH reduces load on slow devices
+			int slowDownMin = 10;
             int slowDownCount = 5;
             int slowDownAmount = 200;
             int slowDownMax = 1500;
-            if (inUse > slowDownCount) {
+            //if (inUse > slowDownCount) {
                 //logger.debug("running out of invoke IDs for destination={}, all destinations={}", destination, invokeIds.keySet());
                 try {
-                    int sleep = Math.min(slowDownMax, (inUse / slowDownCount) * slowDownAmount);
+                    int sleep = Math.min(slowDownMax,
+							Math.max(slowDownMin, (inUse / slowDownCount) * slowDownAmount));
                     //logger.debug("sleeping {}ms...", sleep);
                     Thread.sleep(sleep);
                 } catch (InterruptedException ex) {
                     logger.debug("", ex);
                 }
-            }
+            //}
             if (ids.nextClearBit(0) > 255) {
                 logger.warn("out of invoke IDs");
                 throw new IllegalStateException("out of invoke IDs");

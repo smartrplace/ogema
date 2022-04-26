@@ -99,6 +99,10 @@ public class Tag {
     public static Tag createClosingTag(int tagNumber) {
         return new Tag(tagNumber, TagClass.Context, TagConstants.CONTEXT_CLOSING_TAG);
     }
+	
+	public static Tag createNullTag(TagClass tagClass) {
+		return new Tag(TagConstants.TAG_NULL, tagClass, 0);
+	}
     
     public long getLengthValueType() {
         return lengthValueType;
