@@ -67,21 +67,6 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
     public IpThermostatBChannel(HomeMaticConnection conn) {
         super(conn);
     }
-
-    private void setupControlModeResource(Thermostat thermos, final String deviceAddress) {
-        IntegerResource controlMode = thermos.addDecorator(CONTROL_MODE_DECORATOR, IntegerResource.class);
-        controlMode.create().activate(false);
-        controlMode.addValueListener(new ResourceValueListener<IntegerResource>() {
-            @Override
-            public void resourceChanged(IntegerResource resource) {
-                Map<String, Object> params = new HashMap<>();
-                // 0: automatic, 1: manual
-                // cannot be read, but will be available as VALUES/SET_POINT_MODE
-                params.put("CONTROL_MODE", resource.getValue());
-                conn.performPutParamset(deviceAddress, "VALUES", params);
-            }
-        }, true);
-    }
     
     enum PARAMS {
 
@@ -175,9 +160,9 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
             logger.warn("received no VALUES parameters for device {}", desc.getAddress());
             return;
         }
-
         Thermostat thermos = parent.addDecorator(swName, Thermostat.class);
         ThermostatUtils.setupParameterResources(parent, desc, paramSets, conn, thermos, logger);
+		ThermostatUtils.setupThermostatDecorators(parent, desc, paramSets, conn, thermos, logger);
         Map<String, SingleValueResource> resources = new HashMap<>();
         for (Map.Entry<String, ParameterDescription<?>> e : values.entrySet()) {
             try {
@@ -254,7 +239,7 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
         
         conn.registerControlledResource(conn.getChannel(parent, deviceAddress), thermos);
         conn.registerControlledResource(conn.getChannel(parent, deviceAddress), thermos.temperatureSensor());
-        setupControlModeResource(thermos, deviceAddress);
+        ThermostatUtils.setupControlModeResource(thermos, conn, deviceAddress);
         ThermostatUtils.setupProgramListener(deviceAddress, conn, thermos, logger);
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
         setupHmParameterValues(thermos, desc.getAddress());
