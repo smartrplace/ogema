@@ -92,6 +92,10 @@ abstract class ThermostatUtils {
 			HomeMaticConnection conn, Thermostat model, Logger logger) {
 		Map<String, ParameterDescription<?>> masterParams
 				= paramSets.get(ParameterDescription.SET_TYPES.MASTER.name());
+		if (masterParams == null) {
+			logger.debug("no MASTER params for {}", desc.getAddress());
+			return;
+		}
 		if (masterParams.containsKey("VALVE_ERROR_RUN_POSITION")) {
 			logger.debug("setup VALVE_ERROR_RUN_POSITION decorator on {}", model.valve().getPath());
 			model.valve().create().activate(false);
