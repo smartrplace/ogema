@@ -49,8 +49,14 @@
                 <input type="text" class="form-control" ng-model="restPath"><br/>
             </div>
         </div>
+		<div class="row">            
+            <div class="col-md-12">
+                <input type="checkbox" id="includeRefs" ng-model="includeRefs"><label for="includeRefs">Include References</label>
+            </div>
+        </div>
         <div class="row">
             <div class="col-md-12">
+				<!--
                 <label> Filter for Resource Names </label>
                 <input type="text" class="form-control" ng-model="searchText"><br/>
                 <div ng-if="treeDataTotal.length > 0">
@@ -59,6 +65,7 @@
                 <div ng-if="treeDataTotal.length <= 0">
                     An Error occured! No Data found.
                 </div>
+                -->	
                 <p>ResourceTree <button ng-click="getAllResources()" type="button" class="btn btn-xs"><span class="glyphicon glyphicon-refresh"></span>  </button></p>
                 <div treecontrol class="tree-boot" tree-model="treeData" options="treeOptions"
                      order-by="'name'" reverse-order="false"
@@ -66,7 +73,7 @@
                      on-node-toggle="loadNode(node.path,expanded,$parentNode)"
                      expanded-nodes="expandedNodes"
                      >
-                    {{node.name}} {{node.value || node.resourcelink.name || ""}} 
+                    <span style="font-style: {{ node.referencing ? 'italic' : 'normal' }}">{{node.name}} {{node.value || node.resourcelink.name || ""}} </span>
                 </div>
             </div>
 

@@ -99,9 +99,9 @@ ngOGFrAdminApp.controller('ResourcesCtrl', ['$scope', 'ogemaGateway', '$interval
         };
 
         $scope.$watch('searchText', function (newValue, oldValue) {
-
-            $scope.treeData = $filter('filter')($scope.treeDataTotal, {name: $scope.searchText});
-
+			if (typeof $scope.treeDataTotal !== 'undefined') {
+				$scope.treeData = $filter('filter')($scope.treeDataTotal.subresources, {name: $scope.searchText});
+			}
         });
 
         $scope.$watch('restPath', function (newValue, oldValue) {
@@ -154,9 +154,10 @@ ngOGFrAdminApp.controller('ResourcesCtrl', ['$scope', 'ogemaGateway', '$interval
             if (!expanded) {
                 return;
             }
-            console.log("loading %s", path);
+			var includeRefs = $scope.includeRefs === true;
+            console.log("loading %s, %s", path, includeRefs);
             var url = $scope.restPath + path + "?user=" + encodeURIComponent($scope.restUser) + "&pw=" + encodeURIComponent($scope.restPwd);
-            ogemaGateway.getJSON(url, {"depth": 2}).then(function (result) {
+            ogemaGateway.getJSON(url, {"depth": 2, "references": includeRefs}).then(function (result) {
                 $scope.resources = result;
 
                 result = $scope.unifyResult(result);
