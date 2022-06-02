@@ -16,6 +16,7 @@
 package org.ogema.util.test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
@@ -30,6 +31,7 @@ import org.ogema.core.model.schedule.Schedule;
 import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.tools.SerializationManager;
 import org.ogema.exam.OsgiAppTestBase;
+import org.ogema.model.devices.buildingtechnology.AirConditioner;
 import org.ogema.model.devices.whitegoods.CoolingDevice;
 import org.ogema.model.metering.ElectricityMeter;
 import org.ops4j.pax.exam.ProbeBuilder;
@@ -93,6 +95,62 @@ public class CollectionsTest extends OsgiAppTestBase {
 		// FIXME
 		System.out.println("   ~~~ resources created: " + list);
 		assertEquals(2,	list.size());
+	}
+	
+	@Test
+	public void collectionRoundTripPreservesLinks() throws Exception {
+		String ac1name = newResourceName();
+		String ac2name = newResourceName();
+		AirConditioner ac1 = getApplicationManager().getResourceManagement().createResource(ac1name, AirConditioner.class);
+		AirConditioner ac2 = getApplicationManager().getResourceManagement().createResource(ac2name, AirConditioner.class);
+		ac1.onOffSwitch().stateControl().create();
+		ac1.onOffSwitch().stateControl().setValue(true);
+		
+		ac2.onOffSwitch().setAsReference(ac1.onOffSwitch());
+		SerializationManager sm = getApplicationManager().getSerializationManager(Integer.MAX_VALUE, false, true);
+		String xml = sm.toXml(Arrays.<Resource>asList(ac1, ac2));
+		
+		Assert.assertTrue(ac1.onOffSwitch().equalsLocation(ac2.onOffSwitch()));
+		
+		ac1.delete();
+		ac2.delete();
+		
+		Assert.assertFalse(ac1.onOffSwitch().equalsLocation(ac2.onOffSwitch()));
+		
+		sm.createResourcesFromXml(xml);
+		
+		ac1 = getApplicationManager().getResourceAccess().getResource(ac1name);
+		ac2 = getApplicationManager().getResourceAccess().getResource(ac2name);
+		
+		Assert.assertTrue(ac1.onOffSwitch().equalsLocation(ac2.onOffSwitch()));
+		Assert.assertTrue(ac1.onOffSwitch().stateControl().getValue());
+	}
+	
+	@Test
+	public void collectionDeserialisationToSubresourcePreservesLinks() throws Exception {
+		String ac1name = newResourceName();
+		String ac2name = newResourceName();
+		AirConditioner ac1 = getApplicationManager().getResourceManagement().createResource(ac1name, AirConditioner.class);
+		AirConditioner ac2 = getApplicationManager().getResourceManagement().createResource(ac2name, AirConditioner.class);
+		ac1.onOffSwitch().stateControl().create();
+		ac1.onOffSwitch().stateControl().setValue(true);
+		
+		ac2.onOffSwitch().setAsReference(ac1.onOffSwitch());
+		SerializationManager sm = getApplicationManager().getSerializationManager(Integer.MAX_VALUE, false, true);
+		String xml = sm.toXml(Arrays.<Resource>asList(ac1, ac2));
+		
+		Assert.assertTrue(ac1.onOffSwitch().equalsLocation(ac2.onOffSwitch()));
+		
+		Resource newParent = getApplicationManager().getResourceManagement().createResource(newResourceName(), Resource.class);
+		sm.createResourcesFromXml(xml, newParent);
+		
+		AirConditioner ac1repl = newParent.getSubResource(ac1name);
+		AirConditioner ac2repl = newParent.getSubResource(ac2name);
+		
+		Assert.assertTrue(ac1repl.onOffSwitch().equalsLocation(ac2repl.onOffSwitch()));
+		Assert.assertFalse(ac1.onOffSwitch().equalsLocation(ac1repl.onOffSwitch()));
+		Assert.assertFalse(ac2.onOffSwitch().equalsLocation(ac2repl.onOffSwitch()));
+		Assert.assertTrue(ac1repl.onOffSwitch().stateControl().getValue());
 	}
 
 }

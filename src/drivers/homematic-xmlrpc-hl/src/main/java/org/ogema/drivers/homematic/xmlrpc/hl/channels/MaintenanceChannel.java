@@ -106,6 +106,11 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
         exec.scheduleWithFixedDelay(this::updateRssi, 60, 60, TimeUnit.SECONDS);
     }
 
+	@Override
+	public void close() {
+		exec.shutdownNow();
+	}
+
     void updateRssi() {
         knownDevices.forEach(d -> {
             try {

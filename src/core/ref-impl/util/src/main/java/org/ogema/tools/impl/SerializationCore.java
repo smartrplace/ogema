@@ -544,7 +544,7 @@ final class SerializationCore {
 	 */
 	// TODO exception handling
 	@SuppressWarnings("unchecked")
-	protected Set<LinkInfo> apply(org.ogema.serialization.jaxb.Resource input, Resource target, boolean forceUpdate)
+	protected Set<LinkInfo> apply(org.ogema.serialization.jaxb.Resource input, final Resource target, boolean forceUpdate)
 			throws ClassNotFoundException {
 		Set<LinkInfo> unresolvedLinks = Collections.emptySet();
 		Set<LinkInfo> lastUnresolvedLinks;
@@ -555,7 +555,7 @@ final class SerializationCore {
 		do {
 			lastUnresolvedLinks = unresolvedLinks;
 			unresolvedLinks = applyInternal(input, target, forceUpdate, trans, resourcesToActivate,
-					resourcesToDeactivate);
+					resourcesToDeactivate, target);
 			// repeat until there are no more unresolved links, or the set
 			// of unresolved links doesn't change any more (-> input broken or
 			// refering to deleted resources)
@@ -628,7 +628,9 @@ final class SerializationCore {
 	// serialized input
 	@SuppressWarnings("unchecked")
 	private Set<LinkInfo> applyInternal(org.ogema.serialization.jaxb.Resource input, Resource target, boolean forceUpdate,
-			@SuppressWarnings("deprecation") org.ogema.core.resourcemanager.Transaction trans, Collection<Resource> resourcesToActivate, Collection<Resource> resourcesToDeactivate)
+			@SuppressWarnings("deprecation") org.ogema.core.resourcemanager.Transaction trans,
+			Collection<Resource> resourcesToActivate, Collection<Resource> resourcesToDeactivate,
+			final Resource importBase)
 			throws ClassNotFoundException {
 		Set<LinkInfo> unresolvedLinks = new HashSet<>();
 		final Class<?> inputOgemaType = Class.forName(input.getType());
@@ -681,12 +683,24 @@ final class SerializationCore {
                     ogemaSubRes = target.addDecorator(name, subResType);
 				}
 				unresolvedLinks.addAll(applyInternal(subRes, ogemaSubRes, forceUpdate, trans, resourcesToActivate,
-						resourcesToDeactivate));
+						resourcesToDeactivate, importBase));
 			} else if (o instanceof ResourceLink) {
 				ResourceLink link = (ResourceLink) o;
-				Resource linkedResource = resacc.getResource(link.getLink());
+				// when importing a resource collection to a subresource, links
+				// between imported resources must be resolved relative to their
+				// new base resource
+				String linkPath = link.getLink();
+				String importBasePath = importBase == null
+						? ""
+						: (importBase.getParent() != null
+							? importBase.getParent().getPath()
+							: "");
+				linkPath = linkPath.startsWith("/")
+						? importBasePath + linkPath
+						: importBasePath + "/" + linkPath;
+				Resource linkedResource = resacc.getResource(linkPath);
 				if (linkedResource == null || !linkedResource.exists()) {
-					unresolvedLinks.add(new LinkInfo(target.getPath(), link.getName(), link.getLink(), link.getType()));
+					unresolvedLinks.add(new LinkInfo(target.getPath(), link.getName(), linkPath, link.getType()));
 					continue;
 				}
 				Resource ogemaSubRes = target.getSubResource(link.getName());

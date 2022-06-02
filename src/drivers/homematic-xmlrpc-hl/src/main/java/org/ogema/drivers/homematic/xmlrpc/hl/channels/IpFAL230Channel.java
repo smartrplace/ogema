@@ -18,11 +18,15 @@ package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import org.ogema.core.model.Resource;
 
 import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
+import org.ogema.core.resourcemanager.ResourceStructureEvent;
+import org.ogema.core.resourcemanager.ResourceStructureListener;
 import org.ogema.core.resourcemanager.ResourceValueListener;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandler;
@@ -33,6 +37,7 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEventListener;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
+import org.ogema.model.devices.buildingtechnology.Thermostat;
 import org.ogema.model.devices.connectiondevices.ThermalValve;
 import org.ogema.model.devices.sensoractordevices.SensorDevice;
 import org.ogema.tools.resource.util.ResourceUtils;
@@ -47,6 +52,8 @@ import org.slf4j.LoggerFactory;
  */
 @Component(service = {DeviceHandlerFactory.class}, property = {Constants.SERVICE_RANKING + ":Integer=1"})
 public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHandlerFactory {
+	
+	public static final String LINKED_THERMOSTAT_DECORATOR = "linkedThermostat";
     
     Logger logger = LoggerFactory.getLogger(getClass());
     
@@ -120,11 +127,16 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
 
     }
 
-    @Override
-    public boolean accept(DeviceDescription desc) {
-        //System.out.println("parent type = " + desc.getParentType());
-        return (("HmIP-FAL230-C10".equalsIgnoreCase(desc.getParentType()) || "HmIP-FAL230-C6".equalsIgnoreCase(desc.getParentType())) && "CLIMATECONTROL_FLOOR_TRANSCEIVER".equalsIgnoreCase(desc.getType()));
-    }
+	/*
+	accept FLOOR & FLOOR_PUMP_TRANCEIVERs, but FLOOR_PUMP_TRANCEIVER will be treated same as other channels
+	 */
+	@Override
+	public boolean accept(DeviceDescription desc) {
+		//System.out.println("parent type = " + desc.getParentType());
+		return ("HmIP-FAL230-C10".equalsIgnoreCase(desc.getParentType()) || "HmIP-FAL230-C6".equalsIgnoreCase(desc.getParentType()))
+				&& ("CLIMATECONTROL_FLOOR_TRANSCEIVER".equalsIgnoreCase(desc.getType())
+				|| "CLIMATECONTROL_FLOOR_PUMP_TRANSCEIVER".equalsIgnoreCase(desc.getType()));
+	}
 
     @Override
     public void setup(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
@@ -164,7 +176,7 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
         
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
         setupHmParameterValues(valve, parent.address().getValue());
-        //setupTempSensLinking(thermos);
+        setupThermostatLinking(valve, conn, logger);
     }
     
     class ParameterListener implements ResourceValueListener<SingleValueResource> {
@@ -206,4 +218,53 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
             masterParameters.create();
         }
     }
+	
+	static void setupThermostatLinking(final ThermalValve valve, HomeMaticConnection conn, Logger logger) {
+		String TEMPERATURE_SENDER_CHANNEL = "CLIMATECONTROL_FLOOR_TRANSMITTER";
+		String TEMPERATURE_RECEIVER_CHANNEL = "CLIMATECONTROL_FLOOR_TRANSCEIVER";
+		
+        Thermostat tempSens = valve.getSubResource(LINKED_THERMOSTAT_DECORATOR, Thermostat.class);
+        
+        ResourceStructureListener l = new ResourceStructureListener() {
+
+            @Override
+            public void resourceStructureChanged(ResourceStructureEvent event) {
+                Resource added = event.getChangedResource();
+                if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_ADDED) {
+                    if (added.getName().equals(LINKED_THERMOSTAT_DECORATOR) && added instanceof Thermostat) {
+                        DeviceHandlers.linkChannels(conn, added, TEMPERATURE_SENDER_CHANNEL,
+                                valve, TEMPERATURE_RECEIVER_CHANNEL, logger,
+                                "Valve-Thermostat-Link", "Link wall thermostat - floor heating", false);
+                    }
+                } else if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_REMOVED
+                		&& added.getName().equals(LINKED_THERMOSTAT_DECORATOR)) {
+                	// since we do not know which resource the link referenced before it got deleted
+                	// we need to use the low level API to find out all links for the weather receiver channel
+                    Optional<HmDevice> recChan = DeviceHandlers.findDeviceChannel(
+                            conn, valve, TEMPERATURE_RECEIVER_CHANNEL, logger);
+                    if (!recChan.isPresent()) {
+                    	return;
+                    }
+                    String receiverChannelAddress = recChan.get().address().getValue();
+                	for (Map<String, Object> link : conn.performGetLinks(receiverChannelAddress, 0)) {
+                		if (!receiverChannelAddress.equals(link.get("RECEIVER")))
+                			continue;
+                		final Object sender = link.get("SENDER");
+                		if (!(sender instanceof String))
+                			continue;
+                		conn.performRemoveLink((String) sender, receiverChannelAddress);
+                		logger.info("Valve thermostat connection removed. Valve {}, thermostat {}",
+                				receiverChannelAddress, sender);
+                	}
+                }
+            }
+        };
+        valve.addStructureListener(l);
+        if (tempSens.isActive()) {
+            DeviceHandlers.linkChannels(conn, tempSens, TEMPERATURE_SENDER_CHANNEL,
+                    valve, TEMPERATURE_RECEIVER_CHANNEL, logger,
+                    "TempSens", "external temperature sensor", false);
+        }
+    }
+	
 }
