@@ -3,6 +3,7 @@ package org.ogema.drivers.homematic.xmlrpc.hl.api;
 import java.io.IOException;
 import java.util.List;
 
+import org.ogema.drivers.homematic.xmlrpc.hl.api.CCUAccessI.HomematicConnectionData;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmLogicInterface;
 
 public interface CCUAccessI {
@@ -48,5 +49,6 @@ public interface CCUAccessI {
 	}
 	
 	public List<HomematicConnectionData> getConnectionsData();
+	public List<HomematicConnectionData> getConnectionsData(HmLogicInterface iface);
 
 }
