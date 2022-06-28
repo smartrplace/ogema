@@ -36,6 +36,7 @@ import de.fhg.iee.bacnet.tags.UnsignedIntTag;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -72,6 +74,8 @@ public class CovSubscriber implements Closeable {
 	private final Set<DeviceAddress> knownDevices = new HashSet<>();
     private final Map<SubscriptionKey, List<Subscription>> subscriptions = new ConcurrentHashMap<>();
     private final ScheduledExecutorService subscriptionRefresher = Executors.newSingleThreadScheduledExecutor();
+	// randomize refresh intervals a little
+	private final Random rnd = new Random();
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
@@ -182,6 +186,7 @@ public class CovSubscriber implements Closeable {
         public final CovListener listener;
         private ScheduledFuture<?> refreshHandle;
         private volatile boolean subscribed = false;
+		private volatile long lastRefresh = 0;
 
         public Subscription(int id, DeviceAddress destination, ObjectIdentifierTag object, boolean confirmed, int lifetime, CovListener listener) {
             this.id = id;
@@ -306,10 +311,13 @@ public class CovSubscriber implements Closeable {
 
     private void scheduleRefresh(final Subscription sub, long initialDelayS) {
         if (sub.lifetime > 0 && (sub.refreshHandle == null || sub.refreshHandle.isDone())) {
-			long interval = sub.lifetime; // delayJitter(sub.lifetime);
-			//initialDelayS = delayJitter(initialDelayS);
+			long interval = //sub.lifetime; 
+					delayJitter(sub.lifetime);
+			initialDelayS = delayJitter(initialDelayS);
 			try {
-            sub.refreshHandle = subscriptionRefresher.scheduleAtFixedRate(
+				logger.trace("scheduling refresh for ({})@{}: delay={}s, period={}s",
+						sub.object, sub.destination, initialDelayS, interval);
+	            sub.refreshHandle = subscriptionRefresher.scheduleAtFixedRate(
                     () -> resubscribe(sub), initialDelayS, interval, TimeUnit.SECONDS);
 			} catch (IllegalArgumentException iae) {
 				logger.error("delay={}, interval={}", initialDelayS, interval, iae);
@@ -318,7 +326,8 @@ public class CovSubscriber implements Closeable {
     }
 	
 	private long delayJitter(long l) {
-		return (long) (1d - (Math.random() / 10d)) * l;
+		double d = (9000d + rnd.nextInt(960)) / 10_000d;
+		return (long) (d * l);
 	}
     
     private IndicationListener<Subscription> subscribeResponseListener(Subscription sub) {
@@ -328,7 +337,7 @@ public class CovSubscriber implements Closeable {
                 ProtocolControlInformation pci = i.getProtocolControlInfo();
                 switch (pci.getPduType()) {
                     case ApduConstants.TYPE_SIMPLE_ACK:
-                        logger.trace("subscription confirmed for {}@{}", sub.object, sub.destination);
+                        logger.trace("subscription confirmed for ({})@{}", sub.object, sub.destination);
                         subscriptions.getOrDefault(new SubscriptionKey(sub), Collections.emptyList()).forEach(s -> { s.subscribed = true; });
                         scheduleRefresh(sub, sub.lifetime);
                         return sub;
@@ -357,7 +366,7 @@ public class CovSubscriber implements Closeable {
                                 eCode.map(BACnetErrorCode::toString).orElse("unknown:" + errorCode.getUnsignedInt()));
                         if (BACnetErrorClass.object.code == errorClass.getUnsignedInt().intValue()
                                 && BACnetErrorCode.unknown_object.code == errorCode.getUnsignedInt().intValue()) {
-                            logger.warn("disabling supbscription for unknown object {}@{}", sub.object, sub.destination);
+                            logger.warn("disabling subscription for unknown object ({})@{}", sub.object, sub.destination);
                             subscriptions.remove(new SubscriptionKey(sub));
                             return sub;
                         }
@@ -380,7 +389,7 @@ public class CovSubscriber implements Closeable {
                 .filter(e -> e.getValue().stream().anyMatch(Predicate.not(Subscription::isSubscribed)))
                 .map(Map.Entry::getValue).filter(Predicate.not(List::isEmpty))
                 .map(l -> l.get(0)).forEach(sub -> {
-            logger.trace("retrying subscription for {}@{}", sub.object, sub.destination);
+            logger.trace("retrying subscription for ({})@{}", sub.object, sub.destination);
             resubscribe(sub);
         });
     }
@@ -389,10 +398,12 @@ public class CovSubscriber implements Closeable {
         ByteBuffer bb = createSubscriptionMessage(sub.id, sub.object, sub.confirmed, sub.lifetime);
         try {
             IndicationListener<Subscription> refreshConfirmedListener = subscribeResponseListener(sub);
-            logger.debug("request refresh for subscription on {}@{}", sub.object, sub.destination);
+            logger.debug("request refresh ({}s) for subscription on ({})@{} (last refresh: {})",
+					sub.lifetime, sub.object, sub.destination, Instant.ofEpochMilli(sub.lastRefresh));
             transport.request(sub.destination, bb, Transport.Priority.Normal, true, refreshConfirmedListener);
+			sub.lastRefresh = System.currentTimeMillis();
         } catch (IOException ex) {
-            logger.error("could not refresh subscription for {}@{}: {}", sub.object, sub.destination, ex);
+            logger.error("could not refresh subscription for ({})@{}: {}", sub.object, sub.destination, ex);
         }
     }
 	
@@ -459,8 +470,8 @@ public class CovSubscriber implements Closeable {
         for (CompositeTag t : valueTagMulti.getSubTags()) {
             switch (t.getTagNumber()) {
                 case 0:
+					total++;
 					if (recipient != null) {
-						total++;
 						//... build
 						//XXX this will miss the last entry
 						if (myProcessIdentifier == processIdentifier.getUnsignedInt().intValue()) {
@@ -470,6 +481,7 @@ public class CovSubscriber implements Closeable {
 									new ObjectIdentifierTag(subscriptionOid.getOidType(), subscriptionOid.getOidInstanceNumber()));
 							sk.nextRefresh = now + (1000 * timeRemaining);
 							synchronized (subscriptions) {
+								logger.debug("resumed subscription for ID {}, object {} @ {}", sk.id, sk.object, sk.destination);
 								subscriptions.computeIfAbsent(sk, __ -> new ArrayList<>());
 							}
 							resumed++;
@@ -497,10 +509,27 @@ public class CovSubscriber implements Closeable {
 					break;
             }
         }
-		logger.debug("read {} subscriptions from {} ({}), resumed {}, total subs {}",
+		
+		// last entry
+		if (myProcessIdentifier == processIdentifier.getUnsignedInt().intValue()) {
+			SubscriptionKey sk = new SubscriptionKey(
+					processIdentifier.getUnsignedInt().intValue(),
+					i.getSource().toDestinationAddress(),
+					new ObjectIdentifierTag(subscriptionOid.getOidType(), subscriptionOid.getOidInstanceNumber()));
+			sk.nextRefresh = now + (1000 * timeRemaining);
+			synchronized (subscriptions) {
+				logger.debug("resumed subscription for ID {}, object {} @ {}", sk.id, sk.object, sk.destination);
+				subscriptions.computeIfAbsent(sk, __ -> new ArrayList<>());
+			}
+			resumed++;
+		}
+		
+		logger.info("read {} subscriptions from {} ({}), resumed {}, total subs {}",
 				total, i.getSource().toDestinationAddress(), _oid.getInstanceNumber(), resumed, subscriptions.size());
 		return null;
 	}
+	
+	
 
     public Future<Subscription> subscribe(DeviceAddress device, ObjectIdentifierTag object, boolean confirmed, int lifetime, CovListener l) throws IOException {
         logger.trace("Send Subscribe to " + device + " for " + object.getObjectType() + " / " + object.getInstanceNumber());
@@ -551,7 +580,7 @@ public class CovSubscriber implements Closeable {
                 DeviceAddress src = i.getSource().toDestinationAddress();
                 List<Subscription> subs = subscriptions.get(new SubscriptionKey(id, src, object));
                 if (subs == null || subs.isEmpty()) {
-                    logger.debug("have no subscriptions for ID {}, object {} @ {}", id, object, src);
+                    logger.debug("have no subscriptions for ID {}, object {} from {} @ {}", id, object, device.getInstanceNumber(), src);
                     //logger.debug("received COVNotification for unknown ID {}, sending cancellation", id);
                     //cancel(i.getSource().toDestinationAddress(), object, id);
                     return null;

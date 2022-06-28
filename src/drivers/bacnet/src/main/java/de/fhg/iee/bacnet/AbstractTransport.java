@@ -108,8 +108,8 @@ public abstract class AbstractTransport implements Transport {
                 }
             //}
             if (ids.nextClearBit(0) > 255) {
-                logger.warn("out of invoke IDs");
-                throw new IllegalStateException("out of invoke IDs");
+                logger.warn("out of invoke IDs for {}", destination);
+                throw new IllegalStateException("out of invoke IDs for " + destination);
             }
             do {
                 lastId = (lastId + 1) % 256;
