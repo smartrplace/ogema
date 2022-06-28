@@ -409,6 +409,7 @@ public class RestTest extends OsgiAppTestBase {
 		Request get = Request.Get(url).addHeader("Accept", "application/xml");
 		String xml = get.execute().returnContent().asString();
 
+		System.out.println("url: " + url);
 		System.out.println(xml);
 
 		s1.delete();
@@ -420,7 +421,18 @@ public class RestTest extends OsgiAppTestBase {
 		Request put = Request.Put(url).addHeader("Accept", "application/xml").bodyString(xml,
 				ContentType.APPLICATION_XML);
 		Response putResponse = put.execute();
-		assertEquals(2, putResponse.returnResponse().getStatusLine().getStatusCode() / 100);
+		HttpResponse resp = putResponse.returnResponse();
+		StatusLine status = resp.getStatusLine();
+		if (status.getStatusCode() / 100 != 2) {
+			try (InputStreamReader isr = new InputStreamReader(resp.getEntity().getContent());
+					BufferedReader br = new BufferedReader(isr)) {
+				String line;
+				while ((line = br.readLine()) != null) {
+					System.err.println(line);
+				}
+			}
+		}
+		assertEquals(2, status.getStatusCode() / 100);
 		//System.out.println(putResponse.returnContent().asString());
 
 		assertNotNull(s1 = resacc.getResource(s1name));
