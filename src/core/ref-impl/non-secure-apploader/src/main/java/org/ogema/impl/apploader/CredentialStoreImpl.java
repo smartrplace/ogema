@@ -43,12 +43,14 @@ import org.osgi.service.useradmin.Group;
 import org.osgi.service.useradmin.Role;
 import org.osgi.service.useradmin.User;
 import org.osgi.service.useradmin.UserAdmin;
+import org.osgi.service.useradmin.UserAdminEvent;
+import org.osgi.service.useradmin.UserAdminListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Component(specVersion = "1.2", immediate = true)
-@Service(CredentialStore.class)
-public class CredentialStoreImpl implements CredentialStore {
+@Service({CredentialStore.class, UserAdminListener.class})
+public class CredentialStoreImpl implements CredentialStore, UserAdminListener {
 
 	private static final String APPSTORE_GROUP_NAME = "appstoreGroup";
 	private static final String APPSTORE_PWD_NAME = "appstoreCred";
@@ -91,7 +93,7 @@ public class CredentialStoreImpl implements CredentialStore {
         logger.debug("password hashed in {}ms, {} iterations", time, iterations);
         return Base64.getEncoder().encodeToString(key.getEncoded());
     }
-    
+	
     static boolean checkPassword(Dictionary<String, Object> dict, String password, String stored) throws NoSuchAlgorithmException, InvalidKeySpecException {
         if (!stored.startsWith(PW_STORED_PREFIX)) {
             logger.debug("encoding clear text password");
@@ -237,15 +239,20 @@ public class CredentialStoreImpl implements CredentialStore {
 
 	@Override
 	public boolean login(String usrName, final String pwd) {
-		Role role = findRole(usrName);
-		if (role == null)
+		if (pwd == null) {
 			return false;
+		}
+		Role role = findRole(usrName);
+		if (role == null) {
+			logger.trace("no such user: '{}'", usrName);
+			return false;
+		}
 		final User admin = (User) role;
 		Boolean hasCred = AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
             @Override
 			public Boolean run() {
                 Object o = admin.getCredentials().get(Constants.PASSWORD_NAME);
-                if (o == null || pwd == null) {
+                if (o == null) {
                     return false;
                 }
                 @SuppressWarnings("unchecked")
@@ -342,4 +349,31 @@ public class CredentialStoreImpl implements CredentialStore {
 	public SSLContext getDISSLContext() {
 		return null;
 	}
+
+	@Override
+	@SuppressWarnings("unchecked")
+	public void roleChanged(UserAdminEvent event) {
+		if (event.getType() == UserAdminEvent.ROLE_REMOVED) {
+			return;
+		}
+		if (event.getRole().getType() != Role.USER) {
+			return;
+		}
+		User u = (User) event.getRole();
+		Object storedPwO = u.getCredentials().get(Constants.PASSWORD_NAME);
+		if (storedPwO == null) {
+			return;
+		}
+		String stored = storedPwO.toString();
+		if (!stored.startsWith(PW_STORED_PREFIX)) {
+			try {
+				logger.debug("encoding clear text password");
+				stored = encodePassword(stored, PW_ITERATIONS);
+				u.getCredentials().put(Constants.PASSWORD_NAME, stored);
+			} catch (NoSuchAlgorithmException | InvalidKeySpecException ex) {
+				logger.warn("password hashing failed: {}", ex.getMessage());
+			}
+        }
+	}
+	
 }
