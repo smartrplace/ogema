@@ -695,6 +695,9 @@ final class SerializationCore {
 						: (importBase.getParent() != null
 							? importBase.getParent().getPath()
 							: "");
+				if (importBasePath.equals("/")) {
+					importBasePath = "";
+				}
 				linkPath = linkPath.startsWith("/")
 						? importBasePath + linkPath
 						: importBasePath + "/" + linkPath;
