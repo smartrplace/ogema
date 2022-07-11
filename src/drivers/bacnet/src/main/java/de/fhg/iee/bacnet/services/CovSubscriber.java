@@ -49,6 +49,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -482,7 +483,7 @@ public class CovSubscriber implements Closeable {
 							sk.nextRefresh = now + (1000 * timeRemaining);
 							synchronized (subscriptions) {
 								logger.debug("resumed subscription for ID {}, object {} @ {}", sk.id, sk.object, sk.destination);
-								subscriptions.computeIfAbsent(sk, __ -> new ArrayList<>());
+								subscriptions.computeIfAbsent(sk, __ -> new CopyOnWriteArrayList<>());
 							}
 							resumed++;
 						}
@@ -519,7 +520,7 @@ public class CovSubscriber implements Closeable {
 			sk.nextRefresh = now + (1000 * timeRemaining);
 			synchronized (subscriptions) {
 				logger.debug("resumed subscription for ID {}, object {} @ {}", sk.id, sk.object, sk.destination);
-				subscriptions.computeIfAbsent(sk, __ -> new ArrayList<>());
+				subscriptions.computeIfAbsent(sk, __ -> new CopyOnWriteArrayList<>());
 			}
 			resumed++;
 		}
@@ -558,7 +559,7 @@ public class CovSubscriber implements Closeable {
 				rval.complete(sub);
 				return rval;
 			} else {
-				subscriptions.computeIfAbsent(key, _s -> new ArrayList<>()).add(sub);
+				subscriptions.computeIfAbsent(key, _s -> new CopyOnWriteArrayList<>()).add(sub);
 			}
         }
 		final IndicationListener<Subscription> subAckListener = subscribeResponseListener(sub);
@@ -617,7 +618,6 @@ public class CovSubscriber implements Closeable {
                         timeRemaining.getValue().intValue(), Collections.unmodifiableMap(valueMap));
                 //already on an event thread, call listener directly
                 subs.forEach(sub -> sub.listener.receivedNotification(n));
-                
             }
             return null;
         }
