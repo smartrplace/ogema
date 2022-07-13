@@ -116,6 +116,7 @@ public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
         public void event(List<HmEvent> events) {
             for (HmEvent e : events) {
                 switch (e.getValueKey()) {
+					case "POWER":
                     case "IEC_POWER": {
                         initElectricityMetering();
                         ElectricityMeter meter = meters.get(e.getAddress());
@@ -131,6 +132,7 @@ public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
                         logger.debug("power reading updated: {} = {}", pwr.getPath(), e.getValueFloat());
                         break;
                     }
+					case "ENERGY_COUNTER":
                     case "IEC_ENERGY_COUNTER": {
                         initElectricityMetering();
                         ElectricityMeter meter = meters.get(e.getAddress());
