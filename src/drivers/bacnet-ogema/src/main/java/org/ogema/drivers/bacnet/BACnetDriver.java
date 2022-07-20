@@ -299,7 +299,7 @@ public class BACnetDriver implements AutoCloseable {
         };
         try {
             Future<CovSubscriber.Subscription> sub = subscriber.subscribe(i.getSource().toDestinationAddress(),
-                    binaryInput, false, 120, l);
+                    device.identifier().instanceNumber().getValue(), binaryInput, false, 120, l);
         } catch (IOException ex) {
             logger.error("failed to setup binary input", ex);
             input.deactivate(true);
@@ -324,7 +324,7 @@ public class BACnetDriver implements AutoCloseable {
         };
         try {
             Future<CovSubscriber.Subscription> sub = subscriber.subscribe(switchDeviceAddr,
-                    binaryOutput, false, 120, l);
+                    device.identifier().instanceNumber().getValue(), binaryOutput, false, 120, l);
             //XXX do sth with subscription?
         } catch (IOException ex) {
             logger.error("failed to setup binary output", ex);
