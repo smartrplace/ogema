@@ -283,6 +283,10 @@ public class AppAdminAccessImpl implements AdminApplication {
 		String user = null;
 		if (sesAuth != null) // if security is disabled sesAuth is null
 			user = sesAuth.getName();
+		return isWebAccessAllowed(user);
+	}
+	@Override
+	public boolean isWebAccessAllowed(String user) {
 		AccessManager accMan = appman.tracker.getPermissionManager().getAccessManager();
 		return accMan.isAppPermitted(user, getID());
 	}

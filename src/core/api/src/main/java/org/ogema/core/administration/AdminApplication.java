@@ -115,6 +115,7 @@ public interface AdminApplication {
 	 * @param req
 	 */
 	boolean isWebAccessAllowed(HttpServletRequest req);
+	boolean isWebAccessAllowed(String user);
 
 	/**
 	 * return true if application is stopped via stop, other false
