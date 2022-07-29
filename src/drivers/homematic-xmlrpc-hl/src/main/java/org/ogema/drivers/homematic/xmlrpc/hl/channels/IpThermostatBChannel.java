@@ -15,6 +15,7 @@
  */
 package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
+import java.util.Collections;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import java.util.HashMap;
 import java.util.List;
@@ -22,6 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
+import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
@@ -40,6 +42,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmMaintenance;
+import org.ogema.model.actors.OnOffSwitch;
 import org.ogema.tools.resource.util.ResourceUtils;
 import org.ogema.tools.resource.util.ValueResourceUtils;
 
@@ -95,8 +98,10 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
         LEVEL,
         
         SET_POINT_MODE,
+		
+		VALVE_ADAPTION,
         
-        VALVE_STATE;
+        VALVE_STATE;		
 
         public float convertInput(float v) {
             return v;
@@ -131,7 +136,6 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
                 try {
                     PARAMS p = PARAMS.valueOf(e.getValueKey());
                     ValueResourceUtils.setValue(res, p.convertInput(e.getValueFloat()));
-                    //((FloatResource) res).setValue(p.convertInput(e.getValueFloat()));
                     logger.debug("resource updated ({}/{}): {} = {}", p, e, res.getPath(), e.getValue());
                 } catch (IllegalArgumentException ex) {
                     //this block intentionally left blank
@@ -205,6 +209,22 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
                         }
                         logger.debug("found supported thermostat parameter {} on {}", e.getKey(), desc.getAddress());
                         resources.put(e.getKey(), reading);
+                        break;
+                    }
+					case VALVE_ADAPTION: {
+						Resource adaOld = thermos.valve().getSubResource("adaption");
+						if (adaOld != null && adaOld instanceof OnOffSwitch) {
+							adaOld.delete();
+						}
+						logger.debug("found supported thermostat parameter {} on {}", e.getKey(), desc.getAddress());
+						BooleanResource adapt = thermos.valve()
+								.getSubResource("startAdaption", BooleanResource.class).create();
+                        adapt.create().activate(false);
+                        adapt.addValueListener((BooleanResource r) -> {
+							if (r.getValue()) {
+								conn.performPutParamset(desc.getAddress(), "VALUES", Collections.singletonMap("VALVE_ADAPTION", true));
+							}
+						}, true);
                         break;
                     }
                     case VALVE_STATE: {
