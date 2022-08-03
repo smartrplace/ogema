@@ -53,6 +53,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
 import org.ogema.accesscontrol.AccessManager;
+import org.ogema.accesscontrol.Authenticator;
 import org.ogema.accesscontrol.Constants;
 import org.ogema.accesscontrol.HttpConfig;
 import org.ogema.accesscontrol.HttpConfigManagement;
@@ -220,7 +221,8 @@ public class OgemaHttpContext implements HttpContext {
 		}
         
         if (request.getSession(false) == null || request.getSession().getAttribute(Constants.AUTH_ATTRIBUTE_NAME) == null) {
-            tryBasicAuthLogin(request);
+			tryPluggableAuthenticators(request);
+            //tryBasicAuthLogin(request);
         }
 		HttpSession httpses = request.getSession();
 		SessionAuth sesAuth;
@@ -405,6 +407,38 @@ public class OgemaHttpContext implements HttpContext {
 		}
 	}
     
+	private void tryPluggableAuthenticators(HttpServletRequest request) {
+		//XXX
+		Map<String, Authenticator> authenticators = ((DefaultPermissionManager) permMan).authenticators;
+		for (Map.Entry<String, Authenticator> e : authenticators.entrySet()) {
+			Authenticator auth = e.getValue();
+			String authId = e.getKey();
+			logger.trace("trying pluggable authenticator {}", authId);
+			String username = auth.authenticate(request);
+			if (username != null) {
+				logger.debug("authenticator '{}' authenicated user '{}'", authId, username);
+				UserRightsProxy urp = accessMngr.getUrp(username);
+				if (urp != null) {
+					try {
+						HttpSession ses = request.getSession();
+						ServiceReference<UserAdmin> srUA = urp.getBundle().getBundleContext().getServiceReference(UserAdmin.class);
+						UserAdmin admin = urp.getBundle().getBundleContext().getService(srUA);
+						User user = (User) AccessManagerImpl.findRole(admin, username);
+						Authorization author = admin.getAuthorization(user);
+						SessionAuth sauth = new SessionAuth(author, permMan.getAccessManager(), ses);
+						ses.setAttribute(Constants.AUTH_ATTRIBUTE_NAME, sauth);
+						logger.debug("login succeeded with authenticator {} for {}", authId, username);
+						break;
+					} catch (NullPointerException npe) {
+						logger.debug("something is missing", npe);
+					}
+				} else {
+					logger.debug("no URP for user {}?!?", username);
+				}
+			}
+		}
+	}	
+	
     /* see if there is a basic auth header and setup a session if login succeeds */
     private void tryBasicAuthLogin(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");

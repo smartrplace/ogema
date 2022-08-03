@@ -110,7 +110,7 @@ import org.slf4j.Logger;
 class AccessManagerImpl implements AccessManager, BundleListener {
 
 	private final Logger logger = org.slf4j.LoggerFactory.getLogger(getClass());
-	final Map<String, ServiceReference<Authenticator>> authenticators;
+	final Map<String, Authenticator> authenticators;
 	private volatile Collection<String> globallyAdmissibleAuthenticatorIds = null;
 	
 	// static final String ADMIN_NAME = "master";
@@ -715,6 +715,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 				Thread.currentThread().interrupt();
 			}
 		// wait until meanLoginTime is over
+		logger.debug("failed login attempt with user name '{}'", usrName);
 		return result;
 	}
 
@@ -923,6 +924,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 	private String authenticate(HttpServletRequest req, Boolean isNatural) {
 		return authenticate(req, isNatural, null);
 	}
+	
 	private String authenticate(HttpServletRequest req, Boolean isNatural,
 			LoginViaNaturalUserChecker natUserLoginChecker) {
 		long time = System.currentTimeMillis();
@@ -939,13 +941,16 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 					return null;
 			}
 		}
-		for (Map.Entry<String, ServiceReference<Authenticator>> entry : authenticators.entrySet()) {
+		for (Map.Entry<String, Authenticator> entry : authenticators.entrySet()) {
+			logger.error("trying pluggable authenticator: {}", entry.getKey());
 			if (isNatural != null && 
-					!isAuthenticatorAdmitted(isNatural ? OGEMA_NATURAL_USER : OGEMA_MACHINE_USER, entry.getKey()))
+					!isAuthenticatorAdmitted(isNatural ? OGEMA_NATURAL_USER : OGEMA_MACHINE_USER, entry.getKey())) {
+				logger.error("pluggable authenticator not admitted (isNatural={})", isNatural);
 				continue;
+			}
 			Authenticator auth = null;
 			try {
-				auth = osgi.getService(entry.getValue());
+				auth = entry.getValue();//osgi.getService(entry.getValue());
 				final String usr;
 				if(Boolean.getBoolean("org.ogema.impl.security.enablerestusernamecompletion") &&
 						isNatural != null && (!isNatural)) {
@@ -990,9 +995,6 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 				}
 			} catch (Exception e) {
 				logger.warn("Exception using authenticator {}", entry.getKey());
-			} finally {
-				if (auth != null)
-					osgi.ungetService(entry.getValue());
 			}
 		}
 		time = System.currentTimeMillis() - time;

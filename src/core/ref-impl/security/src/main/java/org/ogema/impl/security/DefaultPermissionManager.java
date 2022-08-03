@@ -96,6 +96,7 @@ import org.slf4j.Logger;
 			referenceInterface=Authenticator.class,
 			policy=ReferencePolicy.DYNAMIC,
 			cardinality=ReferenceCardinality.OPTIONAL_MULTIPLE,
+			policyOption = ReferencePolicyOption.GREEDY,
 			name="authenticator",
 			bind="addAuthenticator",
 			unbind="removeAuthenticator"
@@ -167,7 +168,7 @@ public class DefaultPermissionManager implements PermissionManager {
 	private ShellCommands sc;
 
 	private final HashMap<Application, AccessControlContext> accs = new HashMap<>();
-	final Map<String, ServiceReference<Authenticator>> authenticators = new ConcurrentHashMap<>(4);
+	final Map<String, Authenticator> authenticators = new ConcurrentHashMap<>(4);
 
 	@Override
 	public WebAccessManager getWebAccess() {
@@ -300,27 +301,29 @@ public class DefaultPermissionManager implements PermissionManager {
 		return l;
 	}
 
-	protected void addAuthenticator(final ServiceReference<Authenticator> authenticator) {
-		final Object id = authenticator.getProperty(Authenticator.AUTHENTICATOR_ID);
+	protected void addAuthenticator(Authenticator service, Map<String,Object> props) {
+		final Object id = props.get(Authenticator.AUTHENTICATOR_ID);
 		if (!(id instanceof String)) {
-			logger.warn("Authenticator service without authenticator.id in bundle {}", authenticator.getBundle());
+			logger.warn("Authenticator service without authenticator.id: {}", service);
 			return;
 		}
-		if (Authenticator.DEFAULT_USER_PW_ID.equals(id))
-			throw new IllegalArgumentException("Illegal authenticator id " + id + " in bundle " + authenticator.getBundle());
-		final ServiceReference<Authenticator> old = authenticators.put((String) id, authenticator);
+		if (Authenticator.DEFAULT_USER_PW_ID.equals(id)) {
+			throw new IllegalArgumentException("Illegal authenticator id " + id);
+		}
+		final Authenticator old = authenticators.put((String) id, service);
 		if (old != null) {
-			logger.warn("Duplicate authenticator id: {}: {}, {}",id, old, authenticator);
+			logger.warn("Duplicate authenticator id: {}: {}, {}",id, old, service);
 		}
 	}
 	
 	protected void removeAuthenticator(final ServiceReference<Authenticator> authenticator) {
-		final Object id = authenticator.getProperty(Authenticator.AUTHENTICATOR_ID);
+		final String id = String.valueOf(authenticator.getProperty(Authenticator.AUTHENTICATOR_ID));
 		if (!(id instanceof String)) {
 			return;
 		}
-		if (authenticator.equals(authenticators.get(id)))
+		if (bc.getService(authenticator).equals(authenticators.get(id))) {
 			authenticators.remove(id);
+		}
 	}
 
 	private ServiceRegistration<URLStreamHandlerService> urpHandlerRegistratrion;
