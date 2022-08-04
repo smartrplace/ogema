@@ -85,7 +85,7 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 	private final Map<HmLogicInterface, HmConnection> connections = new HashMap<>();
 	// cache parameter sets (by device type + version) so that they are only retrieved from the CCU once
 	private final Map<String, Map<String, Map<String, ParameterDescription<?>>>> deviceParameterSetCache = new ConcurrentHashMap<>();
-	private final Set<HmDevice> failedSetup = new HashSet<>(); // devices for which deviceSetup failed.
+	private final Set<HmDevice> failedSetup = Collections.newSetFromMap(new ConcurrentHashMap<>()); // devices for which deviceSetup failed.
 	private volatile boolean setupInProgress = false;
 
 	private ScheduledFuture<?> serviceRegistrationAction;
