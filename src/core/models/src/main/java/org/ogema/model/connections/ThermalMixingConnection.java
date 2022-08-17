@@ -3,6 +3,7 @@ package org.ogema.model.connections;
 import org.ogema.model.connections.ThermalConnection;
 import org.ogema.model.devices.buildingtechnology.Pump;
 import org.ogema.model.devices.connectiondevices.ThermalValve;
+import org.ogema.model.prototypes.PhysicalElement;
 import org.ogema.model.sensors.TemperatureSensor;
 
 /**
@@ -11,7 +12,7 @@ import org.ogema.model.sensors.TemperatureSensor;
  * 
  * @author jlapp
  */
-public interface ThermalMixingConnection extends ThermalConnection {
+public interface ThermalMixingConnection extends ThermalConnection, PhysicalElement {
 	
 	TemperatureSensor returnTemperature();
 
