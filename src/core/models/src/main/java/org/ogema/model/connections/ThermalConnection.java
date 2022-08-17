@@ -71,7 +71,7 @@ public interface ThermalConnection extends CircuitConnection {
 	TemperatureSensor inputTemperature();
 
 	/**
-	 * "Output" temperature.
+	 * "Output" (flow) temperature.
 	 * @see ThermalConnection#inputTemperature()
 	 */
 	TemperatureSensor outputTemperature();
