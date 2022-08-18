@@ -15,6 +15,7 @@
  */
 package org.ogema.util.test;
 
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -127,7 +128,7 @@ public class CollectionsTest extends OsgiAppTestBase {
 	}
 	
 	@Test
-	public void collectionDeserialisationToSubresourcePreservesLinks() throws Exception {
+	public void collectionDeserialisationToSubresourceWithRelativeLinks() throws Exception {
 		String ac1name = newResourceName();
 		String ac2name = newResourceName();
 		AirConditioner ac1 = getApplicationManager().getResourceManagement().createResource(ac1name, AirConditioner.class);
@@ -141,8 +142,8 @@ public class CollectionsTest extends OsgiAppTestBase {
 		
 		Assert.assertTrue(ac1.onOffSwitch().equalsLocation(ac2.onOffSwitch()));
 		
-		Resource newParent = getApplicationManager().getResourceManagement().createResource(newResourceName(), Resource.class);
-		sm.createResourcesFromXml(xml, newParent);
+		Resource newParent = getApplicationManager().getResourceManagement().createResource(newResourceName()+"_CollectionTarget", Resource.class);
+		sm.createResourcesFromXml(new StringReader(xml), newParent, newParent);
 		
 		AirConditioner ac1repl = newParent.getSubResource(ac1name);
 		AirConditioner ac2repl = newParent.getSubResource(ac2name);
@@ -151,6 +152,33 @@ public class CollectionsTest extends OsgiAppTestBase {
 		Assert.assertFalse(ac1.onOffSwitch().equalsLocation(ac1repl.onOffSwitch()));
 		Assert.assertFalse(ac2.onOffSwitch().equalsLocation(ac2repl.onOffSwitch()));
 		Assert.assertTrue(ac1repl.onOffSwitch().stateControl().getValue());
+	}
+	
+	@Test
+	public void collectionDeserialisationToSubresourcePreservesGlobalLinks() throws Exception {
+		String ac1name = newResourceName();
+		String ac2name = newResourceName();
+		AirConditioner ac1 = getApplicationManager().getResourceManagement().createResource(ac1name, AirConditioner.class);
+		
+		Resource dir = getApplicationManager().getResourceManagement().createResource(newResourceName() + "_ACs", AirConditioner.class);
+		AirConditioner ac2 = dir.getSubResource(ac2name, AirConditioner.class);
+		ac1.onOffSwitch().stateControl().create();
+		ac1.onOffSwitch().stateControl().setValue(true);
+		
+		ac2.onOffSwitch().setAsReference(ac1.onOffSwitch());
+		SerializationManager sm = getApplicationManager().getSerializationManager(Integer.MAX_VALUE, false, true);
+		String xml = sm.toXml(Arrays.<Resource>asList(ac1, ac2));
+		
+		Assert.assertTrue(ac1.onOffSwitch().equalsLocation(ac2.onOffSwitch()));
+		
+		Resource newParent = getApplicationManager().getResourceManagement().createResource(newResourceName()+"_CollectionTarget", Resource.class);
+		sm.createResourcesFromXml(new StringReader(xml), newParent);
+		
+		AirConditioner ac2repl = newParent.getSubResource(ac2name);
+
+		//System.out.println(ac2repl.onOffSwitch().getPath());
+		//System.out.println(ac2repl.onOffSwitch().getLocation());
+		Assert.assertTrue(ac1.onOffSwitch().equalsLocation(ac2repl.onOffSwitch()));
 	}
 
 }

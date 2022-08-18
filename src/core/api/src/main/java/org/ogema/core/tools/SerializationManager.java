@@ -430,6 +430,19 @@ public interface SerializationManager {
 	Collection<Resource> createResourcesFromXml(Reader xml, Resource parent);
 	
 	/**
+	 * Add the resources described in the XML document as new subresources of
+	 * the given parent resource, resolving all links relative to the given
+	 * link base resource (usually the parent).
+	 *
+	 * @param xml XML document for a collection of resources. 
+	 * 		Note that this differs from the format for a single resource.
+	 * @param parent resource in which to add the new resource.
+	 * @param linkBase resolve links against this resource (may be null)
+	 * @return the newly created sub-resources.
+	 */
+	Collection<Resource> createResourcesFromXml(Reader xml, Resource parent, Resource linkBase);
+	
+	/**
 	 * Add the resources described in the JSON document as new subresources of
 	 * the given parent resource.
 	 *
@@ -450,5 +463,18 @@ public interface SerializationManager {
 	 * @return the newly created sub-resources.
 	 */
 	Collection<Resource> createResourcesFromJson(Reader json, Resource parent);
+	
+	/**
+	 * Add the resources described in the JSON document as new subresources of
+	 * the given parent resource, resolving all links relative to the given
+	 * link base resource (usually the parent).
+	 *
+	 * @param json JSON document for a collection of resources. 
+	 * 		Note that this differs from the format for a single resource.
+	 * @param parent resource in which to add the new resource.
+	 * @param linkBase resolve links against this resource (may be null)
+	 * @return the newly created sub-resources.
+	 */
+	Collection<Resource> createResourcesFromJson(Reader json, Resource parent, Resource linkBase);
 
 }

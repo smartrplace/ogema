@@ -182,7 +182,7 @@ public class SerializationManagerImpl implements SerializationManager {
     @Override
     public <T extends Resource> T createFromXml(Reader xmlReader) throws ResourceAlreadyExistsException {
         try {
-            return core.create(core.deserializeXml(xmlReader), null);
+            return core.create(core.deserializeXml(xmlReader), null, null);
         } catch (IOException ioex) {
             //TODO
             throw new RuntimeException(ioex);
@@ -197,7 +197,7 @@ public class SerializationManagerImpl implements SerializationManager {
     @Override
     public <T extends Resource> T createFromXml(Reader xmlReader, Resource parent) {
         try {
-            return core.create(core.deserializeXml(xmlReader), parent);
+            return core.create(core.deserializeXml(xmlReader), parent, null);
         } catch (IOException ioex) {
             //TODO
             throw new RuntimeException(ioex);
@@ -212,7 +212,7 @@ public class SerializationManagerImpl implements SerializationManager {
     @Override
     public <T extends Resource> T createFromJson(Reader json) {
         try {
-            return core.create(core.deserializeJson(json), null);
+            return core.create(core.deserializeJson(json), null, null);
         } catch (IOException | ClassNotFoundException ex) {
             //TODO
             throw new RuntimeException(ex);
@@ -227,7 +227,7 @@ public class SerializationManagerImpl implements SerializationManager {
     @Override
     public <T extends Resource> T createFromJson(Reader json, Resource parent) {
         try {
-            return core.create(core.deserializeJson(json), parent);
+            return core.create(core.deserializeJson(json), parent, null);
         } catch (IOException | ClassNotFoundException ex) {
             //TODO
             throw new RuntimeException(ex);
@@ -365,7 +365,7 @@ public class SerializationManagerImpl implements SerializationManager {
     @Override
     public Collection<Resource> createResourcesFromXml(Reader xmlReader) {
         try {
-            return core.create(SerializationCore.deserializeXmlCollection(xmlReader), null);
+            return core.create(SerializationCore.deserializeXmlCollection(xmlReader), null, null);
         } catch (IOException | CloneNotSupportedException ioex) {
             //TODO
             throw new RuntimeException(ioex);
@@ -380,7 +380,17 @@ public class SerializationManagerImpl implements SerializationManager {
     @Override
     public Collection<Resource> createResourcesFromXml(Reader xmlReader, Resource parent) {
         try {
-            return core.create(SerializationCore.deserializeXmlCollection(xmlReader), parent);
+            return core.create(SerializationCore.deserializeXmlCollection(xmlReader), parent, null);
+        } catch (IOException | CloneNotSupportedException ioex) {
+            //TODO
+            throw new RuntimeException(ioex);
+        }
+    }
+	
+	@Override
+    public Collection<Resource> createResourcesFromXml(Reader xmlReader, Resource parent, Resource linkBase) {
+        try {
+            return core.create(SerializationCore.deserializeXmlCollection(xmlReader), parent, linkBase);
         } catch (IOException | CloneNotSupportedException ioex) {
             //TODO
             throw new RuntimeException(ioex);
@@ -395,7 +405,7 @@ public class SerializationManagerImpl implements SerializationManager {
     @Override
     public Collection<Resource> createResourcesFromJson(Reader jsonReader) {
         try {
-            return core.create(core.deserializeJsonCollection(jsonReader), null);
+            return core.create(core.deserializeJsonCollection(jsonReader), null, null);
         } catch (IOException ioex) {
             //TODO
             throw new RuntimeException(ioex);
@@ -410,7 +420,17 @@ public class SerializationManagerImpl implements SerializationManager {
     @Override
     public Collection<Resource> createResourcesFromJson(Reader jsonReader, Resource parent) {
         try {
-            return core.create(core.deserializeJsonCollection(jsonReader), parent);
+            return core.create(core.deserializeJsonCollection(jsonReader), parent, null);
+        } catch (IOException ioex) {
+            //TODO
+            throw new RuntimeException(ioex);
+        }
+    }
+	
+	@Override
+    public Collection<Resource> createResourcesFromJson(Reader jsonReader, Resource parent, Resource linkBase) {
+        try {
+            return core.create(core.deserializeJsonCollection(jsonReader), parent, linkBase);
         } catch (IOException ioex) {
             //TODO
             throw new RuntimeException(ioex);

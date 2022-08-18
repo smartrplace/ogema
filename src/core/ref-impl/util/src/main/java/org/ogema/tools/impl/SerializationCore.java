@@ -360,7 +360,7 @@ final class SerializationCore {
 
 	void applyJson(Reader jsonReader, Resource resource, boolean forceUpdate) {
 		try {
-			apply(deserializeJson(jsonReader), resource, forceUpdate);
+			apply(deserializeJson(jsonReader), resource, null, forceUpdate);
 		} catch (IOException | ClassNotFoundException ex) {
 			LOGGER.error("import of JSON resource into OGEMA failed; target resource {}", resource, ex);
 		}
@@ -372,7 +372,7 @@ final class SerializationCore {
 
 	void applyXml(Reader xmlReader, Resource resource, boolean forceUpdate) {
 		try {
-			apply(deserializeXml(xmlReader), resource, forceUpdate);
+			apply(deserializeXml(xmlReader), resource, null, forceUpdate);
 		} catch (IOException | ClassNotFoundException ex) {
 			LOGGER.error("import of XML resource into OGEMA failed; target resource {}", resource, ex);
 		}
@@ -423,9 +423,9 @@ final class SerializationCore {
 		}
 	}
     
-    protected <T extends Resource> T create(org.ogema.serialization.jaxb.Resource input, Resource target) {
+    protected <T extends Resource> T create(org.ogema.serialization.jaxb.Resource input, Resource target, Resource linkBase) {
         Set<LinkInfo> unresolvedLinks = new HashSet<>();
-        T rval = createInternal(input, target, unresolvedLinks);
+        T rval = createInternal(input, target, linkBase, unresolvedLinks);
         for (LinkInfo link: unresolvedLinks) {
             // create missing links between different top level resources
             //XXX works outside of activation transactions.
@@ -456,7 +456,7 @@ final class SerializationCore {
 	 * create the input resource as new subresource of target, or as new top
 	 * level resource if target is null.
 	 */
-	protected <T extends Resource> T createInternal(org.ogema.serialization.jaxb.Resource input, Resource target, Set<LinkInfo> unresolvedLinks) {
+	protected <T extends Resource> T createInternal(org.ogema.serialization.jaxb.Resource input, Resource target, Resource linkBase, Set<LinkInfo> unresolvedLinks) {
 		try {
 			@SuppressWarnings("unchecked")
 			final Class<? extends Resource> inputOgemaType = (Class<? extends Resource>) Class.forName(input.getType());
@@ -471,7 +471,7 @@ final class SerializationCore {
 				// add to root
 				for (Object o : input.getSubresources()) {
 					if (o instanceof org.ogema.serialization.jaxb.Resource) {
-						createInternal((org.ogema.serialization.jaxb.Resource) o, null, unresolvedLinks);
+						createInternal((org.ogema.serialization.jaxb.Resource) o, null, linkBase, unresolvedLinks);
 					} else {
 						LOGGER.error("trying to create top level link: {}", o.getClass());
 					}
@@ -498,7 +498,7 @@ final class SerializationCore {
 					target = sub;
                     checkResourceList(input, target);
 				}
-				unresolvedLinks.addAll(apply(input, target, true));
+				unresolvedLinks.addAll(apply(input, target, linkBase, true));
 			}
 			@SuppressWarnings("unchecked")
 			T rval = resacc.getResource(target.getPath());// (T) target;
@@ -544,7 +544,7 @@ final class SerializationCore {
 	 */
 	// TODO exception handling
 	@SuppressWarnings("unchecked")
-	protected Set<LinkInfo> apply(org.ogema.serialization.jaxb.Resource input, final Resource target, boolean forceUpdate)
+	protected Set<LinkInfo> apply(org.ogema.serialization.jaxb.Resource input, final Resource target, final Resource linkBase, boolean forceUpdate)
 			throws ClassNotFoundException {
 		Set<LinkInfo> unresolvedLinks = Collections.emptySet();
 		Set<LinkInfo> lastUnresolvedLinks;
@@ -555,7 +555,7 @@ final class SerializationCore {
 		do {
 			lastUnresolvedLinks = unresolvedLinks;
 			unresolvedLinks = applyInternal(input, target, forceUpdate, trans, resourcesToActivate,
-					resourcesToDeactivate, target);
+					resourcesToDeactivate, linkBase);
 			// repeat until there are no more unresolved links, or the set
 			// of unresolved links doesn't change any more (-> input broken or
 			// refering to deleted resources)
@@ -630,7 +630,7 @@ final class SerializationCore {
 	private Set<LinkInfo> applyInternal(org.ogema.serialization.jaxb.Resource input, Resource target, boolean forceUpdate,
 			@SuppressWarnings("deprecation") org.ogema.core.resourcemanager.Transaction trans,
 			Collection<Resource> resourcesToActivate, Collection<Resource> resourcesToDeactivate,
-			final Resource importBase)
+			final Resource linkBase)
 			throws ClassNotFoundException {
 		Set<LinkInfo> unresolvedLinks = new HashSet<>();
 		final Class<?> inputOgemaType = Class.forName(input.getType());
@@ -683,24 +683,18 @@ final class SerializationCore {
                     ogemaSubRes = target.addDecorator(name, subResType);
 				}
 				unresolvedLinks.addAll(applyInternal(subRes, ogemaSubRes, forceUpdate, trans, resourcesToActivate,
-						resourcesToDeactivate, importBase));
+						resourcesToDeactivate, linkBase));
 			} else if (o instanceof ResourceLink) {
 				ResourceLink link = (ResourceLink) o;
 				// when importing a resource collection to a subresource, links
 				// between imported resources must be resolved relative to their
 				// new base resource
 				String linkPath = link.getLink();
-				String importBasePath = importBase == null
+				String importBasePath = linkBase == null
 						? ""
-						: (importBase.getParent() != null
-							? importBase.getParent().getPath()
-							: "");
-				if (importBasePath.equals("/")) {
-					importBasePath = "";
-				}
-				linkPath = linkPath.startsWith("/")
-						? importBasePath + linkPath
-						: importBasePath + "/" + linkPath;
+						: linkBase.getPath();
+				String joined = joinPaths(importBasePath, linkPath);
+				linkPath = joined;
 				Resource linkedResource = resacc.getResource(linkPath);
 				if (linkedResource == null || !linkedResource.exists()) {
 					unresolvedLinks.add(new LinkInfo(target.getPath(), link.getName(), linkPath, link.getType()));
@@ -720,6 +714,16 @@ final class SerializationCore {
 			}
 		}
 		return unresolvedLinks;
+	}
+	
+	static String joinPaths(String p1, String p2) {
+		return p1.endsWith("/")
+				? p2.startsWith("/")
+					? p1 + p2.substring(1)
+					: p1 + p2
+				: p2.startsWith("/")
+					? p1 + p2
+					: p1 + "/" + p2;
 	}
 
 	static boolean isOptionalElement(String elementName, Class<? extends Resource> type) {
@@ -829,7 +833,8 @@ final class SerializationCore {
 		// elements, requires investigation (+ separate
 		// unit tests)
 		if (jaxbSchedule.getStart() != null) {
-			long end = jaxbSchedule.getEnd() == null || jaxbSchedule.getEnd() == -1 ? Long.MAX_VALUE
+			long end = jaxbSchedule.getEnd() == null || jaxbSchedule.getEnd() == -1
+					? Long.MAX_VALUE
 					: jaxbSchedule.getEnd();
 			ogemaSchedule.replaceValues(jaxbSchedule.getStart(), end, ogemaValues);
 		} else {
@@ -980,11 +985,11 @@ final class SerializationCore {
 		}
 	}
 	
-	protected Collection<Resource> create(ResourceCollection input, Resource target) throws CloneNotSupportedException {
+	protected Collection<Resource> create(ResourceCollection input, Resource target, Resource linkBase) throws CloneNotSupportedException {
 		List<Resource> resources = new ArrayList<>();
 		for (Object res: input.getSubresources()) {
 			try {
-				Resource result = create((org.ogema.serialization.jaxb.Resource) res, target);
+				Resource result = create((org.ogema.serialization.jaxb.Resource) res, target, linkBase);
 				if (result != null)
 					resources.add(result);
 			} catch (Exception e) {
@@ -994,11 +999,11 @@ final class SerializationCore {
 		return resources;
 	}
 	
-	protected Collection<Resource> create(Collection<org.ogema.serialization.jaxb.Resource> input, Resource target) {
+	protected Collection<Resource> create(Collection<org.ogema.serialization.jaxb.Resource> input, Resource target, Resource linkBase) {
 		List<Resource> resources = new ArrayList<>();
 		for (org.ogema.serialization.jaxb.Resource res: input) {
 			try {
-				Resource result = create(res, target);
+				Resource result = create(res, target, linkBase);
 				if (result != null)
 					resources.add(result);
 			} catch (Exception e) {
