@@ -32,7 +32,9 @@ import java.lang.reflect.ParameterizedType;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.ProtectionDomain;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.objectweb.asm.ClassWriter;
@@ -104,6 +106,9 @@ enum ResourceFactoryASM {
 			mv.visitMaxs(4, 4);
 			mv.visitEnd();
 		}
+		
+		// filter out duplicate names
+		List<String> methodNamesList = new ArrayList<>();
         
         for (Method m : ogemaType.getMethods()) {
             if (m.getDeclaringClass().equals(Resource.class)) {
@@ -114,6 +119,10 @@ enum ResourceFactoryASM {
                 //Java 8 default method, skip
                 continue;
             }
+			
+			if (methodNamesList.contains(m.getName())) {
+				continue;
+			}
             
 			String signature = null;
 			if (ResourceList.class.isAssignableFrom(m.getReturnType())){
@@ -125,7 +134,7 @@ enum ResourceFactoryASM {
 						Type.getInternalName(m.getReturnType()),
 						Type.getInternalName(typeParameter));
 			}
-            
+			
             int access = ACC_PUBLIC | ((m.isBridge() || m.isSynthetic()) ? ACC_SYNTHETIC : 0);
 
 			mv = cw.visitMethod(access, m.getName(),
@@ -141,6 +150,8 @@ enum ResourceFactoryASM {
 			mv.visitInsn(ARETURN);
 			mv.visitMaxs(2, 1);
 			mv.visitEnd();
+			
+			methodNamesList.add(m.getName());
 		}
 
 		cw.visitEnd();
