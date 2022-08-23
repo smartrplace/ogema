@@ -22,6 +22,7 @@ import java.util.Optional;
 import org.ogema.core.model.Resource;
 
 import org.ogema.core.model.ResourceList;
+import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
@@ -41,6 +42,7 @@ import org.ogema.model.devices.buildingtechnology.Thermostat;
 import org.ogema.model.devices.connectiondevices.ThermalValve;
 import org.ogema.model.devices.sensoractordevices.SensorDevice;
 import org.ogema.tools.resource.util.ResourceUtils;
+import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.osgi.framework.Constants;
 import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
@@ -50,7 +52,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author jlapp
  */
-@Component(service = {DeviceHandlerFactory.class}, property = {Constants.SERVICE_RANKING + ":Integer=1"})
+@Component(service = {DeviceHandlerFactory.class}, property = {Constants.SERVICE_RANKING + ":Integer=5"})
 public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHandlerFactory {
 	
 	public static final String LINKED_THERMOSTAT_DECORATOR = "linkedThermostat";
@@ -71,26 +73,23 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
     }
     
     enum PARAMS {
-        STATE() {
+		STATE() {
+			@Override
+			public void setEventValue(HmEvent e, SingleValueResource res) {
+				// FAL230 provides only false / true values for the valve state
+				((FloatResource) res).setValue(e.getValueBoolean() ? 1.0f : 0.0f);
+			}
+		},
+		LEVEL() {
+			@Override
+			public void setEventValue(HmEvent e, SingleValueResource res) {
+				// FALMOT provides valve state as 0..100%
+				((FloatResource) res).setValue(e.getValueFloat() / 100f);
+			}
+		};
 
-                    @Override
-                    public float convertInput(boolean v) {
-                    	// FAL provides only false / true values for the valve state
-                        return v?1.0f:0.0f;
-                    }
-
-                },
-        BATTERY_STATE;
-
-        public float convertInput(boolean b) {
-            return b?1.0f:0.0f;
-        }
-        public float convertInput(float b) {
-            return b;
-        }
-
-        public float convertOutput(float v) {
-            return v;
+        public void setEventValue(HmEvent e, SingleValueResource res) {
+            ValueResourceUtils.setValue(res, e.getValueString());
         }
 
     }
@@ -117,7 +116,7 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
                 }
                 try {
                     PARAMS p = PARAMS.valueOf(e.getValueKey());
-                    ((FloatResource) res).setValue(p.convertInput(e.getValueBoolean()));
+					p.setEventValue(e, res);
                     logger.debug("resource updated: {} = {}", res.getPath(), e.getValue());
                 } catch (IllegalArgumentException ex) {
                     //this block intentionally left blank
@@ -133,9 +132,10 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
 	@Override
 	public boolean accept(DeviceDescription desc) {
 		//System.out.println("parent type = " + desc.getParentType());
-		return ("HmIP-FAL230-C10".equalsIgnoreCase(desc.getParentType()) || "HmIP-FAL230-C6".equalsIgnoreCase(desc.getParentType()))
+		return (("HmIP-FAL230-C10".equalsIgnoreCase(desc.getParentType()) || "HmIP-FAL230-C6".equalsIgnoreCase(desc.getParentType()))
 				&& ("CLIMATECONTROL_FLOOR_TRANSCEIVER".equalsIgnoreCase(desc.getType())
-				|| "CLIMATECONTROL_FLOOR_PUMP_TRANSCEIVER".equalsIgnoreCase(desc.getType()));
+				|| "CLIMATECONTROL_FLOOR_PUMP_TRANSCEIVER".equalsIgnoreCase(desc.getType())))
+				|| ("HmIP-FALMOT-C12".equalsIgnoreCase(desc.getParentType()) && "CLIMATECONTROL_FLOOR_TRANSCEIVER".equalsIgnoreCase(desc.getType()));
 	}
 
     @Override
