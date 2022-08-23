@@ -942,10 +942,10 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 			}
 		}
 		for (Map.Entry<String, Authenticator> entry : authenticators.entrySet()) {
-			logger.error("trying pluggable authenticator: {}", entry.getKey());
+			logger.debug("trying pluggable authenticator: {}", entry.getKey());
 			if (isNatural != null && 
 					!isAuthenticatorAdmitted(isNatural ? OGEMA_NATURAL_USER : OGEMA_MACHINE_USER, entry.getKey())) {
-				logger.error("pluggable authenticator not admitted (isNatural={})", isNatural);
+				logger.debug("pluggable authenticator not admitted (isNatural={})", isNatural);
 				continue;
 			}
 			Authenticator auth = null;

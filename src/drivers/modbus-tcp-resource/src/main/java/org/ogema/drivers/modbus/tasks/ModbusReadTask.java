@@ -168,20 +168,25 @@ public class ModbusReadTask extends ModbusTask {
 		} else if (resource instanceof FloatResource) {
 			float f = Float.valueOf(response.getFloatValue()).floatValue()
 					* factor + offset;
+			logger.debug("setting resource value: {}={}", resource.getPath(), f);
 			((FloatResource) resource).setValue(f);
 		} else if (resource instanceof IntegerResource) {
 			Integer val = (int) (Integer.valueOf(response.getIntegerValue())
 					.intValue() * factor + offset);
+			logger.debug("setting resource value: {}={}", resource.getPath(), val);
 			((IntegerResource) resource).setValue(val);
 		} else if (resource instanceof TimeResource) {
 			Long val = (long) (Long.valueOf(response.getLongValue())
 					.longValue() * factor + offset);
+			logger.debug("setting resource value: {}={}", resource.getPath(), val);
 			((TimeResource) resource).setValue(val);
 		} else if (resource instanceof StringResource) {
 			String val = response.getStringValue();
+			logger.debug("setting resource value: {}={}", resource.getPath(), val);
 			((StringResource) resource).setValue(val);
 		} else if (resource instanceof ByteArrayResource) {
 			byte[] val = response.getByteArrayValue();
+			logger.debug("setting resource value: {}=({} bytes)", resource.getPath(), val.length);
 			((ByteArrayResource) resource).setValues(val);
 		} else {
 			logger.warn("Modbus Task for resource of type "

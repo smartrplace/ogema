@@ -45,6 +45,11 @@ import org.ogema.core.tools.SerializationManager;
 import org.ogema.exam.OsgiAppTestBase;
 import org.ogema.exam.ResourceAssertions;
 import org.ogema.model.actors.OnOffSwitch;
+import org.ogema.model.connections.ThermalMixingConnection;
+import org.ogema.model.locations.Room;
+import org.ogema.model.locations.WorkPlace;
+import org.ogema.model.prototypes.Configuration;
+import org.ogema.model.prototypes.PhysicalElement;
 import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
 import org.ops4j.pax.exam.spi.reactors.PerClass;
 
@@ -274,5 +279,31 @@ public class JsonSerializationOsgiTest extends OsgiAppTestBase {
         ResourceAssertions.assertExists(sw);
         assertEquals(42, pow.getValue(), 0);
     }
+	
+	@Test
+	public void resourceListRoundtrip() throws Exception {
+		ResourceList l = resman.createResource(newResourceName(), ResourceList.class);
+		l.setElementType(PhysicalElement.class);
+		OnOffSwitch sw1 = l.getSubResource("sw1", OnOffSwitch.class).create();
+		OnOffSwitch sw2 = l.getSubResource("sw2", OnOffSwitch.class).create();
+		Resource testDecorator = l.getSubResource("_decorator_", Configuration.class).create();
+		Resource testDecorator2 = l.getSubResource("_decorator2_", ThermalMixingConnection.class).create();
+
+		StringWriter output = new StringWriter();
+		sman.writeJson(output, l);
+		System.out.println(output.toString());
+
+		Resource outputRes = resman.createResource(newResourceName(), Resource.class);
+		
+		ResourceList restored = sman.createFromJson(output.toString(), outputRes);
+		
+		Assert.assertTrue("Not a ResourceList: " + restored,
+				restored instanceof ResourceList);
+		Assert.assertNotNull("wp1 missing", restored.getSubResource(sw1.getName()));
+		Assert.assertNotNull("wp2 missing", restored.getSubResource(sw2.getName()));
+		Assert.assertNotNull("decorator 1 missing", restored.getSubResource(testDecorator.getName()));
+		Assert.assertNotNull("decorator 2 missing", restored.getSubResource(testDecorator2.getName()));
+	}
+
 
 }
