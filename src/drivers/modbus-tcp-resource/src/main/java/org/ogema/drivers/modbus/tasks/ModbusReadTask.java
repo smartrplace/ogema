@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.core.channelmanager.measurements.Value;
+import org.ogema.core.model.Resource;
 import org.ogema.core.model.ValueResource;
 import org.ogema.core.model.array.ByteArrayResource;
 import org.ogema.core.model.simple.BooleanResource;
@@ -39,6 +40,7 @@ import org.ogema.drivers.modbus.ModbusPattern;
 import org.ogema.drivers.modbus.enums.FunctionCode;
 import org.ogema.drivers.modbus.util.Connection;
 import org.ogema.drivers.modbus.util.ModbusDriverUtil;
+import org.ogema.model.ranges.GenericFloatRange;
 
 /**
  * Task for reading from a modbus device.
@@ -161,15 +163,45 @@ public class ModbusReadTask extends ModbusTask {
 				AccessPriority.PRIO_LOWEST); // release resource
 		// do not destroy executor... it may be used by other threads still
 	}
+	
+	private Float outOfRangeValue(float val) {
+		try {
+		if (!Float.isFinite(val)) {
+			return null;
+		}
+		Resource r = pattern.model.getSubResource("validValuesRange");
+		if (r != null) {
+			GenericFloatRange range = (GenericFloatRange) r;
+			if (range.lowerLimit().isActive() && range.upperLimit().isActive()) {
+				if (val < range.lowerLimit().getValue() || val > range.upperLimit().getValue()) {
+					FloatResource err = range.getSubResource("invalidValue", FloatResource.class);
+					if (err.isActive()) {
+						return err.getValue();
+					}
+				}
+			}
+		}
+		return null;
+		} catch (RuntimeException re) {
+			logger.error("fail!", re);
+			return null;
+		}
+	}
 
 	private void writeToResource(Value response) {
 		if (resource instanceof BooleanResource) {
 			((BooleanResource) resource).setValue(response.getBooleanValue());
 		} else if (resource instanceof FloatResource) {
-			float f = Float.valueOf(response.getFloatValue()).floatValue()
-					* factor + offset;
-			logger.debug("setting resource value: {}={}", resource.getPath(), f);
-			((FloatResource) resource).setValue(f);
+			float modbusValue = Float.valueOf(response.getFloatValue()).floatValue();
+			float f = modbusValue * factor + offset;
+			Float err = outOfRangeValue(f);
+			if (err != null) {
+				logger.debug("received out of range value for {}: {}, setting error value: {}", resource.getPath(), f, err);
+				((FloatResource) resource).setValue(err);
+			} else {
+				logger.debug("setting resource value: {}={}", resource.getPath(), f);
+				((FloatResource) resource).setValue(f);
+			}
 		} else if (resource instanceof IntegerResource) {
 			Integer val = (int) (Integer.valueOf(response.getIntegerValue())
 					.intValue() * factor + offset);
