@@ -23,14 +23,18 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 
 public class DataFile {
 
 	static final int BUFFER_SIZE = 1024;
 
 	String fileName;
-	RandomAccessFile raf;
+	private RandomAccessFile raf;
 	DataOutputStream out;
+	private ByteBuffer bb;
+	ByteBufferDataInput input;
 
 	private File file;
 
@@ -41,7 +45,10 @@ public class DataFile {
 		this.file = dataFile;
 		try {
 			this.raf = new RandomAccessFile(dataFile, "r");
-		} catch (FileNotFoundException e) {
+			this.bb = raf.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, raf.length());
+			input = new ByteBufferDataInput(bb);
+			// System.out.printf(" --- opened data file %s, %d bytes ---%n", dataFile, raf.length());
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}

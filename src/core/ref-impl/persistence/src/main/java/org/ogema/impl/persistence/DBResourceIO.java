@@ -20,6 +20,10 @@ import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.io.UTFDataFormatException;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -187,7 +191,7 @@ public class DBResourceIO {
 			if (f != null) {
 				resDataFiles.fileNew = f;
 				dataFile = new DataFile(f);
-				emergencyParser(dataFile.raf);
+				emergencyParser(dataFile.input);
 				dataFile.close();
 				// dataFile = null;
 			}
@@ -206,7 +210,7 @@ public class DBResourceIO {
 			dbFileInitialOffset = (int) resDataFiles.fileNew.length();
 	}
 
-	private void emergencyParser(RandomAccessFile raf) {
+	private void emergencyParser(ByteBufferDataInput raf) {
 		logger.debug("EmergencyParser parses Resources...");
 
 		// read the entries
@@ -219,7 +223,7 @@ public class DBResourceIO {
 				int key = node.resID;
 				offsetByID.put(key, offset);
 			}
-		} catch (IOException e) {
+		} catch (BufferUnderflowException | IOException e) {
 			if (Configuration.LOGGING)
 				logger.debug("...Resources parsing aborted with exception");
 		}
@@ -229,12 +233,6 @@ public class DBResourceIO {
 
 		if (Configuration.LOGGING)
 			logger.debug("...Resources parsed");
-		try {
-			if (raf != null)
-				raf.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
 		parsed = true;
 	}
 
@@ -337,8 +335,8 @@ public class DBResourceIO {
 		if (dataFileLength <= offset)
 			return null;
 		try {
-			df.raf.seek(offset);
-			tryReadEntry(df.raf);
+			df.input.seek(offset);
+			tryReadEntry(df.input);
 		} catch (Exception e) {
 			df.close();
 			return null; // In this case resource data file is smaller than it's expected. The resource tree could be
@@ -392,8 +390,28 @@ public class DBResourceIO {
 				return;
 			}
 			dataFile.out.writeUTF(name);
-		} catch (IOException e) {
+		} catch (UTFDataFormatException dfe) {
+            System.err.printf("UTFDataFormatException: %s%n", dfe.getMessage());
+        } catch (IOException e) {
 			e.printStackTrace();
+		}
+	}
+    
+    private void setUTF8(String name, TreeElementImpl node) {
+		try {
+			/*
+			 * If the string is null wrtiteUTF throws an exception. In order to encode this case correctly in the
+			 * database -1 is written instead of the UTF-8 string. During the parse process this case is to be
+			 * evaluated.
+			 */
+			if (name == null) {
+				dataFile.out.writeShort(-1);
+				return;
+			}
+			dataFile.out.writeUTF(name);
+        } catch (IOException e) {
+			System.err.printf("Exception on node %s: %s %s%n",
+                    node.path, e.getClass().getSimpleName(), e.getMessage());
 		}
 	}
 
@@ -552,7 +570,7 @@ public class DBResourceIO {
 				break;
 
 			case DBConstants.TYPE_KEY_STRING:
-				setUTF8(node.isNonpersistent() ? null : value.S);
+				setUTF8(node.isNonpersistent() ? null : value.S, node);
 				node.footprint += value.footprint;
 				break;
 			// set Primitive array resource values
@@ -640,13 +658,15 @@ public class DBResourceIO {
 		if (Configuration.LOGGING)
 			logger.debug("Parse Resources...");
 
-		RandomAccessFile dirRaf = mapFile.raf;
 		// read the entries
-		RandomAccessFile dataRaf = dataFile.raf;
+		ByteBufferDataInput dataRaf = dataFile.input;
 		this.garbage = 0;
 		int endGarbage = 0, beginGarbage = 0;
-		if (dirRaf != null) {
-			try {
+		if (mapFile.raf != null) {
+			//RandomAccessFile dirRaf = mapFile.raf;
+			try (RandomAccessFile raf = mapFile.raf) {
+				ByteBuffer bb = raf.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, raf.length());
+				ByteBufferDataInput dirRaf = new ByteBufferDataInput(bb);		
 				dirRaf.seek(0);
 				int dirEntryCount = mapFile.entryCount;
 				while (dirEntryCount > 0) {
@@ -669,15 +689,11 @@ public class DBResourceIO {
 		database.nextresourceID = maxID + 1;
 
 		postProcess();
-		if (Configuration.LOGGING)
+		if (Configuration.LOGGING) {
 			logger.debug("...Resources parsed");
-		try {
-			if (dataRaf != null)
-				dataRaf.close();
-			if (dirRaf != null)
-				dirRaf.close();
-		} catch (IOException e) {
-			e.printStackTrace();
+		}
+		if (dataRaf != null) {
+			dataRaf.close();
 		}
 	}
 
@@ -730,7 +746,7 @@ public class DBResourceIO {
 	 * @param ifaces
 	 * @return
 	 */
-	TreeElementImpl readEntry(RandomAccessFile raf) throws IOException, EOFException {
+	TreeElementImpl readEntry(ByteBufferDataInput raf) throws IOException, EOFException {
 		boolean clsLoaded = true;
 		@SuppressWarnings("unused")
 		// 1. read header of the entry
@@ -864,7 +880,7 @@ public class DBResourceIO {
 		}
 	}
 
-	void tryReadEntry(RandomAccessFile raf) throws IOException, EOFException {
+	void tryReadEntry(ByteBufferDataInput raf) throws IOException, EOFException {
 		// 1. read header of the entry
 		TreeElementImpl node = new TreeElementImpl(database);
 		readHeader(node, raf);
@@ -981,7 +997,7 @@ public class DBResourceIO {
 	 * If the string is null wrtiteUTF throws an exception. In order to encode this case correctly in the database -1 is
 	 * written instead of the UTF-8 string. During the parse process is this case to be evaluated. This method
 	 */
-	private boolean isNullString(RandomAccessFile raf) {
+	private boolean isNullString(ByteBufferDataInput raf) {
 		try {
 			int strlen = raf.readShort();
 			if (strlen == -1) { // null string encoded
@@ -998,7 +1014,7 @@ public class DBResourceIO {
 	}
 
 	private void readAS(TreeElementImpl node) throws IOException {
-		RandomAccessFile raf = dataFile.raf;
+		ByteBufferDataInput raf = dataFile.input;
 		int length = raf.readInt();
 		String sArr[] = new String[length];
 		String val = null;
@@ -1019,7 +1035,7 @@ public class DBResourceIO {
 	}
 
 	private void readAZ(TreeElementImpl node) throws IOException {
-		RandomAccessFile raf = dataFile.raf;
+		ByteBufferDataInput raf = dataFile.input;
 		int length = raf.readInt();
 		boolean zArr[] = new boolean[length];// node.simpleValue.aZ;
 		boolean val = false;
@@ -1037,7 +1053,7 @@ public class DBResourceIO {
 	}
 
 	private void readAF(TreeElementImpl node) throws IOException {
-		RandomAccessFile raf = dataFile.raf;
+		ByteBufferDataInput raf = dataFile.input;
 		int length = raf.readInt();
 		float fArr[] = new float[length];// node.simpleValue.aF;
 		float val = 0;
@@ -1055,7 +1071,7 @@ public class DBResourceIO {
 	}
 
 	private void readAJ(TreeElementImpl node) throws IOException {
-		RandomAccessFile raf = dataFile.raf;
+		ByteBufferDataInput raf = dataFile.input;
 		int length = raf.readInt();
 		long jArr[] = new long[length];// node.simpleValue.aJ;
 		long val = 0;
@@ -1073,7 +1089,7 @@ public class DBResourceIO {
 	}
 
 	private void readAI(TreeElementImpl node) throws IOException {
-		RandomAccessFile raf = dataFile.raf;
+		ByteBufferDataInput raf = dataFile.input;
 		int length = raf.readInt();
 		int iArr[] = new int[length];// node.simpleValue.aI;
 		int val = 0;
@@ -1091,7 +1107,7 @@ public class DBResourceIO {
 	}
 
 	private void readAB(TreeElementImpl node) throws IOException {
-		RandomAccessFile raf = dataFile.raf;
+		ByteBufferDataInput raf = dataFile.input;
 		int length = raf.readInt();
 		byte bArr[] = new byte[length]; // node.simpleValue.aB;
 		int val = 0;
@@ -1171,7 +1187,7 @@ public class DBResourceIO {
 		return true;
 	}
 
-	private void readHeader(TreeElementImpl entry, RandomAccessFile raf) throws IOException, EOFException {
+	private void readHeader(TreeElementImpl entry, ByteBufferDataInput raf) throws IOException, EOFException {
 		/* 1. Set type ID */
 		entry.typeName = raf.readUTF();
 		// 2. set resource ID
@@ -1181,11 +1197,11 @@ public class DBResourceIO {
 		// 3. set resources parent ID
 		entry.parentID = raf.readInt();
 		// 4. setFlags
-		entry.setFlags(raf.read());
+		entry.setFlags(raf.readUnsignedByte());
 		if (Configuration.LOGGING && entry.complexArray)
 			logger.debug("ResourceList name: " + entry.typeName);
 		// 5. setTypeKey
-		entry.typeKey = raf.read();
+		entry.typeKey = raf.readUnsignedByte();
 		// 6. set name and path strings
 		String path = raf.readUTF();
 		if (Configuration.LOGGING)

@@ -524,8 +524,8 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 				resIDsByType.put(name, v);
 			}
 
-			if (!v.contains(e.resID))
-				v.add(e.resID);
+			//if (!v.contains(e.resID))
+			v.add(e.resID);
 		}
 
 		// register in table of nodes by id as type
