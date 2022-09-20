@@ -22,7 +22,6 @@ import java.util.Optional;
 import org.ogema.core.model.Resource;
 
 import org.ogema.core.model.ResourceList;
-import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
@@ -159,6 +158,7 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
         Map<String, SingleValueResource> resources = new HashMap<>();
         for (Map.Entry<String, ParameterDescription<?>> e : values.entrySet()) {
             switch (e.getKey()) {
+				case "LEVEL":
                 case "STATE": {
                     FloatResource reading = valve.setting().stateFeedback();
                     if (!reading.exists()) {
