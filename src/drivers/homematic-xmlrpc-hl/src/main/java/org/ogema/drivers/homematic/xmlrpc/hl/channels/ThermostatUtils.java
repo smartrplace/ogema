@@ -2,6 +2,7 @@ package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
 import java.io.IOException;
 import java.time.DayOfWeek;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -16,6 +17,7 @@ import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
+import org.ogema.core.model.units.TemperatureResource;
 import org.ogema.core.resourcemanager.ResourceValueListener;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
 import static org.ogema.drivers.homematic.xmlrpc.hl.channels.IpThermostatBChannel.CONTROL_MODE_DECORATOR;
@@ -39,6 +41,7 @@ abstract class ThermostatUtils {
 	static {
 		PARAMETERS = new LinkedHashMap<>();
 		PARAMETERS.put("TEMPERATUREFALL_MODUS", IntegerResource.class);
+		PARAMETERS.put("TEMPERATUREFALL_VALUE", TemperatureResource.class);
 		PARAMETERS.put("TEMPERATUREFALL_WINDOW_OPEN_TIME_PERIOD", IntegerResource.class);
 		PARAMETERS.put("TEMPERATURE_WINDOW_OPEN", FloatResource.class);
 		PARAMETERS.put("VALVE_MAXIMUM_POSITION", FloatResource.class);
@@ -65,6 +68,14 @@ abstract class ThermostatUtils {
 		@Override
 		public void resourceChanged(SingleValueResource resource) {
 			String paramName = resource.getName();
+			Object resourceValue = getResourceValue(resource, logger);
+			Map<String, Object> parameterSet = new HashMap<>();
+			parameterSet.put(paramName, resourceValue);
+			conn.performPutParamset(address, "MASTER", parameterSet);
+			logger.info("Parameter set 'MASTER' updated for {}: {}", address, parameterSet);
+		}
+		
+		static Object getResourceValue(SingleValueResource resource, Logger logger) {
 			Object resourceValue = null;
 			if (resource instanceof IntegerResource) {
 				resourceValue = ((IntegerResource) resource).getValue();
@@ -75,10 +86,7 @@ abstract class ThermostatUtils {
 			} else {
 				logger.warn("unsupported parameter type: " + resource);
 			}
-			Map<String, Object> parameterSet = new HashMap<>();
-			parameterSet.put(paramName, resourceValue);
-			conn.performPutParamset(address, "MASTER", parameterSet);
-			logger.info("Parameter set 'MASTER' updated for {}: {}", address, parameterSet);
+			return resourceValue;
 		}
 
 	};
@@ -124,6 +132,21 @@ abstract class ThermostatUtils {
 				CompletableFuture.delayedExecutor(3, TimeUnit.SECONDS).execute(readValue);
 			}, true);
 			readValue.run();
+		}
+	}
+	
+	static void sendParameters(String address, ParameterDescription.SET_TYPES set,
+			Map<String, ParameterDescription<?>> allParams, Collection<SingleValueResource> resources,
+			HomeMaticConnection conn, Logger logger) {
+		Map<String, Object> values = new HashMap<>();
+		resources.forEach(svr -> {
+			ParameterDescription<?> desc = allParams.get(svr.getName());
+			if (desc != null && desc.isWritable()) {
+				values.put(svr.getName(), ParameterListener.getResourceValue(svr, logger));
+			}
+		});
+		if (!values.isEmpty()) {
+			conn.performPutParamset(address, set.name(), values);
 		}
 	}
 
