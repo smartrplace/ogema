@@ -32,6 +32,7 @@ import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandler;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandlerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
+import static org.ogema.drivers.homematic.xmlrpc.hl.channels.DeviceHandlers.findDeviceChannel;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
@@ -176,7 +177,7 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
         
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
         setupHmParameterValues(valve, parent.address().getValue());
-        setupThermostatLinking(valve, conn, logger);
+        setupThermostatLinking(valve, deviceAddress, conn, logger);
     }
     
     class ParameterListener implements ResourceValueListener<SingleValueResource> {
@@ -219,9 +220,11 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
         }
     }
 	
-	static void setupThermostatLinking(final ThermalValve valve, HomeMaticConnection conn, Logger logger) {
-		String TEMPERATURE_SENDER_CHANNEL = "CLIMATECONTROL_FLOOR_TRANSMITTER";
-		String TEMPERATURE_RECEIVER_CHANNEL = "CLIMATECONTROL_FLOOR_TRANSCEIVER";
+	
+	
+	static void setupThermostatLinking(final ThermalValve valve, final String falmotChannel, HomeMaticConnection conn, Logger logger) {
+		String TEMPERATURE_SENDER_CHANNEL = "CLIMATECONTROL_FLOOR_TRANSMITTER"; //wall thermostat
+		//String TEMPERATURE_RECEIVER_CHANNEL = "CLIMATECONTROL_FLOOR_TRANSCEIVER"; //falmot
 		
         Thermostat tempSens = valve.getSubResource(LINKED_THERMOSTAT_DECORATOR, Thermostat.class);
         
@@ -232,20 +235,17 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
                 Resource added = event.getChangedResource();
                 if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_ADDED) {
                     if (added.getName().equals(LINKED_THERMOSTAT_DECORATOR) && added instanceof Thermostat) {
-                        DeviceHandlers.linkChannels(conn, added, TEMPERATURE_SENDER_CHANNEL,
-                                valve, TEMPERATURE_RECEIVER_CHANNEL, logger,
-                                "Valve-Thermostat-Link", "Link wall thermostat - floor heating", false);
+						Optional<HmDevice> senderChannel = findDeviceChannel(conn, added, TEMPERATURE_SENDER_CHANNEL, logger);
+						senderChannel.ifPresent(sender -> {
+							String senderAddress = sender.address().getValue();
+							conn.performAddLink(senderAddress, falmotChannel, "Valve-Thermostat-Link", "Link wall thermostat - floor heating");
+						});
                     }
                 } else if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_REMOVED
                 		&& added.getName().equals(LINKED_THERMOSTAT_DECORATOR)) {
                 	// since we do not know which resource the link referenced before it got deleted
                 	// we need to use the low level API to find out all links for the weather receiver channel
-                    Optional<HmDevice> recChan = DeviceHandlers.findDeviceChannel(
-                            conn, valve, TEMPERATURE_RECEIVER_CHANNEL, logger);
-                    if (!recChan.isPresent()) {
-                    	return;
-                    }
-                    String receiverChannelAddress = recChan.get().address().getValue();
+                    String receiverChannelAddress = falmotChannel;
                 	for (Map<String, Object> link : conn.performGetLinks(receiverChannelAddress, 0)) {
                 		if (!receiverChannelAddress.equals(link.get("RECEIVER")))
                 			continue;
@@ -259,12 +259,14 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
                 }
             }
         };
-        valve.addStructureListener(l);
-        if (tempSens.isActive()) {
-            DeviceHandlers.linkChannels(conn, tempSens, TEMPERATURE_SENDER_CHANNEL,
-                    valve, TEMPERATURE_RECEIVER_CHANNEL, logger,
-                    "TempSens", "external temperature sensor", false);
-        }
+		valve.addStructureListener(l);
+		if (tempSens.isActive()) {
+			Optional<HmDevice> senderChannel = findDeviceChannel(conn, tempSens, TEMPERATURE_SENDER_CHANNEL, logger);
+			senderChannel.ifPresent(sender -> {
+				String senderAddress = sender.address().getValue();
+				conn.performAddLink(senderAddress, falmotChannel, "Valve-Thermostat-Link", "Link wall thermostat - floor heating");
+			});
+		}
     }
 	
 }
