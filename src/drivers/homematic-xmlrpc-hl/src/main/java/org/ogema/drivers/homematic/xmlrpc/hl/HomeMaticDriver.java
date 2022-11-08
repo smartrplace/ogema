@@ -15,10 +15,11 @@
  */
 package org.ogema.drivers.homematic.xmlrpc.hl;
 
+import java.io.IOException;
+import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -51,11 +52,13 @@ import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandler;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandlerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticDeviceAccess;
+import org.ogema.drivers.homematic.xmlrpc.hl.channels.ThermostatUtils;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmLogicInterface;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
+import org.ogema.model.devices.buildingtechnology.ThermostatProgram;
 import org.osgi.framework.Constants;
 import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.ComponentContext;
@@ -74,7 +77,9 @@ import org.slf4j.LoggerFactory;
  * @author jlapp
  */
 @Component(service = {Application.class},
-		property = {"osgi.command.scope=hmhl", "osgi.command.function=listDevices",
+		property = {"osgi.command.scope=hmhl",
+			"osgi.command.function=checkPrograms",
+			"osgi.command.function=listDevices",
 			"osgi.command.function=writeCounts"})
 public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 
@@ -409,6 +414,25 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 		if (setupInProgress) {
 			System.out.println("Setup in progress...");
 		}
+	}
+	
+	public void checkPrograms() {
+		acceptedDevices.forEach((addr, cd) -> {
+			cd.device.getSubResources(ThermostatProgram.class, true).forEach(tp -> {
+				try {
+					List<DayOfWeek> errors = ThermostatUtils.compareProgram(cd.connection, addr, tp, logger);
+					if (errors.isEmpty()) {
+						System.out.printf("programs match for %s / %s%n", addr, tp.getPath());
+					} else {
+						System.err.printf("programs differ for %s / %s on %s%n", addr, tp.getPath(), errors);
+						System.out.println("retransmitting program on " + addr);
+						ThermostatUtils.transmitProgram(cd.connection, addr, tp, logger);
+					}
+				} catch (IOException ex) {
+					logger.warn(ex.getMessage());
+				}
+			});
+		});
 	}
 
 	public Map<String, Integer> writeCounts(String hmInterface) {

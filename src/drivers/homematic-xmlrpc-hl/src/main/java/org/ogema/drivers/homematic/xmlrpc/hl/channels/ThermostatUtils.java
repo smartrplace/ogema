@@ -2,10 +2,12 @@ package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
 import java.io.IOException;
 import java.time.DayOfWeek;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -34,7 +36,7 @@ import org.slf4j.Logger;
  *
  * @author jlapp
  */
-abstract class ThermostatUtils {
+public abstract class ThermostatUtils {
 
 	private final static Map<String, Class<? extends SingleValueResource>> PARAMETERS;
 
@@ -71,8 +73,8 @@ abstract class ThermostatUtils {
 			Object resourceValue = getResourceValue(resource, logger);
 			Map<String, Object> parameterSet = new HashMap<>();
 			parameterSet.put(paramName, resourceValue);
-			conn.performPutParamset(address, "MASTER", parameterSet);
-			logger.info("Parameter set 'MASTER' updated for {}: {}", address, parameterSet);
+			conn.performPutParamset(address, set, parameterSet);
+			logger.info("Parameter set '{}' updated for {}: {}", set, address, parameterSet);
 		}
 		
 		static Object getResourceValue(SingleValueResource resource, Logger logger) {
@@ -146,7 +148,10 @@ abstract class ThermostatUtils {
 			}
 		});
 		if (!values.isEmpty()) {
+			logger.debug("sending parameters for {}/{}: {}", address, set, values);
 			conn.performPutParamset(address, set.name(), values);
+		} else {
+			logger.debug("no parameters set on for {}/{}", address, set);
 		}
 	}
 
@@ -237,8 +242,60 @@ abstract class ThermostatUtils {
 	static float toCelsius(float k) {
 		return k - 273.15f;
 	}
+	
+	public static List<DayOfWeek> compareProgram(HomeMaticConnection conn, String address, ThermostatProgram prg, Logger logger) throws IOException {
+		int updateVal = prg.update().getValue();
+		int prgNum = prg.programNumber().isActive()
+				? prg.programNumber().getValue()
+				: 1;
+		String ENDTIME_PATTERN = "P%d_ENDTIME_%s_%d";
+		String TEMPERATURE_PATTERN = "P%d_TEMPERATURE_%s_%d";
+		Map<String, Object> masterValues = null;// = new HashMap<>();
+		List<DayOfWeek> daysWithErrors = new ArrayList<>();
+		for (DayOfWeek day : DayOfWeek.values()) {
+			String dayString = day.name().toUpperCase();
+			// DayOfWeek values are 1 (Monday) ... 7 (Sunday)
+			if ((updateVal & (1 << day.getValue() - 1)) != 0) {
+				Optional<int[]> endTimes = prg.endTimesDay(day);
+				if (!endTimes.isPresent()) {
+					continue;
+				}
+				int[] timesArray = endTimes.get();
+				Optional<float[]> temperatures = prg.temperaturesDay(day);
+				if (!temperatures.isPresent() || temperatures.get().length != timesArray.length) {
+					logger.debug("skipping {}/{}, temperatures array has different size!", prg.getPath(), day);
+					continue;
+				}
+				float[] tempArray = temperatures.get();
+				if (masterValues == null) {
+					masterValues = conn.getParamset(address, "MASTER");
+				}
+				for (int i = 0; i < timesArray.length; i++) {
+					int t = timesArray[i];
+					String paramNameTime = String.format(ENDTIME_PATTERN, prgNum, dayString, i + 1);
+					String paramNameTemp = String.format(TEMPERATURE_PATTERN, prgNum, dayString, i + 1);
+					float tc = toCelsius(tempArray[i]);
+					int mvTime = ((Number) masterValues.get(paramNameTime)).intValue();
+					float mvTemp = ((Number) masterValues.get(paramNameTemp)).floatValue();
+					if (t != mvTime || tc != mvTemp) {
+						logger.debug("setting differ for {}, {}: ({}, {}) != ({}, {})",
+								address, paramNameTime,
+								t, tc, mvTime, mvTemp);
+						daysWithErrors.add(day);
+						break;
+					}
+				}
+			}
+		}
+		if (daysWithErrors.isEmpty()) {
+			logger.info("program setting transmitted correctly for {}", address);
+			return daysWithErrors;
+		}
+		logger.warn("program settings differ for {} on days {}", address, daysWithErrors);
+		return daysWithErrors;
+	}
 
-	static void transmitProgram(HomeMaticConnection conn, String address, ThermostatProgram prg, Logger logger) {
+	public static void transmitProgram(HomeMaticConnection conn, String address, ThermostatProgram prg, Logger logger) {
 		int updateVal = prg.update().getValue();
 		int prgNum = prg.programNumber().isActive()
 				? prg.programNumber().getValue()

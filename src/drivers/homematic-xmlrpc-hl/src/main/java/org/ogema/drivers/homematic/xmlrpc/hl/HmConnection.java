@@ -389,8 +389,8 @@ public class HmConnection implements HomeMaticConnection {
 						return false;
 					}
 				} catch (XmlRpcException ex) {
-					// TODO
-					logger.warn("PING failed", ex);
+					logger.warn("PING failed: {}", ex.getMessage());
+					logger.debug("PING failed", ex);
 					return false;
 				} finally {
 					removeEventListener(pong);
@@ -859,7 +859,11 @@ public class HmConnection implements HomeMaticConnection {
 							hm.close();
 						}
 						if (commandLineRegistration != null) {
-							commandLineRegistration.unregister();
+							try {
+								commandLineRegistration.unregister();
+							} catch (IllegalStateException ise) {
+								// already unregistered, probably due to bundle restart
+							}
 						}
 					}
 				}).start();

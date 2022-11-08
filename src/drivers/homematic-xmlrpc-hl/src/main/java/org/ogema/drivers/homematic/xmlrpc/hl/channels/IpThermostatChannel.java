@@ -158,7 +158,7 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
     @Override
     public boolean accept(DeviceDescription desc) {
         //System.out.println("parent type = " + desc.getParentType());
-        return ("HMIP-eTRV".equalsIgnoreCase(desc.getParentType())
+        return (("HMIP-eTRV".equalsIgnoreCase(desc.getParentType()) || "HmIP-BWTH".equalsIgnoreCase(desc.getParentType()))
                 && "HEATING_CLIMATECONTROL_TRANSCEIVER".equalsIgnoreCase(desc.getType()))
                 || (desc.getParentType() != null
                 && desc.getParentType().toLowerCase().startsWith("hmip-wth-")
