@@ -20,6 +20,8 @@ import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
 import org.ogema.core.model.units.TemperatureResource;
+import org.ogema.core.resourcemanager.ResourceStructureEvent;
+import org.ogema.core.resourcemanager.ResourceStructureListener;
 import org.ogema.core.resourcemanager.ResourceValueListener;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
 import static org.ogema.drivers.homematic.xmlrpc.hl.channels.IpThermostatBChannel.CONTROL_MODE_DECORATOR;
@@ -29,6 +31,7 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.ogema.model.actors.MultiSwitch;
 import org.ogema.model.devices.buildingtechnology.Thermostat;
 import org.ogema.model.devices.buildingtechnology.ThermostatProgram;
+import org.ogema.model.sensors.DoorWindowSensor;
 import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.slf4j.Logger;
 
@@ -37,6 +40,8 @@ import org.slf4j.Logger;
  * @author jlapp
  */
 public abstract class ThermostatUtils {
+	
+	public final static String SHUTTER_CONTACT_DECORATOR = "linkedShutterContact";
 
 	private final static Map<String, Class<? extends SingleValueResource>> PARAMETERS;
 
@@ -353,5 +358,53 @@ public abstract class ThermostatUtils {
 			}
 		}, true);
 	}
+	
+    static void setupShutterContactLinking(final Thermostat thermos, HomeMaticConnection conn, Logger logger) {
+		final String senderChannelType = "SHUTTER_CONTACT";
+		final String receiverChannelType = "HEATING_SHUTTER_CONTACT_RECEIVER";
+		//final Class<? extends Resource> decoratorType = DoorWindowSensor.class;
+        DoorWindowSensor shutterContact = thermos.getSubResource(SHUTTER_CONTACT_DECORATOR, DoorWindowSensor.class);
+        
+        ResourceStructureListener l = new ResourceStructureListener() {
+
+            @Override
+            public void resourceStructureChanged(ResourceStructureEvent event) {
+                Resource added = event.getChangedResource();
+                if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_ADDED) {
+                    if (added.getName().equals(SHUTTER_CONTACT_DECORATOR) && added instanceof DoorWindowSensor) {
+                        DeviceHandlers.linkChannels(conn, added, senderChannelType,
+                                thermos, receiverChannelType, logger,
+                                "Shutter Contact", "Window open sensor / thermostat link", false);
+                    }
+                } else if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_REMOVED
+                		&& added.getName().equals(SHUTTER_CONTACT_DECORATOR)) {
+                	// since we do not know which resource the link referenced before it got deleted
+                	// we need to use the low level API to find out all links for the weather receiver channel
+                    Optional<HmDevice> recChan = DeviceHandlers.findDeviceChannel(
+                            conn, thermos, receiverChannelType, logger);
+                    if (!recChan.isPresent()) {
+                    	return;
+                    }
+                    String receiverChannelAddress = recChan.get().address().getValue();
+                	for (Map<String, Object> link : conn.performGetLinks(receiverChannelAddress, 0)) {
+                		if (!receiverChannelAddress.equals(link.get("RECEIVER")))
+                			continue;
+                		final Object sender = link.get("SENDER");
+                		if (!(sender instanceof String))
+                			continue;
+                		conn.performRemoveLink((String) sender, receiverChannelAddress);
+                		logger.info("Thermostat / shutter contact connection removed. Thermostat channel {}, shutter contact sensor {}",
+                				receiverChannelAddress, sender);
+                	}
+                }
+            }
+        };
+        thermos.addStructureListener(l);
+        if (shutterContact.isActive()) {
+            DeviceHandlers.linkChannels(conn, shutterContact, senderChannelType,
+                    thermos, receiverChannelType, logger,
+                    "Shutter Contact", "Window open sensor / thermostat link", false);
+        }
+    }
 
 }

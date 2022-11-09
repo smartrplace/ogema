@@ -346,13 +346,14 @@ public class HmConnection implements HomeMaticConnection {
 				logger.debug("polled installation mode: {}s", secondsRemaining);
 				baseResource.installationMode().stateFeedback().setValue(secondsRemaining > 0);
 			} catch (XmlRpcException ex) {
-				logger.error("could not poll HomeMatic client for installation mode state", ex);
+				logger.warn("could not poll HomeMatic client for installation mode state: {}", ex.getMessage());
+				logger.debug("could not poll HomeMatic client for installation mode state", ex);
 			}
 		}
 	};
 
 	Future<Boolean> checkPing() {
-		final String callerId = "ogema" + System.currentTimeMillis();
+		final String callerId = "ogema " + clientUrl + " " + System.currentTimeMillis();
 		final CountDownLatch pongReceived = new CountDownLatch(1);
 		final long pingTimeoutSec = 10;
 
@@ -362,7 +363,7 @@ public class HmConnection implements HomeMaticConnection {
 				if (events.size() == 1) {
 					HmEvent e = events.get(0);
 					if ("PONG".equals(e.getValueKey())) {
-                                                logger.debug("received PONG from {} / {}", e.getAddress(), e.getInterfaceId());
+						logger.debug("received PONG from {} / {}", e.getAddress(), e.getInterfaceId());
 						// BidCos vs IP
 						if ("CENTRAL".equals(e.getAddress()) || "CENTRAL:0".equals(e.getAddress())) {
 							if (callerId.equals(e.getValueString())) {
@@ -580,6 +581,7 @@ public class HmConnection implements HomeMaticConnection {
     		logger.info("New Homematic XML_RPC connection to {}, servlet URL {}{}", xmlRpcServiceUrl, serverUrl, alias);
 			client = new HomeMaticClient(xmlRpcServiceUrl, config.ccuUser().isActive() ? config.ccuUser().getValue() : null, config.ccuPw().isActive() ? config.ccuPw().getValue() : null);
 			clientUrl = xmlRpcServiceUrl;
+			storeClientUrl();
             commandLine = new HomeMaticClientCli(client);
 			commandLineRegistration = commandLine.register(ctx.getBundleContext(), config.getName());
 			//hm = new HomeMaticService(ctx.getBundleContext(), serverUrl, alias);
@@ -599,6 +601,12 @@ public class HmConnection implements HomeMaticConnection {
 			logger.debug("Exception details:", ex);
 			// throw new IllegalStateException(ex);
 		}
+	}
+	
+	private void storeClientUrl() {
+		StringResource urlRes = baseResource.interfaceInfo().getSubResource("clientUrl", StringResource.class).create();
+		urlRes.setValue(clientUrl);
+		urlRes.activate(false);
 	}
 	
 	private static String getServletAlias(final HmLogicInterface config) {
@@ -823,6 +831,7 @@ public class HmConnection implements HomeMaticConnection {
                     }
                     client = new HomeMaticClient(xmlRpcServiceUrl, baseResource.ccuUser().isActive() ? baseResource.ccuUser().getValue() : null, baseResource.ccuPw().isActive() ? baseResource.ccuPw().getValue() : null);
 					clientUrl = xmlRpcServiceUrl;
+					storeClientUrl();
                     commandLine.setClient(client);
                 } catch (IOException ioex) {
                     logger.debug("exception in discovery on reconnect: {} ({})", ioex.getMessage(), ioex.getClass().getSimpleName());

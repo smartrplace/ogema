@@ -23,11 +23,9 @@ import org.ogema.core.model.Resource;
 
 import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.simple.FloatResource;
-import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
 import org.ogema.core.resourcemanager.ResourceStructureEvent;
 import org.ogema.core.resourcemanager.ResourceStructureListener;
-import org.ogema.core.resourcemanager.ResourceValueListener;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandler;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandlerFactory;
@@ -176,52 +174,10 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
         valve.activate(true);
         
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
-        setupHmParameterValues(valve, parent.address().getValue());
+        ThermostatUtils.setupParameterResources(parent, desc, paramSets, conn, valve, logger);
         setupThermostatLinking(valve, deviceAddress, conn, logger);
     }
     
-    class ParameterListener implements ResourceValueListener<SingleValueResource> {
-        
-        final String address;
-
-        public ParameterListener(String address) {
-            this.address = address;
-        }        
-
-        @Override
-        public void resourceChanged(SingleValueResource resource) {
-            String paramName = resource.getName();
-            
-            Object resourceValue = null;
-            if (resource instanceof IntegerResource) {
-                resourceValue = ((IntegerResource) resource).getValue();
-            } else {
-                logger.warn("unsupported parameter type: " + resource);
-            }
-            
-            Map<String, Object> parameterSet = new HashMap<>();
-            parameterSet.put(paramName, resourceValue);
-            conn.performPutParamset(address, "MASTER", parameterSet);
-            logger.info("Parameter set 'MASTER' updated for {}: {}", address, parameterSet);
-        }
-        
-    };
-    
-    private void setupHmParameterValues(ThermalValve valve, String address) {
-        //XXX address mangling (parameters are set on device, not channel)
-        if (address.lastIndexOf(":") != -1) {
-            address = address.substring(0, address.lastIndexOf(":"));
-        }
-        @SuppressWarnings("unchecked")
-        ResourceList<SingleValueResource> masterParameters = valve.addDecorator("HmParametersMaster", ResourceList.class);
-        if (!masterParameters.exists()) {
-            masterParameters.setElementType(SingleValueResource.class);
-            masterParameters.create();
-        }
-    }
-	
-	
-	
 	static void setupThermostatLinking(final ThermalValve valve, final String falmotChannel, HomeMaticConnection conn, Logger logger) {
 		String TEMPERATURE_SENDER_CHANNEL = "CLIMATECONTROL_FLOOR_TRANSMITTER"; //wall thermostat
 		//String TEMPERATURE_RECEIVER_CHANNEL = "CLIMATECONTROL_FLOOR_TRANSCEIVER"; //falmot
