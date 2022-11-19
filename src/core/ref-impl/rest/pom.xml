@@ -12,7 +12,7 @@
     <name>OGEMA ref-impl :: REST</name>
 
     <description>
-        Reference implementation of the OGEMA 2.0 REST interface by Fraunhofer Society.
+        Reference implementation of the OGEMA 2.0 REST interface
     </description>
     <url>http://www.ogema-source.net</url>
     
