@@ -318,12 +318,7 @@ public class DefaultPermissionManager implements PermissionManager {
 	
 	protected void removeAuthenticator(final ServiceReference<Authenticator> authenticator) {
 		final String id = String.valueOf(authenticator.getProperty(Authenticator.AUTHENTICATOR_ID));
-		if (!(id instanceof String)) {
-			return;
-		}
-		if (bc.getService(authenticator).equals(authenticators.get(id))) {
-			authenticators.remove(id);
-		}
+		authenticators.remove(id);
 	}
 
 	private ServiceRegistration<URLStreamHandlerService> urpHandlerRegistratrion;

@@ -35,7 +35,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.ogema.accesscontrol.AccessManager;
 import org.ogema.core.model.Resource;
+import org.ogema.core.model.ValueResource;
+import org.ogema.core.model.simple.BooleanResource;
+import org.ogema.core.model.simple.FloatResource;
+import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.StringResource;
+import org.ogema.core.model.simple.TimeResource;
 import org.ogema.core.resourcemanager.InvalidResourceTypeException;
 import org.ogema.core.resourcemanager.ResourceAlreadyExistsException;
 import org.ogema.core.resourcemanager.ResourceDemandListener;
@@ -136,12 +141,25 @@ public class ResourceDBManager {
 					logger.warn("Deleting recorded data for unknown resource: {}", id);
 					recordedDataAccess.deleteRecordedDataStorage(id);
 				}
-			}
-			else {
-				DefaultRecordedData d = recordedDataManager.getRecordedData(el, true);
-				logger.debug("initialized recorded data: {}", d);
+			} else if (!resourceSupportsRecordedData(el)) {
+				// might happen due to incompatible resource model changes.
+				logger.debug("recorded data ended up on unsupported resource type: {} / {}", id, el.getType());
+			} else {
+				try {
+					DefaultRecordedData d = recordedDataManager.getRecordedData(el, true);
+					logger.debug("initialized recorded data: {}", d);
+				} catch (RuntimeException re) {
+					logger.error("could not initialize recorded data '{}'", id, re);
+				}
 			}
 		}
+	}
+	
+	private boolean resourceSupportsRecordedData(VirtualTreeElement el) {
+		return FloatResource.class.isAssignableFrom(el.getType())
+				|| BooleanResource.class.isAssignableFrom(el.getType())
+				|| IntegerResource.class.isAssignableFrom(el.getType())
+				|| TimeResource.class.isAssignableFrom(el.getType());
 	}
 
     public List<InternalStructureListenerRegistration> getStructureListeners(String path) {

@@ -2,9 +2,12 @@ package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
 import java.io.IOException;
 import java.time.DayOfWeek;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -16,6 +19,9 @@ import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
+import org.ogema.core.model.units.TemperatureResource;
+import org.ogema.core.resourcemanager.ResourceStructureEvent;
+import org.ogema.core.resourcemanager.ResourceStructureListener;
 import org.ogema.core.resourcemanager.ResourceValueListener;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
 import static org.ogema.drivers.homematic.xmlrpc.hl.channels.IpThermostatBChannel.CONTROL_MODE_DECORATOR;
@@ -25,6 +31,7 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.ogema.model.actors.MultiSwitch;
 import org.ogema.model.devices.buildingtechnology.Thermostat;
 import org.ogema.model.devices.buildingtechnology.ThermostatProgram;
+import org.ogema.model.sensors.DoorWindowSensor;
 import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.slf4j.Logger;
 
@@ -32,13 +39,16 @@ import org.slf4j.Logger;
  *
  * @author jlapp
  */
-abstract class ThermostatUtils {
+public abstract class ThermostatUtils {
+	
+	public final static String SHUTTER_CONTACT_DECORATOR = "linkedShutterContact";
 
 	private final static Map<String, Class<? extends SingleValueResource>> PARAMETERS;
 
 	static {
 		PARAMETERS = new LinkedHashMap<>();
 		PARAMETERS.put("TEMPERATUREFALL_MODUS", IntegerResource.class);
+		PARAMETERS.put("TEMPERATUREFALL_VALUE", TemperatureResource.class);
 		PARAMETERS.put("TEMPERATUREFALL_WINDOW_OPEN_TIME_PERIOD", IntegerResource.class);
 		PARAMETERS.put("TEMPERATURE_WINDOW_OPEN", FloatResource.class);
 		PARAMETERS.put("VALVE_MAXIMUM_POSITION", FloatResource.class);
@@ -65,6 +75,14 @@ abstract class ThermostatUtils {
 		@Override
 		public void resourceChanged(SingleValueResource resource) {
 			String paramName = resource.getName();
+			Object resourceValue = getResourceValue(resource, logger);
+			Map<String, Object> parameterSet = new HashMap<>();
+			parameterSet.put(paramName, resourceValue);
+			conn.performPutParamset(address, set, parameterSet);
+			logger.info("Parameter set '{}' updated for {}: {}", set, address, parameterSet);
+		}
+		
+		static Object getResourceValue(SingleValueResource resource, Logger logger) {
 			Object resourceValue = null;
 			if (resource instanceof IntegerResource) {
 				resourceValue = ((IntegerResource) resource).getValue();
@@ -75,10 +93,7 @@ abstract class ThermostatUtils {
 			} else {
 				logger.warn("unsupported parameter type: " + resource);
 			}
-			Map<String, Object> parameterSet = new HashMap<>();
-			parameterSet.put(paramName, resourceValue);
-			conn.performPutParamset(address, "MASTER", parameterSet);
-			logger.info("Parameter set 'MASTER' updated for {}: {}", address, parameterSet);
+			return resourceValue;
 		}
 
 	};
@@ -124,6 +139,24 @@ abstract class ThermostatUtils {
 				CompletableFuture.delayedExecutor(3, TimeUnit.SECONDS).execute(readValue);
 			}, true);
 			readValue.run();
+		}
+	}
+	
+	static void sendParameters(String address, ParameterDescription.SET_TYPES set,
+			Map<String, ParameterDescription<?>> allParams, Collection<SingleValueResource> resources,
+			HomeMaticConnection conn, Logger logger) {
+		Map<String, Object> values = new HashMap<>();
+		resources.forEach(svr -> {
+			ParameterDescription<?> desc = allParams.get(svr.getName());
+			if (desc != null && desc.isWritable()) {
+				values.put(svr.getName(), ParameterListener.getResourceValue(svr, logger));
+			}
+		});
+		if (!values.isEmpty()) {
+			logger.debug("sending parameters for {}/{}: {}", address, set, values);
+			conn.performPutParamset(address, set.name(), values);
+		} else {
+			logger.debug("no parameters set on for {}/{}", address, set);
 		}
 	}
 
@@ -214,8 +247,60 @@ abstract class ThermostatUtils {
 	static float toCelsius(float k) {
 		return k - 273.15f;
 	}
+	
+	public static List<DayOfWeek> compareProgram(HomeMaticConnection conn, String address, ThermostatProgram prg, Logger logger) throws IOException {
+		int updateVal = prg.update().getValue();
+		int prgNum = prg.programNumber().isActive()
+				? prg.programNumber().getValue()
+				: 1;
+		String ENDTIME_PATTERN = "P%d_ENDTIME_%s_%d";
+		String TEMPERATURE_PATTERN = "P%d_TEMPERATURE_%s_%d";
+		Map<String, Object> masterValues = null;// = new HashMap<>();
+		List<DayOfWeek> daysWithErrors = new ArrayList<>();
+		for (DayOfWeek day : DayOfWeek.values()) {
+			String dayString = day.name().toUpperCase();
+			// DayOfWeek values are 1 (Monday) ... 7 (Sunday)
+			if ((updateVal & (1 << day.getValue() - 1)) != 0) {
+				Optional<int[]> endTimes = prg.endTimesDay(day);
+				if (!endTimes.isPresent()) {
+					continue;
+				}
+				int[] timesArray = endTimes.get();
+				Optional<float[]> temperatures = prg.temperaturesDay(day);
+				if (!temperatures.isPresent() || temperatures.get().length != timesArray.length) {
+					logger.debug("skipping {}/{}, temperatures array has different size!", prg.getPath(), day);
+					continue;
+				}
+				float[] tempArray = temperatures.get();
+				if (masterValues == null) {
+					masterValues = conn.getParamset(address, "MASTER");
+				}
+				for (int i = 0; i < timesArray.length; i++) {
+					int t = timesArray[i];
+					String paramNameTime = String.format(ENDTIME_PATTERN, prgNum, dayString, i + 1);
+					String paramNameTemp = String.format(TEMPERATURE_PATTERN, prgNum, dayString, i + 1);
+					float tc = toCelsius(tempArray[i]);
+					int mvTime = ((Number) masterValues.get(paramNameTime)).intValue();
+					float mvTemp = ((Number) masterValues.get(paramNameTemp)).floatValue();
+					if (t != mvTime || tc != mvTemp) {
+						logger.debug("setting differ for {}, {}: ({}, {}) != ({}, {})",
+								address, paramNameTime,
+								t, tc, mvTime, mvTemp);
+						daysWithErrors.add(day);
+						break;
+					}
+				}
+			}
+		}
+		if (daysWithErrors.isEmpty()) {
+			logger.info("program setting transmitted correctly for {}", address);
+			return daysWithErrors;
+		}
+		logger.warn("program settings differ for {} on days {}", address, daysWithErrors);
+		return daysWithErrors;
+	}
 
-	static void transmitProgram(HomeMaticConnection conn, String address, ThermostatProgram prg, Logger logger) {
+	public static void transmitProgram(HomeMaticConnection conn, String address, ThermostatProgram prg, Logger logger) {
 		int updateVal = prg.update().getValue();
 		int prgNum = prg.programNumber().isActive()
 				? prg.programNumber().getValue()
@@ -273,5 +358,53 @@ abstract class ThermostatUtils {
 			}
 		}, true);
 	}
+	
+    static void setupShutterContactLinking(final Thermostat thermos, HomeMaticConnection conn, Logger logger) {
+		final String senderChannelType = "SHUTTER_CONTACT";
+		final String receiverChannelType = "HEATING_SHUTTER_CONTACT_RECEIVER";
+		//final Class<? extends Resource> decoratorType = DoorWindowSensor.class;
+        DoorWindowSensor shutterContact = thermos.getSubResource(SHUTTER_CONTACT_DECORATOR, DoorWindowSensor.class);
+        
+        ResourceStructureListener l = new ResourceStructureListener() {
+
+            @Override
+            public void resourceStructureChanged(ResourceStructureEvent event) {
+                Resource added = event.getChangedResource();
+                if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_ADDED) {
+                    if (added.getName().equals(SHUTTER_CONTACT_DECORATOR) && added instanceof DoorWindowSensor) {
+                        DeviceHandlers.linkChannels(conn, added, senderChannelType,
+                                thermos, receiverChannelType, logger,
+                                "Shutter Contact", "Window open sensor / thermostat link", false);
+                    }
+                } else if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_REMOVED
+                		&& added.getName().equals(SHUTTER_CONTACT_DECORATOR)) {
+                	// since we do not know which resource the link referenced before it got deleted
+                	// we need to use the low level API to find out all links for the weather receiver channel
+                    Optional<HmDevice> recChan = DeviceHandlers.findDeviceChannel(
+                            conn, thermos, receiverChannelType, logger);
+                    if (!recChan.isPresent()) {
+                    	return;
+                    }
+                    String receiverChannelAddress = recChan.get().address().getValue();
+                	for (Map<String, Object> link : conn.performGetLinks(receiverChannelAddress, 0)) {
+                		if (!receiverChannelAddress.equals(link.get("RECEIVER")))
+                			continue;
+                		final Object sender = link.get("SENDER");
+                		if (!(sender instanceof String))
+                			continue;
+                		conn.performRemoveLink((String) sender, receiverChannelAddress);
+                		logger.info("Thermostat / shutter contact connection removed. Thermostat channel {}, shutter contact sensor {}",
+                				receiverChannelAddress, sender);
+                	}
+                }
+            }
+        };
+        thermos.addStructureListener(l);
+        if (shutterContact.isActive()) {
+            DeviceHandlers.linkChannels(conn, shutterContact, senderChannelType,
+                    thermos, receiverChannelType, logger,
+                    "Shutter Contact", "Window open sensor / thermostat link", false);
+        }
+    }
 
 }

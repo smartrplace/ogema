@@ -62,6 +62,7 @@ public abstract class ModbusTask {
 	public ModbusTask(ModbusPattern pattern, ValueResource resource,
 			ApplicationManager appManager) throws Exception {
 		this.resource = resource;
+		this.pattern = pattern;
 		factor = pattern.factor.getValue();
 		offset = pattern.offset.getValue();
 		unitId = pattern.unitId.getValue();

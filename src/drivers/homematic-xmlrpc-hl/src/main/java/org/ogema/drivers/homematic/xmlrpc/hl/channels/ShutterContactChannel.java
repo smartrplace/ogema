@@ -102,6 +102,7 @@ public class ShutterContactChannel extends AbstractDeviceHandler {
         sens.activate(true);
         sens.battery().chargeSensor().reading().create();
         sens.activate(true);
+		conn.registerControlledResource(parent, sens);
         conn.addEventListener(new ShutterContactListener(sens, desc.getAddress()));
     }
 

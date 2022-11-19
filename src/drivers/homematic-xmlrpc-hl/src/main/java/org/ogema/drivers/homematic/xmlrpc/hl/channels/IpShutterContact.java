@@ -111,12 +111,14 @@ public class IpShutterContact extends AbstractDeviceHandler implements DeviceHan
         sens.battery().chargeSensor().reading().create();
         sens.activate(true);
         conn.addEventListener(new ShutterContactListener(sens, desc.getAddress()));
+		conn.registerControlledResource(parent, sens);
         try {
             Integer v = conn.getValue(desc.getAddress(), PARAMS.STATE.name());
             sens.reading().setValue(v != 0);
             logger.debug("shutter contact value on start: {} = {}", desc.getAddress(), v);
         } catch (IOException | ClassCastException ex) {
-            logger.warn("could not get initial value reading for shutter contact {}", desc.getAddress(), ex);
+            logger.warn("could not get initial value reading for shutter contact {}: {}", desc.getAddress(), ex.getMessage());
+			logger.debug("could not get initial value reading for shutter contact {}", desc.getAddress(), ex);
         }
     }
 

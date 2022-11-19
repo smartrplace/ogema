@@ -55,6 +55,8 @@ import org.ogema.exam.OsgiAppTestBase;
 import org.ogema.model.locations.Room;
 import org.ogema.model.locations.WorkPlace;
 import org.ogema.model.actors.OnOffSwitch;
+import org.ogema.model.connections.ThermalMixingConnection;
+import org.ogema.model.prototypes.Configuration;
 import org.ogema.serialization.SchemaUtil;
 import org.ogema.serialization.jaxb.ResourceList;
 import org.ogema.serialization.jaxb.FloatResource;
@@ -268,16 +270,21 @@ public class XmlSerializationOsgiTest extends OsgiAppTestBase {
 		room.addOptionalElement("workPlaces");
 		WorkPlace wp1 = room.workPlaces().add();
 		WorkPlace wp2 = room.workPlaces().add();
+		Resource testDecorator = room.workPlaces().getSubResource("_decorator_", Configuration.class).create();
+		Resource testDecorator2 = room.workPlaces().getSubResource("_decorator2_", ThermalMixingConnection.class).create();
 
 		StringWriter output = new StringWriter();
 		sman.writeXml(output, room);
-		System.out.println(output.toString());
 		JAXBContext ctx = createUnmarshallingContext();
 		validateOgemaXml(output.toString());
 		Unmarshaller u = ctx.createUnmarshaller();
 		org.ogema.serialization.jaxb.Resource r = unmarshal(u, output.toString());
 		Assert.assertTrue("workplaces is not a ResourceList: " + r.get("workPlaces"),
 				r.get("workPlaces") instanceof ResourceList);
+		Assert.assertNotNull("wp1 missing", r.get("workPlaces").get(wp1.getName()));
+		Assert.assertNotNull("wp2 missing", r.get("workPlaces").get(wp2.getName()));
+		Assert.assertNotNull("decorator 1 missing", r.get("workPlaces").get(testDecorator.getName()));
+		Assert.assertNotNull("decorator 2 missing", r.get("workPlaces").get(testDecorator2.getName()));
 	}
 
 	@Test
