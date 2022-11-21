@@ -42,6 +42,7 @@ import org.slf4j.Logger;
 public abstract class ThermostatUtils {
 	
 	public final static String SHUTTER_CONTACT_DECORATOR = "linkedShutterContact";
+	public final static String SHUTTER_CONTACT_LIST_DECORATOR = "linkedShutterContacts";
 
 	private final static Map<String, Class<? extends SingleValueResource>> PARAMETERS;
 
@@ -358,7 +359,11 @@ public abstract class ThermostatUtils {
 			}
 		}, true);
 	}
-	
+
+	/* DoorWindowSensors that are linked on the thermostat as sub resource SHUTTER_CONTACT_DECORATOR
+	 * or as sub resource on the resource called SHUTTER_CONTACT_LIST_DECORATOR
+	 * are linked as shutter contacts (window open/close sensors) in Homematic.
+	 */
     static void setupShutterContactLinking(final Thermostat thermos, HomeMaticConnection conn, Logger logger) {
 		final String senderChannelType = "SHUTTER_CONTACT";
 		final String receiverChannelType = "HEATING_SHUTTER_CONTACT_RECEIVER";
@@ -371,7 +376,7 @@ public abstract class ThermostatUtils {
             public void resourceStructureChanged(ResourceStructureEvent event) {
                 Resource added = event.getChangedResource();
                 if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_ADDED) {
-                    if (added.getName().equals(SHUTTER_CONTACT_DECORATOR) && added instanceof DoorWindowSensor) {
+                    if (added instanceof DoorWindowSensor) {
                         DeviceHandlers.linkChannels(conn, added, senderChannelType,
                                 thermos, receiverChannelType, logger,
                                 "Shutter Contact", "Window open sensor / thermostat link", false);
@@ -405,6 +410,15 @@ public abstract class ThermostatUtils {
                     thermos, receiverChannelType, logger,
                     "Shutter Contact", "Window open sensor / thermostat link", false);
         }
-    }
+
+		Resource shutterContactList = thermos.getSubResource(SHUTTER_CONTACT_LIST_DECORATOR, Resource.class);
+		shutterContactList.addStructureListener(l);
+		shutterContactList.getSubResources(DoorWindowSensor.class, false)
+				.stream().filter(r -> r.isActive()).forEach(dws -> {
+			DeviceHandlers.linkChannels(conn, dws, senderChannelType,
+					thermos, receiverChannelType, logger,
+					"Shutter Contact", "Window open sensor / thermostat link", false);
+		});
+	}
 
 }
