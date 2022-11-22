@@ -411,18 +411,20 @@ public abstract class ThermostatUtils {
                     "Shutter Contact", "Window open sensor / thermostat link", false);
         }
 
-		Resource shutterContactList = thermos.getSubResource(SHUTTER_CONTACT_LIST_DECORATOR, ResourceList.class);
-		if(!shutterContactList.isActive()) {
-			shutterContactList.create();
-			shutterContactList.activate(false);
-		}
-		shutterContactList.addStructureListener(l);
-		shutterContactList.getSubResources(DoorWindowSensor.class, false)
-				.stream().filter(r -> r.isActive()).forEach(dws -> {
-			DeviceHandlers.linkChannels(conn, dws, senderChannelType,
-					thermos, receiverChannelType, logger,
-					"Shutter Contact", "Window open sensor / thermostat link", false);
-		});
+        if(Boolean.getBoolean("org.ogema.drivers.homematic.xmlrpc.hl.channels.shutterContactList")) {
+			Resource shutterContactList = thermos.getSubResource(SHUTTER_CONTACT_LIST_DECORATOR, ResourceList.class);
+			if(!shutterContactList.isActive()) {
+				shutterContactList.create();
+				shutterContactList.activate(false);
+			}
+			shutterContactList.addStructureListener(l);
+			shutterContactList.getSubResources(DoorWindowSensor.class, false)
+					.stream().filter(r -> r.isActive()).forEach(dws -> {
+				DeviceHandlers.linkChannels(conn, dws, senderChannelType,
+						thermos, receiverChannelType, logger,
+						"Shutter Contact", "Window open sensor / thermostat link", false);
+			});
+        }
 	}
 
 }
