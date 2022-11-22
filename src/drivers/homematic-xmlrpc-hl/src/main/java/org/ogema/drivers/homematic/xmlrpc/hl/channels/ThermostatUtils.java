@@ -412,6 +412,10 @@ public abstract class ThermostatUtils {
         }
 
 		Resource shutterContactList = thermos.getSubResource(SHUTTER_CONTACT_LIST_DECORATOR, ResourceList.class);
+		if(!shutterContactList.isActive()) {
+			shutterContactList.create();
+			shutterContactList.activate(false);
+		}
 		shutterContactList.addStructureListener(l);
 		shutterContactList.getSubResources(DoorWindowSensor.class, false)
 				.stream().filter(r -> r.isActive()).forEach(dws -> {
