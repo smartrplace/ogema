@@ -374,6 +374,7 @@ public abstract class ThermostatUtils {
 
             @Override
             public void resourceStructureChanged(ResourceStructureEvent event) {
+				logger.info(event.toString());
                 Resource added = event.getChangedResource();
                 if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_ADDED) {
                     if (added instanceof DoorWindowSensor) {
@@ -382,7 +383,7 @@ public abstract class ThermostatUtils {
                                 "Shutter Contact", "Window open sensor / thermostat link", false);
                     }
                 } else if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_REMOVED
-                		&& added.getName().equals(SHUTTER_CONTACT_DECORATOR)) {
+                		&& (added instanceof DoorWindowSensor)) {
                 	// since we do not know which resource the link referenced before it got deleted
                 	// we need to use the low level API to find out all links for the weather receiver channel
                     Optional<HmDevice> recChan = DeviceHandlers.findDeviceChannel(
@@ -392,11 +393,13 @@ public abstract class ThermostatUtils {
                     }
                     String receiverChannelAddress = recChan.get().address().getValue();
                 	for (Map<String, Object> link : conn.performGetLinks(receiverChannelAddress, 0)) {
-                		if (!receiverChannelAddress.equals(link.get("RECEIVER")))
+                		if (!receiverChannelAddress.equals(link.get("RECEIVER"))) {
                 			continue;
+						}
                 		final Object sender = link.get("SENDER");
-                		if (!(sender instanceof String))
+                		if (!(sender instanceof String)) {
                 			continue;
+						}
                 		conn.performRemoveLink((String) sender, receiverChannelAddress);
                 		logger.info("Thermostat / shutter contact connection removed. Thermostat channel {}, shutter contact sensor {}",
                 				receiverChannelAddress, sender);
@@ -411,20 +414,18 @@ public abstract class ThermostatUtils {
                     "Shutter Contact", "Window open sensor / thermostat link", false);
         }
 
-        if(Boolean.getBoolean("org.ogema.drivers.homematic.xmlrpc.hl.channels.shutterContactList")) {
-			Resource shutterContactList = thermos.getSubResource(SHUTTER_CONTACT_LIST_DECORATOR, ResourceList.class);
-			if(!shutterContactList.isActive()) {
-				shutterContactList.create();
-				shutterContactList.activate(false);
-			}
-			shutterContactList.addStructureListener(l);
-			shutterContactList.getSubResources(DoorWindowSensor.class, false)
-					.stream().filter(r -> r.isActive()).forEach(dws -> {
-				DeviceHandlers.linkChannels(conn, dws, senderChannelType,
-						thermos, receiverChannelType, logger,
-						"Shutter Contact", "Window open sensor / thermostat link", false);
-			});
-        }
+		Resource shutterContactList = thermos.getSubResource(SHUTTER_CONTACT_LIST_DECORATOR, Resource.class);
+		if (!shutterContactList.isActive()) {
+			shutterContactList.create();
+			shutterContactList.activate(false);
+		}
+		shutterContactList.addStructureListener(l);
+		shutterContactList.getSubResources(DoorWindowSensor.class, false)
+				.stream().filter(r -> r.isActive()).forEach(dws -> {
+			DeviceHandlers.linkChannels(conn, dws, senderChannelType,
+					thermos, receiverChannelType, logger,
+					"Shutter Contact", "Window open sensor / thermostat link", false);
+		});
 	}
 
 }
