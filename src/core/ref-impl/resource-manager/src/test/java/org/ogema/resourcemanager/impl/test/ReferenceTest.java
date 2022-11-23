@@ -1193,7 +1193,8 @@ public class ReferenceTest extends OsgiTestBase {
 		assertLocationsDiffer(element3, currentSens);
 
 		// basic consistency check
-		Assert.assertEquals("Unexpected number of elements in a resource list", 3, devices.getAllElements().size());
+		Assert.assertEquals("Unexpected number of elements in a resource list "
+				+ devices.getSubResources(Resource.class, false), 3, devices.getAllElements().size());
 		
 		devices.delete();
 		currentSens.delete();

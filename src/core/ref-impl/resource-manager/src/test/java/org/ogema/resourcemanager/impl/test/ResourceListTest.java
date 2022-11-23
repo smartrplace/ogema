@@ -21,6 +21,7 @@ import org.ogema.exam.StructureTestListener;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -32,6 +33,7 @@ import org.junit.Test;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.simple.BooleanResource;
+import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.model.units.PowerResource;
 import org.ogema.core.resourcemanager.InvalidResourceTypeException;
@@ -534,5 +536,30 @@ public class ResourceListTest extends OsgiTestBase {
     	meter.delete();
     	price.delete();
     }
+
+	@Test
+	public void bigListTest() {
+		long n = 5000;
+		long start = System.currentTimeMillis();
+		@SuppressWarnings("unchecked")
+		ResourceList<IntegerResource> l = resMan.createResource(newResourceName(), ResourceList.class);
+		l.setElementType(IntegerResource.class);
+		for (int i = 1; i <= n; i++) {
+			l.add().setValue(i);
+			if (i % 500 == 0) {
+				assertEquals(i, l.getAllElements().size());
+				long total_s = (System.currentTimeMillis() - start) / 1000;
+				System.out.println("size=" + i +", total time=" + total_s + "s");
+			}
+		}
+		long sum = 0;
+		int pos = 1;
+		//also check ordering
+		for (IntegerResource res: l.getAllElements()) {
+			sum += res.getValue();
+			assertEquals(pos++, res.getValue());
+		}
+		assertEquals((n * (n+1)) / 2, sum);
+	}
     
 }

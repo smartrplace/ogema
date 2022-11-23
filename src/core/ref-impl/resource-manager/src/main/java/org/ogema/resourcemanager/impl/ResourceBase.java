@@ -64,6 +64,7 @@ import java.security.PrivilegedAction;
 
 import java.util.AbstractMap;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Iterator;
 import org.ogema.core.model.ModelModifiers.NonPersistent;
 import org.ogema.core.model.ValueResource;
@@ -460,8 +461,8 @@ public abstract class ResourceBase implements ConnectedResource {
     
     //preserve order of list elements
     private List<Resource> getListSubResources() {
-        @SuppressWarnings("unchecked")
-        ResourceList<Resource> rl = (ResourceList) this;
+		@SuppressWarnings("unchecked")
+        DefaultResourceList<Resource> rl = (DefaultResourceList) this;
         List<TreeElement> children = getElInternal().getChildren();
         List<Resource> result = new ArrayList<>(children.size());
         Class<?> elType = rl.getElementType();
@@ -469,19 +470,49 @@ public abstract class ResourceBase implements ConnectedResource {
             if (!validResourceName(child)) {
                 continue;
             }
-            if (elType.isAssignableFrom(child.getType())) {
-                continue;
-            }
-            try {
-                Resource resource = resMan.getResource(path + "/" + child.getName());
-                result.add(resource);
-            } catch (SecurityException se) {
-                resMan.logger.trace("missing permission for sub resource", se);
-            }
+			if (!resMan.getAccessRights(child).isReadPermitted()) {
+				continue;
+			}
+            Resource resource = resMan.getResource(path + "/" + child.getName());
+            result.add(resource);
         }
-        result.addAll(rl.getAllElements());
+		List<String> elementOrder = rl.getElementOrder();
+		sortByNames(result, elementOrder);
         return result;
     }
+	
+	
+	protected static <T extends Resource> void sortByNames(List<T> resources, final List<String> names) {
+		Comparator<T> c;
+		if (resources.size() < 50) {
+			c = new Comparator<T>() {
+				@Override
+				public int compare(T o1, T o2) {
+					int p1 = names.indexOf(o1.getName());
+					int p2 = names.indexOf(o2.getName());
+					return Integer.compare(p1, p2);
+				}
+			};
+		} else {
+			c = new Comparator<T>() {
+				final Map<String, Integer> namePosMap = new HashMap<>();
+				{
+					int pos = 0;
+					for (String name : names) {
+						namePosMap.put(name, pos++);
+					}
+				}
+
+				@Override
+				public int compare(T o1, T o2) {
+					Integer p1 = namePosMap.get(o1.getName());
+					Integer p2 = namePosMap.get(o2.getName());
+					return Integer.compare(p1 != null ? p1 : -1, p2 != null ? p2 : -1);
+				}
+			};
+		}
+		Collections.sort(resources, c);
+	}
 
 	protected <T extends Resource> List<T> getDirectSubResources(Class<T> type, final boolean recursive) {
 		if (type == Resource.class)
@@ -591,6 +622,9 @@ public abstract class ResourceBase implements ConnectedResource {
                 if (!validResourceName(child)) {
                     continue;
                 }
+				if (!isSubResourceReadable(child.getName())) {
+					continue;
+				}
                 final T subresource = resMan.getResource(path + "/" + child.getName());
                 Class<?> childType = child.getType();
                 if (childType != null && resourceType.isAssignableFrom(childType)) {
@@ -1557,12 +1591,12 @@ public abstract class ResourceBase implements ConnectedResource {
 			Map<String, DeletedLinkInfo> dl = deleteInternal(null);
 			postProcessLinks(dl);
 			if (parent != null && parent.exists() && (parent instanceof ResourceList)) {
-				((ResourceList) parent).getAllElements();
+				((DefaultResourceList) parent).rebuildList();
 			}
 			for (ResourceList<?> l : affectedLists) {
                 //rebuild the list
 				if (l.exists()) {
-					l.getAllElements();
+					((DefaultResourceList)l).rebuildList();
 				}
 			}
 		} finally {

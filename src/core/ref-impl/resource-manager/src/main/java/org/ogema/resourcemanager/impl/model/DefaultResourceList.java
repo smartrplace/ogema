@@ -150,31 +150,40 @@ public class DefaultResourceList<T extends Resource> extends ResourceBase implem
 		}
 		return name;
 	}
+	
+	public List<String> getElementOrder() {
+		return getElementNames();
+	}
+	
+	public void rebuildList() {
+		List<String> elementNames = getElementNames();
+		boolean update = false;
+		for (Iterator<String> it = elementNames.iterator(); it.hasNext();) {
+			String name = it.next();
+			T sub = getSubResource(name);
+			if (sub == null || !sub.exists()) {
+				it.remove();
+				update = true;
+			}
+		}
+		if (update) {
+			updateElementsNode(elementNames);
+		}
+	}
 
 	@Override
     public List<T> getAllElements() {
         getResourceDB().lockRead();
         try {
             List<String> elementNames = getElementNames();
-            List<T> rval = new ArrayList<>(elementNames.size());
-            boolean update = false;
-            for (Iterator<String> it = elementNames.iterator(); it.hasNext();) {
-                String name = it.next();
-                if (!isSubResourceReadable(name)) {
-                    continue;
-                }
-                T sub = getSubResource(name);
-                if (sub != null && sub.exists()) {
-                    rval.add(sub);
-                } else {
-                    it.remove();
-                    update = true;
-                }
-            }
-            if (update) {
-                updateElementsNode(elementNames);
-            }
-            return rval;
+			Class<T> ltype = getElementType();
+			if (ltype == null) {
+				return Collections.emptyList();
+			}
+			@SuppressWarnings("unchecked")
+			List<T> rval = getSubResources(ltype, false);
+			sortByNames(rval, elementNames);
+			return rval;
         } finally {
             getResourceDB().unlockRead();
         }
@@ -228,12 +237,12 @@ public class DefaultResourceList<T extends Resource> extends ResourceBase implem
 		if (elementType != null && elementType.isAssignableFrom(decorator.getResourceType())) {
 			getResourceDB().lockStructureWrite();
 			try {
-				S dec = super.addDecorator(name, decorator);
 				List<String> elementNames = getElementNames();
 				if (!elementNames.contains(name)) {
 					elementNames.add(name);
 					updateElementsNode(elementNames);
 				}
+				S dec = super.addDecorator(name, decorator);
 				return dec;
 			} finally {
 				getResourceDB().unlockStructureWrite();
@@ -293,7 +302,7 @@ public class DefaultResourceList<T extends Resource> extends ResourceBase implem
             boolean removed = false;
 			for (T e : getAllElements()) {
 				if (e.equalsLocation(element)) {
-					elementNames.remove(e.getName());
+					removed |= elementNames.remove(e.getName());
 					e.delete();
 				}
 			}
@@ -307,12 +316,12 @@ public class DefaultResourceList<T extends Resource> extends ResourceBase implem
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public Class<T> getElementType() {
+	public Class getElementType() {
 		return (Class<T>) getEl().getResourceListType();
 	}
 
 	@Override
-	public final void setElementType(final Class<? extends Resource> resType) {
+	public void setElementType(final Class<? extends Resource> resType) {
 		Objects.requireNonNull(resType, "resource type must not be null");
         checkWritePermission();
 		getResourceDB().lockWrite();

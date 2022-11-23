@@ -232,7 +232,7 @@ public class DefaultVirtualResourceDB implements VirtualResourceDB {
 				if (el instanceof VirtualTreeElement || realResources.getByID(el.getResID()) != null) {
 					vEl.setEl(el);
 				} else { //how?
-					System.err.printf("getElement called for deleted TreeElement: " + el);
+					logger.debug("getElement called for deleted TreeElement: {}", el);
 				}
 	        }
 	        return vEl;

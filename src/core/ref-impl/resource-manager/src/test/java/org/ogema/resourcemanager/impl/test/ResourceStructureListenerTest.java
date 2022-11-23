@@ -30,6 +30,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.ogema.core.administration.RegisteredStructureListener;
 import org.ogema.core.model.Resource;
+import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.units.PowerResource;
 import org.ogema.core.resourcemanager.ResourceStructureEvent;
@@ -877,6 +878,24 @@ public class ResourceStructureListenerTest extends OsgiTestBase {
 			resAcc.getResource("fridge" + i + "_" + suffix).delete();
 		}
 		
+	}
+	
+	@Test
+	@SuppressWarnings("unchecked")
+	public void structureListenersOnResourceListsReceiveCorrectChangedResource() throws InterruptedException {
+		Resource top = resMan.createResource(newResourceName(), CoolingDevice.class);
+		Resource top2 = resMan.createResource(newResourceName(), CoolingDevice.class);
+		String decName = "test";
+		ResourceList<Resource> dec = top.getSubResource(decName, ResourceList.class);
+		dec.create();
+		dec.setElementType(Resource.class);
+		StructureTestListener l = new StructureTestListener();
+		dec.addStructureListener(l);
+		Resource sub1 = dec.add(top2);
+		waitForSingleEventCallback(l, SUBRESOURCE_ADDED);
+		assertEquals(sub1, l.getLastEvent().getChangedResource());
+		sub1.delete();
+		waitForSingleEventCallback(l, SUBRESOURCE_REMOVED);
 	}
 	
 	@Test 

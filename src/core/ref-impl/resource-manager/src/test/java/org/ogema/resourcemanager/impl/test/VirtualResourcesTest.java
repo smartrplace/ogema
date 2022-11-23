@@ -176,7 +176,16 @@ public class VirtualResourcesTest extends OsgiTestBase {
 		assertFalse(sw2.stateControl().exists());
 		sw1.stateControl().setAsReference(sw2.stateControl());
 	}
-
+	
+	@Test
+	public void virtualResourceCanBeCreatedAsSubclass() {
+		Resource res = resMan.createResource(newResourceName(), Resource.class);
+		Resource vres = res.getSubResource("test", Resource.class);
+		PhysicalElement pe = res.getSubResource("test", PhysicalElement.class).create();
+		assertEquals(PhysicalElement.class, pe.getResourceType());
+		assertEquals(PhysicalElement.class, vres.getResourceType());
+	}
+	
 	//	@Test(expected = VirtualResourceException.class)  // behaviour changed
 	@Test
 	public void referencesCannotBeSetOnVirtualResources() {
@@ -387,6 +396,5 @@ public class VirtualResourcesTest extends OsgiTestBase {
         Collection<FloatResource> floatResources = resAcc.getResources(FloatResource.class);
         assertFalse("virtual resource should not be listed by getResources", floatResources.contains(virtual));
     }
-
-
+	
 }

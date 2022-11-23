@@ -315,7 +315,7 @@ public class ScheduleResourceTest extends OsgiTestBase {
 		// test adding values.
 		final long MAX = 100, STEP = 10;
 		for (long t = 0; t <= MAX; t += STEP) {
-			final Value value = new StringValue((new Long(t)).toString());
+			final Value value = new StringValue((Long.valueOf(t)).toString());
 			schedule.addValue(t, value, t);
 		}
 		assertEquals(MAX, (long) schedule.getLastCalculationTime());
@@ -324,12 +324,12 @@ public class ScheduleResourceTest extends OsgiTestBase {
 		assertEquals(InterpolationMode.NEAREST, schedule.getInterpolationMode());
 
 		for (long t = 0; t < MAX; t += STEP) {
-			final String exactValue = (new Long(t)).toString();
+			final String exactValue = (Long.valueOf(t)).toString();
 			final String scheduleValue = schedule.getValue(t + STEP / 2 - 1).getValue().getStringValue();
 			assert exactValue.equals(scheduleValue);
 		}
 		for (long t = 0; t < MAX; t += STEP) {
-			final String exactValue = (new Long(t + STEP)).toString();
+			final String exactValue = (Long.valueOf(t + STEP)).toString();
 			final String scheduleValue = schedule.getValue(t + STEP / 2 + 2).getValue().getStringValue();
 			assert exactValue.equals(scheduleValue);
 		}
