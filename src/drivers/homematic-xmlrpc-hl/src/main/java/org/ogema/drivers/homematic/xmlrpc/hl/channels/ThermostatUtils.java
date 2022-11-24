@@ -42,7 +42,7 @@ import org.slf4j.Logger;
 public abstract class ThermostatUtils {
 	
 	public final static String SHUTTER_CONTACT_DECORATOR = "linkedShutterContact";
-	public final static String SHUTTER_CONTACT_LIST_DECORATOR = "linkedShutterContacts";
+	//public final static String SHUTTER_CONTACT_LIST_DECORATOR = "linkedShutterContacts";
 
 	private final static Map<String, Class<? extends SingleValueResource>> PARAMETERS;
 
@@ -414,18 +414,5 @@ public abstract class ThermostatUtils {
                     "Shutter Contact", "Window open sensor / thermostat link", false);
         }
 
-		Resource shutterContactList = thermos.getSubResource(SHUTTER_CONTACT_LIST_DECORATOR, Resource.class);
-		if (!shutterContactList.isActive()) {
-			shutterContactList.create();
-			shutterContactList.activate(false);
-		}
-		shutterContactList.addStructureListener(l);
-		shutterContactList.getSubResources(DoorWindowSensor.class, false)
-				.stream().filter(r -> r.isActive()).forEach(dws -> {
-			DeviceHandlers.linkChannels(conn, dws, senderChannelType,
-					thermos, receiverChannelType, logger,
-					"Shutter Contact", "Window open sensor / thermostat link", false);
-		});
 	}
-
 }
