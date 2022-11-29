@@ -16,6 +16,7 @@
 package org.ogema.model.devices.buildingtechnology;
 
 import org.ogema.core.model.simple.BooleanResource;
+import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.model.actors.MultiSwitch;
 import org.ogema.model.connections.ThermalConnection;
 import org.ogema.model.devices.generators.HeatPump;
@@ -55,4 +56,14 @@ public interface AirConditioner extends HeatPump {
 	 * 7: auto
 	 */
 	MultiSwitch operationMode();
+	
+	/** Determines whether heating and cooling are supported, may be extended in the future<br>
+	 * Values defined:<br>
+	 * 0 : System default, usually cooling only. If property org.ogema.model.devices.buildingtechnology.airconmodessupporteddefault is set
+	 *    to a value different from 1 then this defines the default mode
+	 * 1 : cooling only
+	 * 2 : heating only
+	 * 3 : cooling and heating
+	 */
+	IntegerResource operationModesSupported();
 }
