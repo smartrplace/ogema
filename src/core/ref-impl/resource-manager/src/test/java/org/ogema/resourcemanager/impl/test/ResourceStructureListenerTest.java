@@ -880,6 +880,7 @@ public class ResourceStructureListenerTest extends OsgiTestBase {
 		
 	}
 	
+	@Ignore
 	@Test
 	@SuppressWarnings("unchecked")
 	public void structureListenersOnResourceListsReceiveCorrectChangedResource() throws InterruptedException {
