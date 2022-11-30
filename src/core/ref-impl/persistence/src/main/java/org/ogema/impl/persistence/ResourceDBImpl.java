@@ -94,7 +94,7 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 	ConcurrentHashMap<String, Class<?>> typeClassByName;
 	ConcurrentHashMap<String, Integer> resIDByName; // actually by path
 	ConcurrentHashMap<Integer, TreeElementImpl> resNodeByID;
-	ConcurrentHashMap<String, Vector<Integer>> resIDsByType; // TODO replace Vector?
+	ConcurrentHashMap<String, Set<Integer>> resIDsByType; // TODO replace Vector?
 
 	final boolean activatePersistence;
 
@@ -518,9 +518,9 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 		if (type != null) {
 			String name = type.getName();
 			// register in table of id's by type as key
-			Vector<Integer> v = resIDsByType.get(name);
+			Set<Integer> v = resIDsByType.get(name);
 			if (v == null) {
-				v = new Vector<Integer>();
+				v = new HashSet<>();
 				resIDsByType.put(name, v);
 			}
 
@@ -556,12 +556,12 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 
 		if (type != null) {
 			// register in table of id's by type as key
-			Vector<Integer> v = resIDsByType.get(type.getName());
+			Set<Integer> v = resIDsByType.get(type.getName());
 			if (v == null) {
 				logger.error("Registration table resIDsByType is corrupted!");
 			}
 			else {
-				exist = v.remove(new Integer(e.resID));
+				exist = v.remove(e.resID);
 				if (!exist)
 					logger.error("Registration table resIDByName is corrupted!");
 			}
@@ -580,7 +580,7 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 		if (cls == null)
 			return null;
 
-		Vector<Integer> v = resIDsByType.get(name);
+		Set<Integer> v = resIDsByType.get(name);
 		if (v == null || v.size() == 0) {
 			return getTypeChildren0(cls);
 		}
@@ -782,7 +782,7 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 
 		// 2. filter by type (path is null)
 		if (type != null) {
-			Vector<Integer> ids = resIDsByType.get(type);
+			Set<Integer> ids = resIDsByType.get(type);
 			if (ids != null)
 				for (int id : ids) {
 					TreeElementImpl e = resNodeByID.get(id);

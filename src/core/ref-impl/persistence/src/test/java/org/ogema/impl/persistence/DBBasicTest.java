@@ -37,7 +37,7 @@ public class DBBasicTest {
 		ConcurrentHashMap<String, Class<?>> typeClassByName = db.typeClassByName;
 		ConcurrentHashMap<String, Integer> resIDByName = db.resIDByName;
 		ConcurrentHashMap<Integer, TreeElementImpl> resNodeByID = db.resNodeByID;
-		ConcurrentHashMap<String, Vector<Integer>> resIDsByType = db.resIDsByType;
+		ConcurrentHashMap<String, Set<Integer>> resIDsByType = db.resIDsByType;
 		// check the consistency of the maps
 		boolean success = true;
 		// 1. root list
@@ -81,10 +81,10 @@ public class DBBasicTest {
 		}
 		// 5. resIDsByType list
 		{
-			Set<Entry<String, Vector<Integer>>> tlrs = resIDsByType.entrySet();
-			for (Map.Entry<String, Vector<Integer>> entry : tlrs) {
+			Set<Entry<String, Set<Integer>>> tlrs = resIDsByType.entrySet();
+			for (Map.Entry<String, Set<Integer>> entry : tlrs) {
 				String cls = entry.getKey();
-				Vector<Integer> values = entry.getValue();
+				Set<Integer> values = entry.getValue();
 
 				for (int ID : values) {
 					TreeElementImpl res = resNodeByID.get(ID);
@@ -117,7 +117,7 @@ public class DBBasicTest {
 		ConcurrentHashMap<String, Class<?>> typeClassByName = db.typeClassByName;
 		ConcurrentHashMap<String, Integer> resIDByName = db.resIDByName;
 		ConcurrentHashMap<Integer, TreeElementImpl> resNodeByID = db.resNodeByID;
-		ConcurrentHashMap<String, Vector<Integer>> resIDsByType = db.resIDsByType;
+		ConcurrentHashMap<String, Set<Integer>> resIDsByType = db.resIDsByType;
 		// reinit the resource db
 		db.restart();
 		// compare the contents of the maps before and after the reinit
@@ -215,15 +215,15 @@ public class DBBasicTest {
 
 		// 5. resIDsByType list
 		{
-			Set<Entry<String, Vector<Integer>>> tlrs = resIDsByType.entrySet();
-			for (Map.Entry<String, Vector<Integer>> entry : tlrs) {
+			Set<Entry<String, Set<Integer>>> tlrs = resIDsByType.entrySet();
+			for (Map.Entry<String, Set<Integer>> entry : tlrs) {
 				String clsOld = entry.getKey();
 				// if (!db.resIDsByType.containsKey(clsOld)) {
 				// success = false;
 				// break;
 				// }
-				Vector<Integer> oldValues = entry.getValue();
-				Vector<Integer> newValues = db.resIDsByType.get(clsOld);
+				Set<Integer> oldValues = entry.getValue();
+				Set<Integer> newValues = db.resIDsByType.get(clsOld);
 				if (oldValues == null && newValues != null) {
 					success = false;
 					break;
