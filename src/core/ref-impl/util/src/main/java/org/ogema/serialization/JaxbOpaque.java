@@ -20,6 +20,7 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
+import org.ogema.core.model.ValueResource;
 
 import static org.ogema.serialization.JaxbResource.NS_OGEMA_REST;
 
@@ -28,7 +29,7 @@ import static org.ogema.serialization.JaxbResource.NS_OGEMA_REST;
  * @author jlapp
  */
 @XmlAccessorType(XmlAccessType.PROPERTY)
-@XmlType(name = "OpaqueResource", namespace = NS_OGEMA_REST)
+@XmlType(name = "OpaqueResource", namespace = NS_OGEMA_REST, propOrder = { "value", "lastUpdateTime" })
 @XmlRootElement(name = "resource", namespace = NS_OGEMA_REST)
 @SuppressWarnings("deprecation")
 public class JaxbOpaque extends JaxbResource {
@@ -44,6 +45,11 @@ public class JaxbOpaque extends JaxbResource {
 	@XmlElement
 	public byte[] getValue() {
 		return ((org.ogema.core.model.simple.OpaqueResource) res).getValue();
+	}
+	
+	@XmlElement
+	public long getLastUpdateTime() {
+		return ((ValueResource) res).getLastUpdateTime();
 	}
 
 }

@@ -24,7 +24,6 @@ package org.ogema.serialization.jaxb;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 import static org.ogema.serialization.JaxbResource.NS_OGEMA_REST;
 
@@ -53,11 +52,20 @@ import static org.ogema.serialization.JaxbResource.NS_OGEMA_REST;
  * 
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "TimeResource", namespace = NS_OGEMA_REST, propOrder = { "value" })
+@XmlType(name = "TimeResource", namespace = NS_OGEMA_REST, propOrder = { "value", "lastUpdateTime" })
 //@XmlRootElement(name = "resource", namespace = NS_OGEMA_REST)
 public class TimeResource extends Resource {
 
 	protected long value;
+	protected long lastUpdateTime = -1;
+	
+	public long getLastUpdateTime() {
+		return lastUpdateTime;
+	}
+
+	public void setLastUpdateTime(long lastUpdateTime) {
+		this.lastUpdateTime = lastUpdateTime;
+	}
 
 	/**
 	 * Gets the value of the value property.

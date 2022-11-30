@@ -111,6 +111,8 @@ final class SerializationCore {
 	final ResourceAccess resacc;
 	final ResourceManagement resman;
 	final static Logger LOGGER = LoggerFactory.getLogger(SerializationCore.class);
+	final static long LASTUPDATE_UNSET = -1;	
+	
 	// JAXBContext is thread safe and expensive to build, initialize only once.
 	private final static JAXBContext MARSHALLING_CONTEXT = AccessController.doPrivileged(new PrivilegedAction<JAXBContext>() {
 
@@ -745,6 +747,9 @@ final class SerializationCore {
 			throw new IllegalArgumentException("incompatible types: " + inputType + " != " + target.getResourceType());
 		}
 		if (input instanceof org.ogema.serialization.jaxb.BooleanResource) {
+			if (((org.ogema.serialization.jaxb.BooleanResource) input).getLastUpdateTime() == LASTUPDATE_UNSET) {
+				return;
+			}
 			if (!forceUpdate && (((BooleanResource) target)
 					.getValue() == ((org.ogema.serialization.jaxb.BooleanResource) input).isValue())) {
 				return;
@@ -756,6 +761,9 @@ final class SerializationCore {
 			// target).setValue(((org.ogema.serialization.jaxb.BooleanResource)
 			// input).isValue());
 		} else if (input instanceof org.ogema.serialization.jaxb.FloatResource) {
+			if (((org.ogema.serialization.jaxb.FloatResource) input).getLastUpdateTime() == LASTUPDATE_UNSET) {
+				return;
+			}
 			if (!forceUpdate && (((FloatResource) target)
 					.getValue() == ((org.ogema.serialization.jaxb.FloatResource) input).getValue())) {
 				return;
@@ -766,6 +774,9 @@ final class SerializationCore {
 			// target).setValue(((org.ogema.serialization.jaxb.FloatResource)
 			// input).getValue());
 		} else if (input instanceof org.ogema.serialization.jaxb.IntegerResource) {
+			if (((org.ogema.serialization.jaxb.IntegerResource) input).getLastUpdateTime() == LASTUPDATE_UNSET) {
+				return;
+			}
 			if (!forceUpdate && (((IntegerResource) target)
 					.getValue() == ((org.ogema.serialization.jaxb.IntegerResource) input).getValue())) {
 				return;
@@ -777,6 +788,9 @@ final class SerializationCore {
 			// target).setValue(((org.ogema.serialization.jaxb.IntegerResource)
 			// input).getValue());
 		} else if (input instanceof org.ogema.serialization.jaxb.OpaqueResource) {
+			if (((org.ogema.serialization.jaxb.OpaqueResource) input).getLastUpdateTime() == LASTUPDATE_UNSET) {
+				return;
+			}
 			if (!forceUpdate && Arrays.equals(((org.ogema.core.model.simple.OpaqueResource) target).getValue(),
 					((org.ogema.serialization.jaxb.OpaqueResource) input).getValue())) {
 				return;
@@ -788,6 +802,9 @@ final class SerializationCore {
 			// target).setValue(((org.ogema.serialization.jaxb.OpaqueResource)
 			// input).getValue());
 		} else if (input instanceof org.ogema.serialization.jaxb.StringResource) {
+			if (((org.ogema.serialization.jaxb.StringResource) input).getLastUpdateTime() == LASTUPDATE_UNSET) {
+				return;
+			}
 			if (!forceUpdate) {
 				String s1 = ((StringResource) target).getValue();
 				String s2 = ((org.ogema.serialization.jaxb.StringResource) input).getValue();
@@ -801,6 +818,9 @@ final class SerializationCore {
 			// target).setValue(((org.ogema.serialization.jaxb.StringResource)
 			// input).getValue());
 		} else if (input instanceof org.ogema.serialization.jaxb.TimeResource) {
+			if (((org.ogema.serialization.jaxb.TimeResource) input).getLastUpdateTime() == LASTUPDATE_UNSET) {
+				return;
+			}
 			if (!forceUpdate && (((TimeResource) target)
 					.getValue() == ((org.ogema.serialization.jaxb.TimeResource) input).getValue())) {
 				return;

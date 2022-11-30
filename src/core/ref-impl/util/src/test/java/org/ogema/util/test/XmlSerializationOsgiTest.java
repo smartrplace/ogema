@@ -57,6 +57,7 @@ import org.ogema.model.locations.WorkPlace;
 import org.ogema.model.actors.OnOffSwitch;
 import org.ogema.model.connections.ThermalMixingConnection;
 import org.ogema.model.prototypes.Configuration;
+import org.ogema.model.sensors.TemperatureSensor;
 import org.ogema.serialization.SchemaUtil;
 import org.ogema.serialization.jaxb.ResourceList;
 import org.ogema.serialization.jaxb.FloatResource;
@@ -126,6 +127,60 @@ public class XmlSerializationOsgiTest extends OsgiAppTestBase {
 		}
 		else {
 			return (T) o;
+		}
+	}
+	
+	@Test
+	public void lastUpdateTimeIsSerialized() {
+		TemperatureSensor ts = getApplicationManager().getResourceManagement().createResource(newResourceName(), TemperatureSensor.class);
+		ts.reading().create();
+		ts.activate(true);
+		ts.reading().setValue(47.11f);
+		long time = ts.reading().getLastUpdateTime();
+		
+		StringWriter output = new StringWriter();
+		try {
+			sman.writeXml(output, ts);
+			System.out.println("XML:\n" + output.toString());
+			JAXBContext ctx = createUnmarshallingContext();
+			validateOgemaXml(output.toString());
+			Unmarshaller u = ctx.createUnmarshaller();
+			org.ogema.serialization.jaxb.Resource fr = unmarshal(u, output.toString());
+			Assert.assertEquals(time, ((FloatResource)fr.get("reading")).getLastUpdateTime());
+		} catch (JAXBException | IOException | SAXException ex) {
+			System.out.println(output.toString());
+			ex.printStackTrace();
+			Assert.fail(ex.getMessage());
+		}
+	}
+	
+	@Test
+	public void lastUpdateTimeIsSerializedForUnsetNonPersistent() {
+		TemperatureSensor ts = getApplicationManager().getResourceManagement().createResource(newResourceName(), TemperatureSensor.class);
+		ts.reading().create();
+		ts.activate(true);
+		//ts.reading().setValue(47.11f);
+		long time = ts.reading().getLastUpdateTime();
+		assertEquals(-1, time);
+		
+		StringWriter output = new StringWriter();
+		try {
+			sman.writeXml(output, ts);
+			System.out.println("XML:\n" + output.toString());
+			JAXBContext ctx = createUnmarshallingContext();
+			validateOgemaXml(output.toString());
+			Unmarshaller u = ctx.createUnmarshaller();
+			org.ogema.serialization.jaxb.Resource fr = unmarshal(u, output.toString());
+			Assert.assertEquals(time, ((FloatResource)fr.get("reading")).getLastUpdateTime());
+			
+			TemperatureSensor tsDeserialized = sman.createFromXml(output.toString(),
+					ts.getSubResource(newResourceName(), Resource.class).create());
+			Assert.assertFalse(ts.equalsLocation(tsDeserialized));
+			Assert.assertEquals(time, tsDeserialized.reading().getLastUpdateTime());
+		} catch (JAXBException | IOException | SAXException ex) {
+			System.out.println(output.toString());
+			ex.printStackTrace();
+			Assert.fail(ex.getMessage());
 		}
 	}
 

@@ -24,7 +24,6 @@ package org.ogema.serialization.jaxb;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -56,13 +55,22 @@ import static org.ogema.serialization.JaxbResource.NS_OGEMA_REST;
  * 
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "FloatResource", namespace = NS_OGEMA_REST, propOrder = { "value", "unit" })
+@XmlType(name = "FloatResource", namespace = NS_OGEMA_REST, propOrder = { "value", "unit", "lastUpdateTime" })
 //@XmlRootElement(name = "resource", namespace = NS_OGEMA_REST)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
 public class FloatResource extends Resource {
 
 	protected float value;
 	protected String unit;
+	protected long lastUpdateTime = -1;
+	
+	public long getLastUpdateTime() {
+		return lastUpdateTime;
+	}
+
+	public void setLastUpdateTime(long lastUpdateTime) {
+		this.lastUpdateTime = lastUpdateTime;
+	}
 
 	/**
 	 * Gets the value of the value property.

@@ -52,11 +52,20 @@ import static org.ogema.serialization.JaxbResource.NS_OGEMA_REST;
  * 
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "IntegerResource", namespace = NS_OGEMA_REST, propOrder = { "value" })
+@XmlType(name = "IntegerResource", namespace = NS_OGEMA_REST, propOrder = { "value", "lastUpdateTime" })
 //@XmlRootElement(name = "resource", namespace = NS_OGEMA_REST)
 public class IntegerResource extends Resource {
 
 	protected int value;
+	protected long lastUpdateTime = -1;
+	
+	public long getLastUpdateTime() {
+		return lastUpdateTime;
+	}
+
+	public void setLastUpdateTime(long lastUpdateTime) {
+		this.lastUpdateTime = lastUpdateTime;
+	}
 
 	/**
 	 * Gets the value of the value property.

@@ -31,7 +31,7 @@ import static org.ogema.serialization.JaxbResource.NS_OGEMA_REST;
  * @author jlapp
  */
 @XmlAccessorType(XmlAccessType.PROPERTY)
-@XmlType(name = "FloatResource", namespace = NS_OGEMA_REST, propOrder = { "value", "unit" })
+@XmlType(name = "FloatResource", namespace = NS_OGEMA_REST, propOrder = { "value", "unit", "lastUpdateTime" })
 @XmlRootElement(name = "resource", namespace = NS_OGEMA_REST)
 public class JaxbFloat extends JaxbResource {
 
@@ -54,6 +54,11 @@ public class JaxbFloat extends JaxbResource {
 			return ((PhysicalUnitResource) res).getUnit().toString();
 		}
 		return null;
+	}
+	
+	@XmlElement
+	public long getLastUpdateTime() {
+		return ((FloatResource) res).getLastUpdateTime();
 	}
 
 }

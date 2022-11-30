@@ -114,30 +114,35 @@ public class JsonReaderJackson {
                             if (value != null) {
                                 br.setValue(Boolean.parseBoolean(String.valueOf(value)));
                             }
+							br.setLastUpdateTime(lastUpdateTime);
                             r = br;
                         } else if (IntegerResource.class.isAssignableFrom(c)) {
                             org.ogema.serialization.jaxb.IntegerResource ir = new org.ogema.serialization.jaxb.IntegerResource();
                             if (value != null) {
                                 ir.setValue(Integer.parseInt(String.valueOf(value)));
                             }
+							ir.setLastUpdateTime(lastUpdateTime);
                             r = ir;
                         } else if (FloatResource.class.isAssignableFrom(c)) {
                             org.ogema.serialization.jaxb.FloatResource fr = new org.ogema.serialization.jaxb.FloatResource();
                             if (value != null) {
                                 fr.setValue(Float.parseFloat(String.valueOf(value)));
                             }
+							fr.setLastUpdateTime(lastUpdateTime);
                             r = fr;
                         } else if (StringResource.class.isAssignableFrom(c)) {
                             org.ogema.serialization.jaxb.StringResource sr = new org.ogema.serialization.jaxb.StringResource();
                             if (value != null) {
                                 sr.setValue(String.valueOf(value));
                             }
+							sr.setLastUpdateTime(lastUpdateTime);
                             r = sr;
                         } else if (TimeResource.class.isAssignableFrom(c)) {
                             org.ogema.serialization.jaxb.TimeResource tr = new org.ogema.serialization.jaxb.TimeResource();
                             if (value != null) {
                                 tr.setValue(Long.parseLong(String.valueOf(value)));
                             }
+							tr.setLastUpdateTime(lastUpdateTime);
                             r = tr;
                         } else {
                             throw new RuntimeException("unsupported type: " + c);

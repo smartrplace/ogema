@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.ogema.core.model.ValueResource;
 import org.ogema.core.model.array.ArrayResource;
 import org.ogema.core.model.array.BooleanArrayResource;
 import org.ogema.core.model.array.ByteArrayResource;
@@ -261,6 +262,9 @@ public class FastJsonGenerator {
                         "unsupported ArrayResource type: {}", resource.getResourceType());
             }
         }
+		if (resource instanceof SingleValueResource) {
+			jGen.writeNumberField("lastUpdateTime", ((ValueResource) resource).getLastUpdateTime());
+		}
 	}
     private static final String ARRAYVALUES = "values";
     private static final String SINGLEVALUE = "value";
