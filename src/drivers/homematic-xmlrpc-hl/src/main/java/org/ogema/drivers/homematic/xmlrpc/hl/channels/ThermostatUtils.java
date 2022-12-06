@@ -2,6 +2,7 @@ package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
 import java.io.IOException;
 import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -13,12 +14,14 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
+import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.model.units.TemperatureResource;
 import org.ogema.core.resourcemanager.ResourceStructureEvent;
 import org.ogema.core.resourcemanager.ResourceStructureListener;
@@ -99,6 +102,66 @@ public abstract class ThermostatUtils {
 
 	};
 
+	private static void setupDecalcDecorators(HmDevice parent, DeviceDescription desc,
+			Map<String, Map<String, ParameterDescription<?>>> paramSets,
+			HomeMaticConnection conn, Thermostat model, Logger logger, Map<String, Object> masterValues) {
+		Map<String, ParameterDescription<?>> masterParams
+				= paramSets.get(ParameterDescription.SET_TYPES.MASTER.name());
+		if (masterParams == null || !masterParams.containsKey("DECALCIFICATION_WEEKDAY")) {
+			logger.debug("no DECALCIFICATION params for {}", desc.getAddress());
+			return;
+		}
+		logger.debug("setup DECALCIFICATION decorator on {}", model.valve().getPath());
+		model.valve().create().activate(false);
+		StringResource setting = model.valve().getSubResource("DECALCIFICATION", StringResource.class);
+		StringResource feedback = model.valve().getSubResource("DECALCIFICATION_FEEDBACK", StringResource.class);
+		Function<Map<String, Object>, String> decalcStringFromParams = masterValueReadings -> {
+			//note: HM weekday enum is Sunday(0) ... Saturday(6)
+			Integer weekday = (Integer) masterValueReadings.get("DECALCIFICATION_WEEKDAY");
+			Integer halfhour = (Integer) masterValueReadings.get("DECALCIFICATION_TIME");
+			if (weekday == null || halfhour == null) {
+				return null;
+			}
+			DayOfWeek dow = weekday == 0 ? DayOfWeek.SUNDAY : DayOfWeek.of(weekday);
+			LocalTime time = LocalTime.ofSecondOfDay(halfhour * 30 * 60);
+			String fb = dow + " " + time;
+			return fb;
+		};
+		Runnable readValue = () -> {
+			try {
+				Map<String, Object> masterValueReadings = conn.getParamset(desc.getAddress(), "MASTER");
+				String fb = decalcStringFromParams.apply(masterValueReadings);
+				if (fb == null) {
+					return;
+				}
+				feedback.create();
+				feedback.setValue(fb);
+				feedback.activate(false);
+				logger.debug("read DECALCIFICATION@{}: {}", desc.getAddress(), fb);
+			} catch (IOException | RuntimeException ex) {
+				logger.warn("could not read VALVE_ERROR_RUN_POSITION from {}: {}", desc.getAddress(), ex.getMessage());
+			}
+		};
+		setting.addValueListener((StringResource v) -> {
+			String s = v.getValue();
+			try {
+				String[] a = s.split(" ");
+				DayOfWeek dow = DayOfWeek.valueOf(a[0]);
+				LocalTime t = LocalTime.parse(a[1]);
+				int hmWeekDay = dow.getValue() % 7; //DayOfWeek is Mon(1)...Sun(7) (ISO-8601)
+				int hmHalfHour = t.toSecondOfDay() / 60 / 30;
+				Map<String, Object> values = new HashMap<>();
+				values.put("DECALCIFICATION_TIME", hmHalfHour);
+				values.put("DECALCIFICATION_WEEKDAY", hmWeekDay);
+				conn.performPutParamset(desc.getAddress(), "MASTER", values);
+				logger.debug("setting decalcification time for {}: {}={}", desc.getAddress(), s, values);
+				CompletableFuture.delayedExecutor(3, TimeUnit.SECONDS).execute(readValue);
+			} catch (RuntimeException re) {
+				logger.warn("illegal value (or bug) on {}: {} ({})", setting.getPath(), s, re.getMessage());
+			}
+		}, true);
+	}
+
 	/*
 	support for:
 		VALVE_ERROR_RUN_POSITION
@@ -112,6 +175,7 @@ public abstract class ThermostatUtils {
 			logger.debug("no MASTER params for {}", desc.getAddress());
 			return;
 		}
+		setupDecalcDecorators(parent, desc, paramSets, conn, model, logger, null);
 		if (masterParams.containsKey("VALVE_ERROR_RUN_POSITION")) {
 			logger.debug("setup VALVE_ERROR_RUN_POSITION decorator on {}", model.valve().getPath());
 			model.valve().create().activate(false);
