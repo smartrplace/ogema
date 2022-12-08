@@ -26,9 +26,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
-import org.ogema.core.administration.RegisteredStructureListener;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.simple.BooleanResource;
@@ -490,22 +488,6 @@ public class ResourceStructureListenerTest extends OsgiTestBase {
 		assertTrue(l.awaitEvent(RESOURCE_DEACTIVATED));
 	}
 
-	class EventTestListener implements ResourceStructureListener {
-
-		public EventType lastType = null;
-		public CountDownLatch latch = new CountDownLatch(1);
-
-		@Override
-		public void resourceStructureChanged(ResourceStructureEvent event) {
-			lastType = event.getType();
-			latch.countDown();
-		}
-
-		public void reset() {
-			latch = new CountDownLatch(1);
-		}
-	};
-
 	@Test
 	public void callbackEventTypeWorks() throws InterruptedException {
 		final OnOffSwitch sw = resMan.createResource(newResourceName(), OnOffSwitch.class);
@@ -554,14 +536,12 @@ public class ResourceStructureListenerTest extends OsgiTestBase {
 		sw.delete(); 
 	}
 
-	@Ignore("Callback missing")
 	@Test
 	public void doubleReferencesWork() throws InterruptedException {
 		ElectricHeater a = resMan.createResource("a", ElectricHeater.class);
 		Room b = resMan.createResource("b", Room.class);
 		TemperatureSensor c = resMan.createResource("c", TemperatureSensor.class);
 		c.reading().create();
-//		final CountDownLatch latch = new CountDownLatch(1);
 
 		StructureTestListener listener = new StructureTestListener();
 
@@ -574,22 +554,21 @@ public class ResourceStructureListenerTest extends OsgiTestBase {
 		//a.location().room().temperatureSensor().reading().activate(false);
 
 		assertTrue(b.equalsLocation(a.location().room()));
-		b.temperatureSensor().setAsReference(c); // <-- broken!
-		//b.temperatureSensor().reading().create(); // <-- broken!
-		//a.location().room().temperatureSensor().setAsReference(c); // works
+		// 3 different ways to cause the create callback on listener
+		b.temperatureSensor().setAsReference(c);
+		//b.temperatureSensor().reading().create();
+		//a.location().room().temperatureSensor().setAsReference(c);
 
 		assertTrue(a.location().room().temperatureSensor().reading().exists());
 		//a.location().room().temperatureSensor().reading().activate(false);
-
+		/*
 		System.out.println("registered structure listeners:");
 		for (RegisteredStructureListener rsl : getApplicationManager().getAdministrationManager().getAppById(
 				getApplicationManager().getAppID().toString()).getStructureListeners()) {
 			System.out.printf("%s: %s%n", rsl.getResource(), rsl.getListener());
 		}
-
-		//latch.await(5, TimeUnit.SECONDS);
+		*/
 		assertTrue("missing create callback", listener.awaitCreate(5, TimeUnit.SECONDS));
-		//assertEquals("Missing structure changed callback; ", 0, latch.getCount());
 		a.location().room().temperatureSensor().reading().removeStructureListener(listener);
 		c.delete();
 		b.delete();
@@ -880,7 +859,6 @@ public class ResourceStructureListenerTest extends OsgiTestBase {
 		
 	}
 	
-	@Ignore
 	@Test
 	@SuppressWarnings("unchecked")
 	public void structureListenersOnResourceListsReceiveCorrectChangedResource() throws InterruptedException {

@@ -316,7 +316,7 @@ public class DefaultResourceList<T extends Resource> extends ResourceBase implem
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public Class getElementType() {
+	public Class<T> getElementType() {
 		return (Class<T>) getEl().getResourceListType();
 	}
 

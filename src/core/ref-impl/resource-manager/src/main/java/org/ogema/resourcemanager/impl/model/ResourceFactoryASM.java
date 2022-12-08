@@ -57,14 +57,15 @@ import org.slf4j.LoggerFactory;
  * @author Jan Lapp, Fraunhofer IWES
  */
 enum ResourceFactoryASM {
-
+	
 	INSTANCE;
-
+	
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
 	private final Map<Class<? extends Resource>, Class<? extends ResourceBase>> implementationTypes = new HashMap<>();
     
     private final String BASECLASS_NAME = Type.getInternalName(ResourceBase.class);
+	private final String BASECLASS_NAME_LIST = Type.getInternalName(DefaultResourceList.class);
     private final String CONSTRUCTOR_DESCRIPTOR = Type.getConstructorDescriptor(ResourceBase.class.getConstructors()[0]);
 
 	ResourceFactoryASM() {
@@ -84,14 +85,17 @@ enum ResourceFactoryASM {
 	private Class<? extends ResourceBase> createImplementationType(final Class<? extends Resource> ogemaType) {
 		final long startTime = System.currentTimeMillis();
 
-		ClassWriter cw = new ClassWriter(0);
+		ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 		MethodVisitor mv;
         
 		final String classname = "resourceImpl."+ogemaType.getCanonicalName();
+		final String baseClassName = (ResourceList.class.isAssignableFrom(ogemaType))
+				? BASECLASS_NAME_LIST
+				: BASECLASS_NAME;
         
 		cw.visit(V1_7, ACC_PUBLIC + ACC_SUPER,
 				classname.replace('.', '/'), null,
-				BASECLASS_NAME,
+				baseClassName,
 				new String[]{Type.getInternalName(ogemaType)});
 
 		{//constructor
@@ -101,7 +105,7 @@ enum ResourceFactoryASM {
 			mv.visitVarInsn(ALOAD, 1);
 			mv.visitVarInsn(ALOAD, 2);
 			mv.visitVarInsn(ALOAD, 3);
-			mv.visitMethodInsn(INVOKESPECIAL, BASECLASS_NAME, "<init>", CONSTRUCTOR_DESCRIPTOR, false);
+			mv.visitMethodInsn(INVOKESPECIAL, baseClassName, "<init>", CONSTRUCTOR_DESCRIPTOR, false);
 			mv.visitInsn(RETURN);
 			mv.visitMaxs(4, 4);
 			mv.visitEnd();
@@ -111,7 +115,7 @@ enum ResourceFactoryASM {
 		List<String> methodNamesList = new ArrayList<>();
         
         for (Method m : ogemaType.getMethods()) {
-            if (m.getDeclaringClass().equals(Resource.class)) {
+            if (m.getDeclaringClass().equals(Resource.class) | m.getDeclaringClass().equals(ResourceList.class)) {
 				continue;
 			}
             
@@ -144,7 +148,7 @@ enum ResourceFactoryASM {
 			mv.visitVarInsn(ALOAD, 0);
 			mv.visitLdcInsn(m.getName());
 			mv.visitMethodInsn(INVOKEVIRTUAL,
-					BASECLASS_NAME,
+					baseClassName,
 					"getSubResource",
 					"(Ljava/lang/String;)Lorg/ogema/core/model/Resource;", false);
 			mv.visitInsn(ARETURN);
@@ -190,7 +194,6 @@ enum ResourceFactoryASM {
 		try {
 			Class<? extends ResourceBase> impl = getImplementation(el.getType());
 			Constructor<?> constr = impl.getConstructor(VirtualTreeElement.class, String.class, ApplicationResourceManager.class);
-
 			return (T) constr.newInstance(new Object[]{el, path, resman});
 		} catch (IllegalAccessException | IllegalArgumentException |
 				InstantiationException | NoSuchMethodException |
