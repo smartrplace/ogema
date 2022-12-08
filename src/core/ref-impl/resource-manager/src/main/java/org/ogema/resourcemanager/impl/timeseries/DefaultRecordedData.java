@@ -56,7 +56,10 @@ import org.slf4j.LoggerFactory;
  */
 public class DefaultRecordedData implements RecordedData {
 
+	public static final String SET_LAST_RECORDED_VALUE_PROP = "org.ogema.resources.setLastRecordedValueOnStart";
+
 	final static boolean SECURITY_ENABLED = System.getSecurityManager() != null;
+	final static boolean SET_LAST_RECORDED_VALUE = Boolean.getBoolean(SET_LAST_RECORDED_VALUE_PROP);
 
 	protected final String id;
 	protected final DataRecorder dataAccess;
@@ -90,6 +93,29 @@ public class DefaultRecordedData implements RecordedData {
 			config = tsData.getConfiguration();
 			createUpdater();
 			setConfiguration(config);
+			if (SET_LAST_RECORDED_VALUE) {
+				setLastRecordedValue();
+			}
+		}
+	}
+	
+	private void setLastRecordedValue() {
+		SampledValue last = data.getPreviousValue(Long.MAX_VALUE);
+		if (last != null) {
+			if (last.getValue() instanceof FloatValue) {
+				el.getData().setFloat(last.getValue().getFloatValue());
+				el.setLastModified(last.getTimestamp());
+				//updater.lastValue = last.getValue().getFloatValue();
+			} else if (last.getValue() instanceof BooleanValue) {
+				el.getData().setBoolean(last.getValue().getBooleanValue());
+				el.setLastModified(last.getTimestamp());
+			} else if (last.getValue() instanceof IntegerValue) {
+				el.getData().setInt(last.getValue().getIntegerValue());
+				el.setLastModified(last.getTimestamp());
+			} else if (last.getValue() instanceof LongValue) {
+				el.getData().setLong(last.getValue().getLongValue());
+				el.setLastModified(last.getTimestamp());
+			}
 		}
 	}
 	
