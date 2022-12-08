@@ -467,6 +467,9 @@ public class ApplicationResourceManager implements ResourceManagement, ResourceA
 		if (path.length() > 0 && path.charAt(0) != '/') {
 			path = "/" + path;
 		}
+		if (path.length() > 1 && path.endsWith("/")) {
+			path = path.substring(0, path.length() - 1);
+		}
 		return findResource(path);
 	}
 	

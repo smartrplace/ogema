@@ -647,6 +647,17 @@ public class ResourceTest extends OsgiTestBase {
         Resource top = resMan.createResource(newResourceName(), Resource.class);
         Resource noSuchResource = top.getSubResource("17");
     }
+	
+	@Test
+	public void trailingSlashesAreOk() {
+		OnOffSwitch sw = resMan.createResource(newResourceName(), OnOffSwitch.class);
+		sw.stateControl().create();
+		sw.activate(true);
+		OnOffSwitch swreq = resAcc.getResource(sw.getName() + "/");
+		assertNotNull(swreq);
+		//failed because of bad path mangling.
+		assertEquals(1, swreq.getSubResources(true).size());
+	}
     
     
 }
