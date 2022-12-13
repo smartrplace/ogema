@@ -16,6 +16,7 @@
 package org.ogema.resourcemanager.virtual;
 
 import com.google.common.collect.MapMaker;
+import java.lang.ref.SoftReference;
 import java.lang.reflect.Method;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -465,7 +466,7 @@ public class DefaultVirtualTreeElement implements VirtualTreeElement {
         }
         return definedType;
     }
-
+	
     @Override
     @SuppressWarnings("deprecation")
     public synchronized void delete() {
@@ -482,37 +483,44 @@ public class DefaultVirtualTreeElement implements VirtualTreeElement {
         if (definedType != null) {
             ((MemoryTreeElement) getEl()).setType(definedType);
         }
-
+		
         final String thisPath = getPath();
-        for (Map.Entry<String, DefaultVirtualTreeElement> e : resourceDB.elements.asMap().entrySet()) {
+		final String thisPathPrefix = thisPath + "/";
+        //for (Map.Entry<String, DefaultVirtualTreeElement> e : resourceDB.elements.entrySet()) {
+		for (Map.Entry<String, SoftReference<DefaultVirtualTreeElement>> e : resourceDB.elements.tailMap(thisPath).entrySet()) {
+		//for (Map.Entry<String, TreeElement> e : affectedPaths.entrySet()) { //resourceDB.elements.asMap().entrySet()) {
             /* FIXME this need to process ALL affected reference paths */
             String path = e.getKey();
-            DefaultVirtualTreeElement childEl = e.getValue();
+            DefaultVirtualTreeElement childEl = e.getValue().get();
+			if (childEl == null) {
+				continue;
+			}
+			//TreeElement childEl = e.getValue();
 
-            if (path.startsWith(thisPath)) {// && !path.equals(thisPath)) {
-                if (childEl.isVirtual() || childEl.isToplevel()) {
-                    continue;
-                }
-                String parentPath = path.substring(0, path.lastIndexOf('/'));
-                VirtualTreeElement parent = resourceDB.elements.getIfPresent(parentPath);
-                if (!childEl.isVirtual()) {
-                   Object oldResRef = childEl.getResRef();
-                   MemoryTreeElement replacement;
-                    if (org.ogema.core.model.SimpleResource.class.isAssignableFrom(childEl.getType())) {
-                        SimpleResourceData data;
-                        data = new DefaultSimpleResourceData();
-                        replacement = new MemoryTreeElement(childEl.getName(), childEl.getType(), parent, childEl.isDecorator(), data);
-                    } else {
-                        replacement = new MemoryTreeElement(childEl.getName(), childEl.getType(), parent, childEl.isDecorator());
-                    }
-                    if (oldResRef != null) {
-                        replacement.setResRef(oldResRef);
-                    }
-                    childEl.setEl(replacement);
-                } else {
-                    childEl.setEl(childEl.el); //xxx why?
-                }
-            }
+			//if (path.startsWith(thisPath)) {// && !path.equals(thisPath)) {
+			if (path.startsWith(thisPathPrefix) || path.equals(thisPath)) {// && !path.equals(thisPath)) {
+				if ((childEl instanceof VirtualTreeElement && ((VirtualTreeElement) childEl).isVirtual()) || childEl.isToplevel()) {
+					continue;
+				}
+				String parentPath = path.substring(0, path.lastIndexOf('/'));
+				VirtualTreeElement parent = resourceDB.elements.get(parentPath).get(); //this cannot have been GC'ed
+				Object oldResRef = childEl.getResRef();
+				MemoryTreeElement replacement;
+				if (org.ogema.core.model.SimpleResource.class.isAssignableFrom(childEl.getType())) {
+					SimpleResourceData data;
+					data = new DefaultSimpleResourceData();
+					replacement = new MemoryTreeElement(childEl.getName(), childEl.getType(), parent, childEl.isDecorator(), data);
+				} else {
+					replacement = new MemoryTreeElement(childEl.getName(), childEl.getType(), parent, childEl.isDecorator());
+				}
+				if (oldResRef != null) {
+					replacement.setResRef(oldResRef);
+				}
+                childEl.setEl(replacement);
+			} else {
+				break;
+			}
+			
         }
         assert isVirtual() : "not virtual after delete: " + el;
         assert getParent() == null || getParent().getChild(getName()).isVirtual() : "after delete: parent has wrong child element";
