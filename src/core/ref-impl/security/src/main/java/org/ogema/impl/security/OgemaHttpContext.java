@@ -342,9 +342,21 @@ public class OgemaHttpContext implements HttpContext {
 			}
 		}
 		if (!result) {
+			/* XXX changed to sendRedirect to hide a bug in the widget javascript(?).
+			  to reproduce: 
+			  open 3 different widget apps in separate tabs, leave tabs open,
+			  use one tab to logout & then login again. unclear how errors
+			  from old asynchronous http requests manage to show up in a different tab
+			  or in the new session...
+			*/
+			logger.warn("failed OTP auth, redirecting to start page (uri was: {})", currenturi);
+			response.sendRedirect(LoginServlet.START_PAGE);
+			return false;
+			/*
 			response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
 					"Servlet access unauthorized. Check your one time credentials.");
 			return false;
+			*/
 		}
 
 		/*

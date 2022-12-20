@@ -164,6 +164,11 @@ public class LoginServlet extends HttpServlet {
 		OutputStream bout;
 		int len;
 		byte[] buf = new byte[512];
+		if (resource == null) {
+			resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+			//resp.sendError(404);
+			return;
+		}
 		try {
 			is = resource.openStream();
 			bout = resp.getOutputStream();
