@@ -30,13 +30,15 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.ogema.core.model.Resource;
@@ -1238,27 +1240,46 @@ public class DBResourceIO {
 	 */
 	void updateDirectory() {
 
-		TreeMap<Integer, Integer> sortedOffsets = new TreeMap<Integer, Integer>(sorter);
-		sortedOffsets.putAll(offsetByID);
+		//TreeMap<Integer, Integer> sortedOffsets = new TreeMap<Integer, Integer>(sorter);
+		//sortedOffsets.putAll(offsetByID);
+		
+		List<Map.Entry<Integer,Integer>> sortedOffsets = new ArrayList<>(offsetByID.size());
+		sortedOffsets.addAll(offsetByID.entrySet());
+		Collections.sort(sortedOffsets, new Comparator<Entry<Integer,Integer>>() {
+			@Override
+			public int compare(Entry<Integer, Integer> o1, Entry<Integer, Integer> o2) {
+				int rval = Integer.compare(o1.getValue(), o2.getValue());
+				return rval == 0 ? -1 : rval;
+			}
+		});
+		
 		// Save the previous length of the file.
 		int numOfEntries = sortedOffsets.size();
-		Iterator<Entry<Integer, Integer>> dirEntries = sortedOffsets.entrySet().iterator();
+		Iterator<Entry<Integer, Integer>> dirEntries = sortedOffsets.iterator();
 		dirFiles.shiftF();
 		mapFile = new MapFile(dirFiles.fileNew, dataFile.fileName);
 		DataOutputStream dos = mapFile.out;
+		int lastOffset = -1;
 		while (dirEntries.hasNext()) {
 			Entry<Integer, Integer> currEntry = dirEntries.next();
+			if (currEntry.getValue() == lastOffset) {
+				System.out.println("-----------\ndup\n------------");
+				continue;
+			}
 			// Put the ID
 			try {
 				dos.writeInt(currEntry.getKey());
-				logger.debug(currEntry.getKey().toString());
-				logger.debug("=");
+				/*
 				logger.debug(currEntry.getValue().toString());
+				logger.debug("=");
+				logger.debug(currEntry.getKey().toString());
 				logger.debug(",");
+				*/
 				dos.writeInt(currEntry.getValue());
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
+			lastOffset = currEntry.getValue();
 		}
 		try {
 			dos.writeUTF(mapFile.dataFileName);
