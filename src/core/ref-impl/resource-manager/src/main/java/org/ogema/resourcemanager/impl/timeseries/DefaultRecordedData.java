@@ -26,6 +26,7 @@ import java.util.concurrent.Executor;
 import org.ogema.core.application.Timer;
 import org.ogema.core.application.TimerListener;
 import org.ogema.core.channelmanager.measurements.BooleanValue;
+import org.ogema.core.channelmanager.measurements.DoubleValue;
 import org.ogema.core.channelmanager.measurements.FloatValue;
 import org.ogema.core.channelmanager.measurements.IntegerValue;
 import org.ogema.core.channelmanager.measurements.LongValue;
@@ -40,6 +41,7 @@ import org.ogema.core.recordeddata.RecordedDataConfiguration;
 import org.ogema.core.recordeddata.RecordedDataConfiguration.StorageType;
 import org.ogema.core.recordeddata.ReductionMode;
 import org.ogema.core.timeseries.InterpolationMode;
+import org.ogema.persistence.DBConstants;
 import org.ogema.recordeddata.DataRecorder;
 import org.ogema.recordeddata.DataRecorderException;
 import org.ogema.recordeddata.RecordedDataStorage;
@@ -67,7 +69,7 @@ public class DefaultRecordedData implements RecordedData {
 	protected final Executor exec;
 	protected final TreeElement el;
 	protected final Logger logger = LoggerFactory.getLogger(getClass());
-
+	
 	// never null; == EmptyRecordedData if logging is disabled for this element
 	protected volatile RecordedDataStorage data = new EmptyRecordedData();
 	protected RecordedDataConfiguration config = null;
@@ -102,19 +104,27 @@ public class DefaultRecordedData implements RecordedData {
 	private void setLastRecordedValue() {
 		SampledValue last = data.getPreviousValue(Long.MAX_VALUE);
 		if (last != null) {
-			if (last.getValue() instanceof FloatValue) {
-				el.getData().setFloat(last.getValue().getFloatValue());
-				el.setLastModified(last.getTimestamp());
-				//updater.lastValue = last.getValue().getFloatValue();
-			} else if (last.getValue() instanceof BooleanValue) {
-				el.getData().setBoolean(last.getValue().getBooleanValue());
-				el.setLastModified(last.getTimestamp());
-			} else if (last.getValue() instanceof IntegerValue) {
-				el.getData().setInt(last.getValue().getIntegerValue());
-				el.setLastModified(last.getTimestamp());
-			} else if (last.getValue() instanceof LongValue) {
-				el.getData().setLong(last.getValue().getLongValue());
-				el.setLastModified(last.getTimestamp());
+			switch (el.getTypeKey()) {
+				case DBConstants.TYPE_KEY_BOOLEAN: {
+					el.getData().setBoolean(last.getValue().getBooleanValue());
+					break;
+				}
+				case DBConstants.TYPE_KEY_FLOAT: {
+					el.getData().setFloat(last.getValue().getFloatValue());
+					break;
+				}
+				case DBConstants.TYPE_KEY_INT: {
+					el.getData().setInt(last.getValue().getIntegerValue());
+					break;
+				}
+				case DBConstants.TYPE_KEY_LONG: {
+					el.getData().setLong(last.getValue().getLongValue());
+					break;
+				}
+				case DBConstants.TYPE_KEY_STRING: {
+					el.getData().setString(last.getValue().getStringValue());
+					break;
+				}
 			}
 		}
 	}
