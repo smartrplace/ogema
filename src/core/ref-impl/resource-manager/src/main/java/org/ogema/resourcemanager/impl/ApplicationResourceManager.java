@@ -24,6 +24,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -284,9 +285,22 @@ public class ApplicationResourceManager implements ResourceManagement, ResourceA
 		}
 		return el;
 	}
+	
+	volatile int lastDbRev = -1;
+	Map<String, VirtualTreeElement> elCache = new ConcurrentHashMap<>();
 
-	protected VirtualTreeElement findTreeElement(String path) {
+	protected VirtualTreeElement findTreeElement(final String path) {
 		assert path.startsWith("/") : "illegal path: " + path;
+		
+		if (lastDbRev == dbMan.getRevision()) {
+			VirtualTreeElement rval = elCache.get(path);
+			if (rval != null) {
+				return rval;
+			}
+		} else {
+			elCache.clear();
+		}
+		
 		String[] names = path.split("/");
 		assert names[0].isEmpty();
 		if (names.length == 1) {
@@ -300,6 +314,11 @@ public class ApplicationResourceManager implements ResourceManagement, ResourceA
         if (el == null && !ResourceBase.validResourceName(names[level-1])) {
             throw new NoSuchResourceException("Path " + path + " contains illegal name '" + names[level-1] + "'");
         }
+		
+		if (el != null) {
+			lastDbRev = dbMan.getRevision();
+			elCache.put(path, el);
+		}
 		return el;
 	}
     
