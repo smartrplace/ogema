@@ -42,6 +42,7 @@ import org.ogema.core.recordeddata.RecordedDataConfiguration.StorageType;
 import org.ogema.core.recordeddata.ReductionMode;
 import org.ogema.core.timeseries.InterpolationMode;
 import org.ogema.persistence.DBConstants;
+import org.ogema.persistence.impl.mem.MemoryTreeElement;
 import org.ogema.recordeddata.DataRecorder;
 import org.ogema.recordeddata.DataRecorderException;
 import org.ogema.recordeddata.RecordedDataStorage;
@@ -103,6 +104,9 @@ public class DefaultRecordedData implements RecordedData {
 	
 	private void setLastRecordedValue() {
 		SampledValue last = data.getPreviousValue(Long.MAX_VALUE);
+		if (el instanceof MemoryTreeElement) {
+			return;
+		}
 		if (last != null) {
 			switch (el.getTypeKey()) {
 				case DBConstants.TYPE_KEY_BOOLEAN: {
