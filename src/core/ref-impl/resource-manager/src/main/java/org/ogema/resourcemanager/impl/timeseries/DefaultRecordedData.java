@@ -104,9 +104,6 @@ public class DefaultRecordedData implements RecordedData {
 	
 	private void setLastRecordedValue() {
 		SampledValue last = data.getPreviousValue(Long.MAX_VALUE);
-		if (el instanceof MemoryTreeElement) {
-			return;
-		}
 		if (last != null) {
 			switch (el.getTypeKey()) {
 				case DBConstants.TYPE_KEY_BOOLEAN: {

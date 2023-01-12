@@ -27,6 +27,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
+import org.ogema.core.model.array.BooleanArrayResource;
+import org.ogema.core.model.array.ByteArrayResource;
+import org.ogema.core.model.array.FloatArrayResource;
+import org.ogema.core.model.array.IntegerArrayResource;
+import org.ogema.core.model.array.StringArrayResource;
+import org.ogema.core.model.array.TimeArrayResource;
+import org.ogema.core.model.simple.BooleanResource;
+import org.ogema.core.model.simple.FloatResource;
+import org.ogema.core.model.simple.IntegerResource;
+import org.ogema.core.model.simple.StringResource;
+import org.ogema.core.model.simple.TimeResource;
+import org.ogema.persistence.DBConstants;
 import org.ogema.resourcetree.SimpleResourceData;
 import org.ogema.resourcetree.TreeElement;
 
@@ -161,7 +173,35 @@ public class MemoryTreeElement implements TreeElement {
 
     @Override
     public int getTypeKey() {
-        throw new UnsupportedOperationException(getClass().getSimpleName()+"#getTypeKey");
+		Class<? extends Resource> t = getType();
+		if (t == null) {
+			return DBConstants.TYPE_KEY_INVALID;
+		} else if (BooleanResource.class.isAssignableFrom(t)) {
+			return DBConstants.TYPE_KEY_BOOLEAN;
+		} else if (FloatResource.class.isAssignableFrom(t)) {
+			return DBConstants.TYPE_KEY_FLOAT;
+		} else if (IntegerResource.class.isAssignableFrom(t)) {
+			return DBConstants.TYPE_KEY_INT;
+		} else if (TimeResource.class.isAssignableFrom(t)) {
+			return DBConstants.TYPE_KEY_LONG;
+		} else if (StringResource.class.isAssignableFrom(t)) {
+			return DBConstants.TYPE_KEY_STRING;
+		} else if (FloatArrayResource.class.isAssignableFrom(t)) {
+			return DBConstants.TYPE_KEY_FLOAT_ARR;
+		} else if (BooleanArrayResource.class.isAssignableFrom(t)) {
+			return DBConstants.TYPE_KEY_BOOLEAN_ARR;
+		} else if (IntegerArrayResource.class.isAssignableFrom(t)) {
+			return DBConstants.TYPE_KEY_INT_ARR;
+		} else if (TimeArrayResource.class.isAssignableFrom(t)) {
+			return DBConstants.TYPE_KEY_LONG_ARR;
+		} else if (StringArrayResource.class.isAssignableFrom(t)) {
+			return DBConstants.TYPE_KEY_STRING_ARR;
+		} else if (ByteArrayResource.class.isAssignableFrom(t)) {
+			return DBConstants.TYPE_KEY_OPAQUE;
+		} else if (ResourceList.class.isAssignableFrom(t)) {
+			return DBConstants.TYPE_KEY_COMPLEX_ARR;
+		}
+        return DBConstants.TYPE_KEY_COMPLEX;
     }
 
     @Override
