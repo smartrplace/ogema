@@ -15,6 +15,7 @@
  */
 package org.ogema.resourcemanager.impl.model;
 
+import java.lang.ref.SoftReference;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -51,6 +52,9 @@ public class DefaultResourceList<T extends Resource> extends ResourceBase implem
 	 * store array element names in an additional String array resource.
 	 */
 	static final String ELEMENTS = "@elements";
+	private volatile int revision = -1;
+	//private volatile List<String> elementNames;
+	private volatile SoftReference<List<T>> allElements;
 
 	public DefaultResourceList(VirtualTreeElement el, String path, ApplicationResourceManager appman) {
 		super(el, path, appman);
@@ -134,13 +138,13 @@ public class DefaultResourceList<T extends Resource> extends ResourceBase implem
 	}
 
 	protected List<String> getElementNames() {
-        TreeElement el = getElementsNode(false);
+		TreeElement el = getElementsNode(false);
         if (el == null) {
             return new ArrayList<>();
         } else {
             return new ArrayList<>(Arrays.asList(el.getData().getStringArr()));
         }
-    }
+	}
 
 	protected String findNewName() {
 		int number = getElementNames().size();
@@ -175,6 +179,11 @@ public class DefaultResourceList<T extends Resource> extends ResourceBase implem
     public List<T> getAllElements() {
         getResourceDB().lockRead();
         try {
+			List<T> ae = allElements != null ? allElements.get() : null;
+			if (ae != null && revision == getResourceDB().getRevision()) {
+				return new ArrayList<>(ae);
+			}
+			revision = getResourceDB().getRevision();
             List<String> elementNames = getElementNames();
 			Class<T> ltype = getElementType();
 			if (ltype == null) {
@@ -183,6 +192,8 @@ public class DefaultResourceList<T extends Resource> extends ResourceBase implem
 			@SuppressWarnings("unchecked")
 			List<T> rval = getSubResources(ltype, false);
 			sortByNames(rval, elementNames);
+			ae = new ArrayList<>(rval);
+			allElements = new SoftReference<>(ae);
 			return rval;
         } finally {
             getResourceDB().unlockRead();
@@ -389,7 +400,7 @@ public class DefaultResourceList<T extends Resource> extends ResourceBase implem
 
 	@Override
 	protected void reload() {
-		getAllElements();
+		//getAllElements();
 	}
 
     @Override

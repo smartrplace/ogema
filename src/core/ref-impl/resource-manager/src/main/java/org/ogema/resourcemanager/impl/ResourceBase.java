@@ -923,6 +923,7 @@ public abstract class ResourceBase implements ConnectedResource {
 		ElementInfo parentInfo = resMan.getDatabaseManager().getElementInfo(parent);
 		child.setResRef(info);
 		parentInfo.updateListenerRegistrations();
+		revision = resMan.getDatabaseManager().incrementRevision();
 	}
 
 	// modify ElementInfo for a newly created reference: add the parent element's
