@@ -458,6 +458,19 @@ public class ValueResourceUtils {
 			return -1;
 		return Arrays.asList(array.getValues()).indexOf(string); 
 	}
+	public static int getContainingIndexIngoringActiveStatus(StringArrayResource array, String string) {
+		Objects.requireNonNull(array);
+		if (string == null)
+			return -1;
+		String[] vals = array.getValues();
+		int idx = 0;
+		for(String val: vals) {
+			if(val.contains(string))
+				return idx;
+			idx++;
+		}
+		return -1;
+	}
 
 	/**
 	 * Check if the array resource contains a float value. This returns false if the resource is inactive.
