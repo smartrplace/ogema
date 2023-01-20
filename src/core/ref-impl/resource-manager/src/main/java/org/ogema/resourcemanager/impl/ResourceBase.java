@@ -1571,10 +1571,10 @@ public abstract class ResourceBase implements ConnectedResource {
 	}
 
 	// write lock must be held
-	protected void deleteTreeElement(boolean requiresLoop) {
+	protected void deleteTreeElement(boolean virtualizeSubResources) {
 		resMan.getDatabaseManager().resourceDeleted(getElInternal());
 
-		((DefaultVirtualTreeElement) getElInternal()).delete(requiresLoop);
+		((DefaultVirtualTreeElement) getElInternal()).delete(virtualizeSubResources);
 		resMan.getDatabaseManager().incrementRevision();
 	}
 

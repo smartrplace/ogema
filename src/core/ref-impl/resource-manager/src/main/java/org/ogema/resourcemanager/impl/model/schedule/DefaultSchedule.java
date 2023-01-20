@@ -88,7 +88,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 	}
 	
     @Override
-    protected void deleteTreeElement(boolean requiresLoop) {
+    protected void deleteTreeElement(boolean virtualizeSubResources) {
     	m_dbMan.startTransaction();
 		try {
 			if (!isReference(false)) {
@@ -99,7 +99,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 			} else {
 				// TODO this is not working!
 			}
-	        super.deleteTreeElement(requiresLoop);
+	        super.deleteTreeElement(virtualizeSubResources);
 		} finally {
 			m_dbMan.finishTransaction();
 		}

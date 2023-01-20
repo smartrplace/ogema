@@ -36,7 +36,7 @@ import org.ogema.core.channelmanager.measurements.FloatValue;
 import org.ogema.core.channelmanager.measurements.Quality;
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.model.Resource;
-import org.ogema.core.model.schedule.DefinitionSchedule;
+import org.ogema.core.model.schedule.AbsoluteSchedule;
 import org.ogema.core.model.schedule.Schedule;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.StringResource;
@@ -60,7 +60,7 @@ public class ResourceFlashServlet extends HttpServlet {
 	final private ResourceManagement rm;
 	final private List<ClassLoader> classLoaders;
 	final private List<TestClass> objects;
-	final private DefinitionSchedule schedule;
+	final private AbsoluteSchedule schedule;
 	final private int DEFAULT_RES_NUM = 1; // default nr of resources to be generated
 	private final AtomicInteger counter;
 	private final static String NOT_FOUND="{\"error\":\"not found\"}";
@@ -234,7 +234,7 @@ public class ResourceFlashServlet extends HttpServlet {
 				}
 			}
 		}
-		else if (DefinitionSchedule.class.isAssignableFrom(clazz)) { 
+		else if (AbsoluteSchedule.class.isAssignableFrom(clazz)) { 
 			if (map.containsKey("action") && map.get("action").equals("delete")) {
 				schedule.deleteValues();
 				System.gc();
@@ -276,6 +276,12 @@ public class ResourceFlashServlet extends HttpServlet {
 				Map<String,Object> subMap = resMap.get(type);
 				subMap.put("nr",((int) subMap.get("nr"))+1);
 			}
+			if (!resMap.keySet().contains(TemperatureSensor.class.getName())) {
+				Map<String,Object> subMap = new HashMap<>();
+				subMap.put("short", "TemperatureSensor");
+				subMap.put("nr", 0);
+				resMap.put(TemperatureSensor.class.getName(), subMap);
+			}
 			// classes
 			Map<String,Map<String,Object>> classMap = new HashMap<>();
 			Map<String,Object> subMap = new HashMap<>();
@@ -285,9 +291,9 @@ public class ResourceFlashServlet extends HttpServlet {
 			// schedule values
 			Map<String,Map<String,Object>> scheduleMap = new HashMap<>();
 			Map<String,Object> subMap2 = new HashMap<>();
-			subMap2.put("short",DefinitionSchedule.class.getSimpleName());
-			subMap2.put("nr", schedule.getValues(0).size());
-			scheduleMap.put(DefinitionSchedule.class.getName(), subMap2);			
+			subMap2.put("short",AbsoluteSchedule.class.getSimpleName());
+			subMap2.put("nr", schedule != null ? schedule.getValues(0).size() : 0);
+			scheduleMap.put(AbsoluteSchedule.class.getName(), subMap2);			
 			
 			Map<String,Map<String,Map<String,Object>>> map = new HashMap<>();
 			map.put("resourceTypes",resMap);

@@ -474,7 +474,7 @@ public class DefaultVirtualTreeElement implements VirtualTreeElement {
     
     
     @SuppressWarnings("deprecation")
-    public synchronized void delete(boolean requiresLoop) {
+    public synchronized void delete(boolean virtualizeSubResources) {
         //System.out.println("deleting " + this);
         if (isVirtual()) {
             return;
@@ -490,8 +490,8 @@ public class DefaultVirtualTreeElement implements VirtualTreeElement {
         }
 
         final String thisPath = getPath();
-        final Map<String, DefaultVirtualTreeElement> elements = requiresLoop ? resourceDB.elements.asMap() : new HashMap<String, DefaultVirtualTreeElement>(2);
-        if (!requiresLoop)
+        final Map<String, DefaultVirtualTreeElement> elements = virtualizeSubResources ? resourceDB.elements.asMap() : new HashMap<String, DefaultVirtualTreeElement>(2);
+        if (!virtualizeSubResources)
         	elements.put(thisPath, this);
         
         for (Map.Entry<String, DefaultVirtualTreeElement> e : elements.entrySet()) {
