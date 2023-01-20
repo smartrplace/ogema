@@ -1553,8 +1553,8 @@ public abstract class ResourceBase implements ConnectedResource {
             }
         }
 
-
-        if (!isReference(false)) {
+        final boolean isRef = isReference(false);
+        if (!isRef) {
             //delete sub resources only if this is not a reference
             //for (Resource sub : getDirectSubResources(false)) {
             for (Resource sub : getSubResources(false)) {
@@ -1562,15 +1562,19 @@ public abstract class ResourceBase implements ConnectedResource {
             }
         }
 
-        deleteTreeElement();
+        deleteTreeElement(isRef);
         return danglingLinks;
     }
+	
+	protected void deleteTreeElement() {
+		deleteTreeElement(true);
+	}
 
 	// write lock must be held
-	protected void deleteTreeElement() {
+	protected void deleteTreeElement(boolean requiresLoop) {
 		resMan.getDatabaseManager().resourceDeleted(getElInternal());
 
-		getElInternal().delete();
+		((DefaultVirtualTreeElement) getElInternal()).delete(requiresLoop);
 		resMan.getDatabaseManager().incrementRevision();
 	}
 

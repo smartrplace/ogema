@@ -21,6 +21,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -467,8 +468,13 @@ public class DefaultVirtualTreeElement implements VirtualTreeElement {
     }
 
     @Override
+    public void delete() {
+    	this.delete(true);
+    }
+    
+    
     @SuppressWarnings("deprecation")
-    public synchronized void delete() {
+    public synchronized void delete(boolean requiresLoop) {
         //System.out.println("deleting " + this);
         if (isVirtual()) {
             return;
@@ -484,7 +490,11 @@ public class DefaultVirtualTreeElement implements VirtualTreeElement {
         }
 
         final String thisPath = getPath();
-        for (Map.Entry<String, DefaultVirtualTreeElement> e : resourceDB.elements.asMap().entrySet()) {
+        final Map<String, DefaultVirtualTreeElement> elements = requiresLoop ? resourceDB.elements.asMap() : new HashMap<String, DefaultVirtualTreeElement>(2);
+        if (!requiresLoop)
+        	elements.put(thisPath, this);
+        
+        for (Map.Entry<String, DefaultVirtualTreeElement> e : elements.entrySet()) {
             /* FIXME this need to process ALL affected reference paths */
             String path = e.getKey();
             DefaultVirtualTreeElement childEl = e.getValue();

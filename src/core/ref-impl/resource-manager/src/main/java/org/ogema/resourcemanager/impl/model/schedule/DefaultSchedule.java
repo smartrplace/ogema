@@ -86,9 +86,9 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 			getResourceDB().unlockStructureWrite();
 		}
 	}
-
+	
     @Override
-    protected void deleteTreeElement() {
+    protected void deleteTreeElement(boolean requiresLoop) {
     	m_dbMan.startTransaction();
 		try {
 			if (!isReference(false)) {
@@ -99,7 +99,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 			} else {
 				// TODO this is not working!
 			}
-	        super.deleteTreeElement();
+	        super.deleteTreeElement(requiresLoop);
 		} finally {
 			m_dbMan.finishTransaction();
 		}
