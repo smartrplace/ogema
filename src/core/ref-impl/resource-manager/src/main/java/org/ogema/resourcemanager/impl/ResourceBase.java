@@ -1554,27 +1554,55 @@ public abstract class ResourceBase implements ConnectedResource {
         }
 
         final boolean isRef = isReference(false);
+        final List<String> pathsToVirtualize;
         if (!isRef) {
             //delete sub resources only if this is not a reference
             //for (Resource sub : getDirectSubResources(false)) {
             for (Resource sub : getSubResources(false)) {
                 ((ResourceBase)sub).deleteInternal(danglingLinks);
             }
+            pathsToVirtualize = new ArrayList<>(1);
+            pathsToVirtualize.add(path);
+        } else {
+        	pathsToVirtualize = getSubpathsRecursive();
         }
 
-        deleteTreeElement(isRef);
+        deleteTreeElement(pathsToVirtualize);
         return danglingLinks;
     }
 	
+	// read lock must be held
+	private List<String> getSubpathsRecursive() {
+		final List<String> result = new ArrayList<>();
+		final TreeElement el = getElInternal();
+		String parentPath = el.isToplevel() ? "" : path.substring(0, path.lastIndexOf("/"));
+		if (parentPath.startsWith("/"))
+			parentPath = parentPath.substring(1);
+		ResourceBase.addSubpathsRecursive(parentPath, el, result, new HashSet<TreeElement>());
+		return result;
+	}
+	
+	// read lock must be held
+	private static void addSubpathsRecursive(String basePath, TreeElement el, List<String> paths, Set<TreeElement> visited) {
+		if (!visited.add(el))
+			return;
+		final String childPath = "".equals(basePath) ? el.getName() : basePath + "/" + el.getName(); 
+		paths.add(childPath);
+		for (TreeElement sub: el.getChildren()) {
+			ResourceBase.addSubpathsRecursive(childPath, sub, paths, visited);
+		}
+	}
+	
 	protected void deleteTreeElement() {
-		deleteTreeElement(true);
+        final List<String> pathsToVirtualize = new ArrayList<>(1);
+        pathsToVirtualize.add(path);
+		deleteTreeElement(pathsToVirtualize);
 	}
 
 	// write lock must be held
-	protected void deleteTreeElement(boolean virtualizeSubResources) {
+	protected void deleteTreeElement(List<String> pathsToVirtualize) {
 		resMan.getDatabaseManager().resourceDeleted(getElInternal());
-
-		((DefaultVirtualTreeElement) getElInternal()).delete(virtualizeSubResources);
+		((DefaultVirtualTreeElement) getElInternal()).delete(pathsToVirtualize);
 		resMan.getDatabaseManager().incrementRevision();
 	}
 

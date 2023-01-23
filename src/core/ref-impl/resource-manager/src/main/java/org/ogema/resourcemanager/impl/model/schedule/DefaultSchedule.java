@@ -88,7 +88,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 	}
 	
     @Override
-    protected void deleteTreeElement(boolean virtualizeSubResources) {
+    protected void deleteTreeElement(List<String> pathsToVirtualize) {
     	m_dbMan.startTransaction();
 		try {
 			if (!isReference(false)) {
@@ -99,7 +99,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 			} else {
 				// TODO this is not working!
 			}
-	        super.deleteTreeElement(virtualizeSubResources);
+	        super.deleteTreeElement(pathsToVirtualize);
 		} finally {
 			m_dbMan.finishTransaction();
 		}

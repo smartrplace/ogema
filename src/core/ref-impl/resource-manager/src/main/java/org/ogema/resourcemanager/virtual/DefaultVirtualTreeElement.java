@@ -467,14 +467,17 @@ public class DefaultVirtualTreeElement implements VirtualTreeElement {
         return definedType;
     }
 
+    // impl note: usually delete(List<String>) should be called instead, to avoid keeping zombie subresources of references around
     @Override
     public void delete() {
-    	this.delete(true);
+    	final List<String> pathsToVirtualize = new ArrayList<>(1);
+    	pathsToVirtualize.add(getPath());
+    	this.delete(pathsToVirtualize);
     }
     
     
     @SuppressWarnings("deprecation")
-    public synchronized void delete(boolean virtualizeSubResources) {
+    public synchronized void delete(final List<String> pathsToVirtualize) {
         //System.out.println("deleting " + this);
         if (isVirtual()) {
             return;
@@ -490,16 +493,11 @@ public class DefaultVirtualTreeElement implements VirtualTreeElement {
         }
 
         final String thisPath = getPath();
-        final Map<String, DefaultVirtualTreeElement> elements = virtualizeSubResources ? resourceDB.elements.asMap() : new HashMap<String, DefaultVirtualTreeElement>(2);
-        if (!virtualizeSubResources)
-        	elements.put(thisPath, this);
-        
-        for (Map.Entry<String, DefaultVirtualTreeElement> e : elements.entrySet()) {
-            /* FIXME this need to process ALL affected reference paths */
-            String path = e.getKey();
-            DefaultVirtualTreeElement childEl = e.getValue();
-
-            if (path.startsWith(thisPath)) {// && !path.equals(thisPath)) {
+        for (final String path: pathsToVirtualize) {
+            DefaultVirtualTreeElement childEl = resourceDB.elements.getIfPresent(path);
+            if (childEl == null)
+            	continue;
+            if (path.startsWith(thisPath)) {// && !path.equals(thisPath)) { // should always be the case now
                 if (childEl.isVirtual() || childEl.isToplevel()) {
                     continue;
                 }
