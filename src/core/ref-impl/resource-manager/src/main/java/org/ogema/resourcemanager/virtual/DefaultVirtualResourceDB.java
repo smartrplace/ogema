@@ -19,10 +19,13 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
+import java.lang.ref.SoftReference;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.ogema.core.model.Resource;
 import org.ogema.core.resourcemanager.InvalidResourceTypeException;
@@ -59,9 +62,14 @@ public class DefaultVirtualResourceDB implements VirtualResourceDB {
             logger.trace("element removed from cache ({}): {}", notification.getCause(), notification.getKey());
         }
     };    
+	
+	SoftReference<DefaultVirtualTreeElement> EMPTYREF = new SoftReference<>(null);
+			
+	final SortedMap<String, SoftReference<DefaultVirtualTreeElement>> elements = new ConcurrentSkipListMap<>();
+	/*
     final Cache<String, DefaultVirtualTreeElement> elements =
             CacheBuilder.newBuilder().weakValues().removalListener(cacheListener).build();//new ConcurrentHashMap<>();
-
+	*/
     public DefaultVirtualResourceDB(ResourceDB realResources) {
         this.realResources = realResources;
         this.virtualResources = new MemoryResourceDB();
@@ -212,7 +220,7 @@ public class DefaultVirtualResourceDB implements VirtualResourceDB {
 
     public DefaultVirtualTreeElement getElement(TreeElement el) {
     	final String path = el.getPath();
-    	DefaultVirtualTreeElement vEl0 = elements.getIfPresent(path);
+    	DefaultVirtualTreeElement vEl0 = elements.getOrDefault(path, EMPTYREF).get();
     	if (vEl0 != null && vEl0.getEl() == el) {
     		return vEl0;
     	}
@@ -220,12 +228,12 @@ public class DefaultVirtualResourceDB implements VirtualResourceDB {
     		while (el instanceof DefaultVirtualTreeElement) {
 	            el = ((DefaultVirtualTreeElement) el).getEl();
 	        }
-	        DefaultVirtualTreeElement vEl = elements.getIfPresent(path);
+	        DefaultVirtualTreeElement vEl = elements.getOrDefault(path, EMPTYREF).get();
 	        //assert vEl == null || !(el instanceof DefaultVirtualTreeElement) || ((el instanceof DefaultVirtualTreeElement) && el == vEl) : "duplicate DefaultVirtualTreeElement: " + el + " | " + vEl;
 	        
 	        if (vEl == null) {
 	            vEl = new DefaultVirtualTreeElement(el, this);
-	            elements.put(path, vEl);
+	            elements.put(path, new SoftReference<>(vEl));
 	        } else if (vEl.getEl() != el) {  // FIXME it is unclear here which element is new
 	        	//System.out.printf("REPLACE ELEMENT at %s: %s%n", path, el);
 				// let's not use TreeElements that are actually deleted...
@@ -241,11 +249,11 @@ public class DefaultVirtualResourceDB implements VirtualResourceDB {
     
     protected synchronized DefaultVirtualTreeElement getElement(String name, TreeElement parent, Class<? extends Resource> type, boolean decorator) {
         String path = parent.getPath() + "/" + name;
-        DefaultVirtualTreeElement vEl = elements.getIfPresent(path);
+        DefaultVirtualTreeElement vEl = elements.getOrDefault(path, EMPTYREF).get();
         if (vEl == null){
             MemoryTreeElement el = new MemoryTreeElement(name, type, parent, decorator);
             vEl = new DefaultVirtualTreeElement(el, this);
-            elements.put(path, vEl);
+            elements.put(path, new SoftReference<>(vEl));
         }
         return vEl;
     }

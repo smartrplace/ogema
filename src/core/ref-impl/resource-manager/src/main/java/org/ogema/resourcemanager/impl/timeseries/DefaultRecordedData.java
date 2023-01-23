@@ -26,7 +26,6 @@ import java.util.concurrent.Executor;
 import org.ogema.core.application.Timer;
 import org.ogema.core.application.TimerListener;
 import org.ogema.core.channelmanager.measurements.BooleanValue;
-import org.ogema.core.channelmanager.measurements.DoubleValue;
 import org.ogema.core.channelmanager.measurements.FloatValue;
 import org.ogema.core.channelmanager.measurements.IntegerValue;
 import org.ogema.core.channelmanager.measurements.LongValue;
@@ -263,7 +262,7 @@ public class DefaultRecordedData implements RecordedData {
 
 	private void disable() {
 		data = dataAccess.getRecordedDataStorage(id);
-		if (data != null) {
+		if (data != null && data.getConfiguration() != null) {
 			data.setConfiguration(null);
 		} else {
 			data = new EmptyRecordedData();
