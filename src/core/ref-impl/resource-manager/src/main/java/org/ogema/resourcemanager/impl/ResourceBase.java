@@ -59,6 +59,7 @@ import org.ogema.resourcetree.listeners.InternalValueChangedListenerRegistration
 import org.ogema.resourcemanager.virtual.VirtualTreeElement;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.lang.ref.SoftReference;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 
@@ -96,6 +97,7 @@ public abstract class ResourceBase implements ConnectedResource {
 		this.resMan = resMan;
 		this.path = path;
 		revision = resMan.getDatabaseManager().getRevision();
+		subresourcesSorted = null;
 
 		assert el.getType() != null;
 	}
@@ -458,14 +460,23 @@ public abstract class ResourceBase implements ConnectedResource {
             resMan.getDatabaseManager().unlockStructureRead();
         }
     }
+	
+	volatile SoftReference<List<Resource>> subresourcesSorted;
     
     //preserve order of list elements
     private List<Resource> getListSubResources() {
 		@SuppressWarnings("unchecked")
         DefaultResourceList<Resource> rl = (DefaultResourceList) this;
+		
+		if (revision == getResourceDB().getRevision()) {
+			List<Resource> cached = subresourcesSorted != null ? subresourcesSorted.get() : null;
+			if (cached != null) {
+				return new ArrayList<>(cached);
+			}
+		}
         List<TreeElement> children = getElInternal().getChildren();
         List<Resource> result = new ArrayList<>(children.size());
-        Class<?> elType = rl.getElementType();
+        //Class<?> elType = rl.getElementType();
         for (TreeElement child : children) {
             if (!validResourceName(child)) {
                 continue;
@@ -478,6 +489,7 @@ public abstract class ResourceBase implements ConnectedResource {
         }
 		List<String> elementOrder = rl.getElementOrder();
 		sortByNames(result, elementOrder);
+		subresourcesSorted = new SoftReference<List<Resource>>(new ArrayList<>(result));
         return result;
     }
 	
@@ -924,6 +936,7 @@ public abstract class ResourceBase implements ConnectedResource {
 		child.setResRef(info);
 		parentInfo.updateListenerRegistrations();
 		revision = resMan.getDatabaseManager().incrementRevision();
+		subresourcesSorted = null;
 	}
 
 	// modify ElementInfo for a newly created reference: add the parent element's
@@ -934,6 +947,7 @@ public abstract class ResourceBase implements ConnectedResource {
 		refInfo.addReference(ref);
 		parentInfo.updateListenerRegistrations();
 		revision = resMan.getDatabaseManager().incrementRevision();
+		subresourcesSorted = null;
 	}
 
 	/* return the type of the optional element of that name, or null if no such
@@ -1320,6 +1334,7 @@ public abstract class ResourceBase implements ConnectedResource {
 			((ResourceBase) getParent()).checkAddPermission(getName(), getResourceType());
 			getElInternal().create();
             revision = resMan.getDatabaseManager().incrementRevision(); //reference paths may need to be reloaded
+			subresourcesSorted = null;
 
 			parent.treeElementChildAdded(parent.getElInternal(), getElInternal());
 			//FIXME somethings broken (in ScheduleTreeElement?)
@@ -1768,6 +1783,7 @@ public abstract class ResourceBase implements ConnectedResource {
             this.el = newEl;
         }
         revision = newRevision;
+		subresourcesSorted = null;
         reload();
         return this.el;
 	}
