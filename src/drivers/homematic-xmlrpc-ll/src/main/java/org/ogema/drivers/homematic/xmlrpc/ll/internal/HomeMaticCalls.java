@@ -67,5 +67,7 @@ public interface HomeMaticCalls {
     Void event(String interfaceId, String address, String valueKey, boolean value);
     
     Void event(String interfaceId, String address, String valueKey, Object value); 
+	
+	Void event(String interfaceId, String address, String valueKey, Double value); 
     
 }

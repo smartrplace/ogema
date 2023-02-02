@@ -197,6 +197,11 @@ public class HomeMaticService {
             }
             return null;
         }
+		
+		@Override
+        public Void event(String interfaceId, String address, String valueKey, Double value) {
+            return event(interfaceId, address, valueKey, (Object) value);
+        }
         
 
     };
