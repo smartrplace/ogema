@@ -7,6 +7,7 @@ package org.ogema.impl.persistence;
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
 /**
@@ -109,7 +110,7 @@ public class ByteBufferDataInput implements DataInput {
 	}
 	
 	public void seek(int position) {
-		bb.position(position);
+		((Buffer)bb).position(position);
 	}
 	
 	public void close() {
