@@ -103,7 +103,7 @@ public final class SampledValue implements Comparable<SampledValue> {
 	/**
 	 * Compares the timestampt of this with another sampled value's timestamp. 
 	 * This implicitly defines a time ordering for SampledValues.
-	 * @param o other value to compare to.
+	 * @param other other value to compare to.
 	 * @return -1 if the timestamp of this preceeds that of o. +1 if the timestamp
 	 * of o preceeds that of this. 0 if both timestamps are equal.
 	 */

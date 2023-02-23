@@ -36,7 +36,7 @@ public interface Schedule extends ValueResource, TimeSeries {
 	 * This iterator does not throw ConcurrentModificationException. If the schedule is changed during iteration, 
 	 * changes may or may not be reflected by the iterator. The returned values are always ordered chronologically,
 	 * though. <br>
-	 * The iterator does not support the <tt>remove</tt>-method.
+	 * The iterator does not support the {@code remove}-method.
 	 * @return
 	 */
 	@Override
@@ -47,7 +47,7 @@ public interface Schedule extends ValueResource, TimeSeries {
 	 * This iterator does not throw ConcurrentModificationException. If the schedule is changed during iteration, 
 	 * changes may or may not be reflected by the iterator. The returned values are always ordered chronologically,
 	 * though. <br>
-	 * The iterator does not support the <tt>remove</tt>-method.
+	 * The iterator does not support the {@code remove}-method.
 	 * @param startTime 
 	 * 			Start time of the interval. Inclusive. 
 	 * @param endTime 
