@@ -49,6 +49,15 @@ public interface CCUAccessI {
 	}
 	
 	public List<HomematicConnectionData> getConnectionsData();
+	
 	public List<HomematicConnectionData> getConnectionsData(HmLogicInterface iface);
+	
+	/**
+	 * Trigger a reboot of the connected CCU.
+	 * 
+	 * @param iface CCU interface
+	 * @throws IOException
+	 */
+	public void reboot(HmLogicInterface iface) throws IOException;
 
 }
