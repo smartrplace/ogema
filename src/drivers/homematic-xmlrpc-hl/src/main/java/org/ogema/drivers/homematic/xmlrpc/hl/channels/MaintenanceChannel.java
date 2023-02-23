@@ -37,9 +37,11 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
+import org.ogema.drivers.homematic.xmlrpc.hl.types.HmLogicInterface;
 import org.ogema.model.devices.sensoractordevices.SensorDevice;
 import org.ogema.model.sensors.GenericBinarySensor;
 import org.ogema.model.sensors.GenericFloatSensor;
+import org.ogema.model.sensors.Sensor;
 import org.ogema.tools.resource.util.ResourceUtils;
 
 /**
@@ -132,7 +134,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
             this.address = address;
             this.parent = parent;
         }
-
+		
         @Override
         public void event(List<HmEvent> events) {
             for (HmEvent e : events) {
@@ -208,6 +210,11 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
         return "MAINTENANCE".equalsIgnoreCase(desc.getType());
     }
 
+	private boolean isCcu(HmDevice parent) {
+		String parentType = parent.type().getValue();
+		return parentType != null && parentType.contains("CCU3");
+	}
+
     @Override
     public void setup(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
         logger.debug("setup MAINTENANCE handler for address {}", desc.getAddress());
@@ -225,11 +232,19 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
          */
         if (values.containsKey(PARAMS.CARRIER_SENSE_LEVEL.name())) {
             logger.debug("adding separate sensor for maintenance channel reading {}", PARAMS.CARRIER_SENSE_LEVEL);
-            maintenanceSensorReading(parent, PARAMS.CARRIER_SENSE_LEVEL, null);
+            Sensor sens = maintenanceSensorReading(parent, PARAMS.CARRIER_SENSE_LEVEL, null);
+			if (isCcu(parent)) {
+				HmLogicInterface ccu = ResourceUtils.getFirstParentOfType(parent, HmLogicInterface.class);
+				ccu.interfaceInfo().addDecorator("carrierSenseLevelMnt", sens);
+			}
         }
         if (values.containsKey(PARAMS.DUTY_CYCLE_LEVEL.name())) {
             logger.debug("adding separate sensor for maintenance channel reading {}", PARAMS.DUTY_CYCLE_LEVEL);
-            maintenanceSensorReading(parent, PARAMS.DUTY_CYCLE_LEVEL, null);
+            Sensor sens = maintenanceSensorReading(parent, PARAMS.DUTY_CYCLE_LEVEL, null);
+			if (isCcu(parent)) {
+				HmLogicInterface ccu = ResourceUtils.getFirstParentOfType(parent, HmLogicInterface.class);
+				ccu.interfaceInfo().addDecorator("dutyCycleLevelMnt", sens);
+			}
         }
         HmMaintenance mnt = parent.addDecorator(swName, HmMaintenance.class);
         // create the battery field as it will be probably be linked into higher level models
@@ -273,13 +288,14 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
         update(mnt, desc.getAddress());
     }
 
-    private void maintenanceSensorReading(HmDevice parent, PARAMS param, HmEvent e) {
+    private Sensor maintenanceSensorReading(HmDevice parent, PARAMS param, HmEvent e) {
         SensorDevice sd = parent.getSubResource("maintenanceChannelReadings", SensorDevice.class);
         if (!sd.isActive()) {
             sd.sensors().create();
             sd.sensors().activate(false);
             sd.activate(false);
         }
+		Sensor rval = null;
         switch (param) {
             case CARRIER_SENSE_LEVEL: {
                 GenericFloatSensor sens = sd.sensors().getSubResource("carrierSensLevel", GenericFloatSensor.class);
@@ -291,6 +307,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                 if (e != null) {
                     sens.reading().setValue(e.getValueFloat() / 100f);
                 }
+				rval = sens;
                 break;
             }
             case DUTY_CYCLE: {
@@ -303,6 +320,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                 if (e != null) {
                     sens.reading().setValue(e.getValueBoolean());
                 }
+				rval = sens;
                 break;
             }
             case DUTY_CYCLE_LEVEL: {
@@ -315,9 +333,11 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                 if (e != null) {
                     sens.reading().setValue(e.getValueFloat() / 100f);
                 }
+				rval = sens;
                 break;
             }
         }
+		return rval;
     }
 
     @Override
