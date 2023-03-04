@@ -25,6 +25,7 @@
 		<module>pattern-debugger</module>
 		<module>remote-ogema-auth</module>
 		<module>resource-manipulators</module>
+		<module>resource-shell-commands</module>
 		<module>resource-utils</module>
 		<module>rest-importer</module>
 		<module>schedule-import</module>
