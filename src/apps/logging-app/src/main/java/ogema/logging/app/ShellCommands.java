@@ -19,6 +19,7 @@ import java.util.Collection;
 
 import org.apache.felix.service.command.Descriptor;
 import org.ogema.core.model.Resource;
+import org.ogema.core.model.simple.SingleValueResource;
 import org.ogema.core.recordeddata.RecordedDataConfiguration;
 
 class ShellCommands {
@@ -51,11 +52,31 @@ class ShellCommands {
 		return app.activateLogging(path);
 	}
 	
+	@Descriptor("Activate logging for a specific resource")
+	public boolean startLogging(
+		@Descriptor("The resource for which logging shall be enabled")
+		final SingleValueResource resource) {
+		if (!resource.isActive()) {
+			System.out.println("Resource " + resource + " is not active.");
+			return false;
+		}
+		if (LoggingApp.isLoggingActive(resource))
+			return true;
+		return LoggingApp.logIfNotActive(resource);
+	}
+	
 	@Descriptor("Deactivate logging for a specific resource")
 	public boolean stopLogging(
 		@Descriptor("The resource path")
 		final String path) {
 		return app.stopLogging(path);
+	}
+	
+	@Descriptor("Deactivate logging for a specific resource")
+	public boolean stopLogging(
+		@Descriptor("The resource")
+		final Resource resource) {
+		return app.stopLogging(resource);
 	}
 
 	@Descriptor("Get all logged resources")
@@ -70,10 +91,25 @@ class ShellCommands {
 		return app.isLoggingActive(path);
 	}
 	
+	@Descriptor("Check if logging is enabled for a specific resource")
+	public boolean isLoggingActive(
+			@Descriptor("The resource")
+			final Resource resource) {
+		return LoggingApp.isLoggingActive(resource);
+	}
+	
 	@Descriptor("Return the logging configuration for a specific resource")
 	public RecordedDataConfiguration getLoggingConfig(
 			@Descriptor("The resource path")
 			final String path) {
 		return app.getLoggingConfiguration(path);
 	}
+	
+	@Descriptor("Return the logging configuration for a specific resource")
+	public RecordedDataConfiguration getLoggingConfig(
+			@Descriptor("The resource")
+			final Resource resource) {
+		return LoggingApp.getLoggingConfiguration(resource);
+	}
+	
 }

@@ -152,6 +152,16 @@ public class LoggingApp implements Application {
 		return true;
 	}
 	
+	boolean stopLogging(final Resource r) {
+		if (r == null)
+			return false;
+		final RecordedData rd = getRecordedData(r);
+		if (rd == null || rd.getConfiguration() == null)
+			return false;
+		rd.setConfiguration(null);
+		return true;
+	}
+	
 	Collection<Resource> getLoggedResources() {
 		final List<Resource> list= new ArrayList<>();
 		for (SingleValueResource res : am.getResourceAccess().getResources(SingleValueResource.class)) {
@@ -169,7 +179,10 @@ public class LoggingApp implements Application {
 	}
 	
 	RecordedDataConfiguration getLoggingConfiguration(final String path) {
-		final Resource r = am.getResourceAccess().getResource(path);
+		return getLoggingConfiguration(am.getResourceAccess().getResource(path));
+	}
+	
+	static RecordedDataConfiguration getLoggingConfiguration(final Resource r) {
 		if (r == null)
 			return null;
 		final RecordedData rd = getRecordedData(r);
@@ -178,14 +191,14 @@ public class LoggingApp implements Application {
 		return rd.getConfiguration();
 	}
 	
-	private static boolean isLoggingActive(final Resource r) {
+	public static boolean isLoggingActive(final Resource r) {
 		final RecordedData rd = getRecordedData(r);
 		if (rd == null)
 			return false;
 		return rd.getConfiguration() != null;
 	}
 	
-	private static boolean logIfNotActive(final Resource r) {
+	public static boolean logIfNotActive(final Resource r) {
 		if (!r.isActive())
 			return false;
 		final RecordedData rd = getRecordedData(r);

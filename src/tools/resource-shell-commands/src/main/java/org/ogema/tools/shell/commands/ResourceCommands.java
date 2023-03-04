@@ -31,6 +31,8 @@ import org.osgi.service.component.annotations.Deactivate;
 				"osgi.command.function=createResource",
 				"osgi.command.function=getResource",
 				"osgi.command.function=getResources",
+				"osgi.command.function=getSubResource",
+				"osgi.command.function=getSubResources",
 				"osgi.command.function=numResources", 
 				"osgi.command.function=numSubresources",
 				"osgi.command.function=resourcesBySize",
@@ -194,24 +196,42 @@ public class ResourceCommands {
 			@Descriptor("Activate the new subresource immediately?")
 			@Parameter(names= { "-a", "--activate"}, absentValue = "false", presentValue="true")
 			boolean activate,
+			@Descriptor("Full resource type, such as 'org.ogema.model.locations.Room', or abbreviated resource type, such as 'Room' for selected common types. "
+					+ "If absent, the subresource must exist as an optional element in the model declaration of the parent resource.")
+			@Parameter(names= { "-t", "--type"}, absentValue = "")
+			String type,
 			@Descriptor("Parent resource")
 			Resource parent,
-			@Descriptor("New resource name")
-			String name,
-			@Descriptor("Full resource type, such as 'org.ogema.model.locations.Room', or abbreviated resource type, such as 'Room' for selected common types.")
-			String type
+			@Descriptor("New resource name. Paths are allowed as well if all intermediate resources are declared in the model. E.g. 'reading/program' for a sensor.")
+			String name
 			) throws InterruptedException {
-		if (parent == null || type.isEmpty() || name.isEmpty()) {
-			System.out.println("Type, path and name must not be empty");
+		if (parent == null || name.isEmpty()) {
+			System.out.println("Path and name must not be empty");
 			return null;
 		}
 		startLatch.await(30, TimeUnit.SECONDS);
-		final Class<? extends Resource> resType = loadResourceClass(appMan.getAppID().getBundle().getBundleContext(), type);
-		if (resType == null) 
-			return null;
-		if (!parent.exists())
-			parent.create();
-		final Resource sub = parent.addDecorator(name, resType);
+		final String[] pathComponents = name.split("/");
+		Resource sub = parent;
+		final int iterationBoundary = type.isEmpty() ? pathComponents.length : pathComponents.length-1;
+		for (int idx=0; idx<iterationBoundary; idx++) { // all but the last subresource must be present in the model, for the last one a type can be provided
+			final String component = pathComponents[idx];
+			final Resource sub2 = sub.getSubResource(component);
+			if (sub2 == null) {
+				System.out.println("Resource " + sub +" does not have a declared child " + component);
+				return null;
+			}
+			sub = sub2;
+		}
+		if (type.isEmpty() && !sub.exists())
+			sub.create();
+		if (!type.isEmpty()) {
+			final Class<? extends Resource> resType = loadResourceClass(appMan.getAppID().getBundle().getBundleContext(), type);
+			if (resType == null) 
+				return null;
+			if (!sub.exists())
+				sub.create();
+			sub = sub.addDecorator(pathComponents[pathComponents.length-1], resType);
+		} 
 		if (activate)
 			sub.activate(false);
 		return sub;
@@ -222,30 +242,86 @@ public class ResourceCommands {
 			@Descriptor("Activate the new subresource immediately?")
 			@Parameter(names= { "-a", "--activate"}, absentValue = "false", presentValue="true")
 			boolean activate,
+			@Descriptor("Full resource type, such as 'org.ogema.model.locations.Room', or abbreviated resource type, such as 'Room' for selected common types. "
+					+ "If absent, the subresource must exist as an optional element in the model declaration of the parent resource.")
+			@Parameter(names= { "-t", "--type"}, absentValue = "")
+			String type,
 			@Descriptor("Parent resource path")
 			String path,
 			@Descriptor("New resource name")
-			String name,
-			@Descriptor("Full resource type, such as 'org.ogema.model.locations.Room', or abbreviated resource type, such as 'Room' for selected common types.")
-			String type
+			String name
 			) throws InterruptedException {
-		if (type.isEmpty() || path.isEmpty() || name.isEmpty()) {
-			System.out.println("Type, path and name must not be empty");
+		if (path.isEmpty() || name.isEmpty()) {
+			System.out.println("Path and name must not be empty");
+			return null;
+		}
+		final Resource parent = this.getResource(path);
+		if (parent == null)
+			return null;
+		return addSubResource(activate, type, parent, name);
+	}
+	
+	@Descriptor("Get a subresource")
+	public Resource getSubResource(
+			@Descriptor("Full resource type, such as 'org.ogema.model.locations.Room', or abbreviated resource type, such as 'Room' for selected common types. "
+					+ "If absent, the subresource must be present already. It can be virtual, though. If a type is provided and the subresource does not exist,"
+					+ " it is created as a virtual resource and returned.")
+			@Parameter(names= { "-t", "--type"}, absentValue = "")
+			String type,
+			@Descriptor("Parent resource")
+			Resource parent,
+			@Descriptor("Subresource name. Paths are allowed as well, e.g. 'reading/program' for a sensor.")
+			String name
+			) throws InterruptedException {
+		if (parent == null || name.isEmpty()) {
+			System.out.println("Path and name must not be empty");
 			return null;
 		}
 		startLatch.await(30, TimeUnit.SECONDS);
-		if (path.endsWith("/"))
-			path = path.substring(0, path.length()-1);
-		if (path.startsWith("/"))
-			path = path.substring(1);
-		final Resource parent = appMan.getResourceAccess().getResource(path);
-		if (parent == null) {
-			System.out.println("Parent " + path + " does not exist");
-			return null;
+		final String[] pathComponents = name.split("/");
+		Resource sub = parent;
+		final int iterationBoundary = type.isEmpty() ? pathComponents.length : pathComponents.length-1;
+		for (int idx=0; idx<iterationBoundary; idx++) { // all but the last subresource must be present in the model, for the last one a type can be provided
+			final String component = pathComponents[idx];
+			final Resource sub2 = sub.getSubResource(component);
+			if (sub2 == null) {
+				System.out.println("Resource " + sub +" does not have a subresource " + component);
+				return null;
+			}
+			sub = sub2;
 		}
-		return addSubResource(activate, parent, name, type);
+		if (!type.isEmpty()) {
+			final Class<? extends Resource> resType = loadResourceClass(appMan.getAppID().getBundle().getBundleContext(), type);
+			if (resType == null) 
+				return null;
+			if (!sub.exists())
+				sub.create();
+			sub = sub.getSubResource(pathComponents[pathComponents.length-1], resType);
+		}
+		return sub;
 	}
 	
+	@Descriptor("Get a subresource")
+	public Resource getSubResource(
+			@Descriptor("Full resource type, such as 'org.ogema.model.locations.Room', or abbreviated resource type, such as 'Room' for selected common types. "
+					+ "If absent, the subresource must be present already. It can be virtual, though. If a type is provided and the subresource does not exist,"
+					+ " it is created as a virtual resource and returned.")
+			@Parameter(names= { "-t", "--type"}, absentValue = "")
+			String type,
+			@Descriptor("Parent resource path")
+			String parentPath,
+			@Descriptor("Subresource name. Paths are allowed as well, e.g. 'reading/program' for a sensor.")
+			String name
+			) throws InterruptedException {
+		if (parentPath.isEmpty() || name.isEmpty()) {
+			System.out.println("Path and name must not be empty");
+			return null;
+		}
+		final Resource parent = this.getResource(parentPath);
+		if (parent == null)
+			return null;
+		return getSubResource(type, parent, name);
+	}
 	
 	@SuppressWarnings("unchecked")
 	@Descriptor("Get toplevel resources")
@@ -307,10 +383,45 @@ public class ResourceCommands {
 		return subResources(type, recursive, base);
 	}
 	
+	@Descriptor("This is an alias for the subResources command")
+	public List<Resource> getSubResources(
+			@Descriptor("Resource type (full class name, or abbreviated resource type, such as 'Room' for selected common types)")
+			@Parameter(names= { "-t", "--type"}, absentValue = "")
+			String type,
+			@Descriptor("Search for recursive subresources?")
+			@Parameter(names= { "-r", "--recursive"}, absentValue = "false", presentValue="true")
+			boolean recursive,
+			@Descriptor("Resource") Resource resource
+			) throws InterruptedException {
+		return subResources(type, recursive, resource);
+	}
+	
+	@Descriptor("This is an alias for the subResources command")
+	public List<Resource> getSubResources(
+			@Descriptor("Resource type (full class name, or abbreviated resource type, such as 'Room' for selected common types)")
+			@Parameter(names= { "-t", "--type"}, absentValue = "")
+			String type,
+			@Descriptor("Search for recursive subresources?")
+			@Parameter(names= { "-r", "--recursive"}, absentValue = "false", presentValue="true")
+			boolean recursive,
+			@Descriptor("Resource path") String path
+			) throws InterruptedException {
+		return subResources(type, recursive, path);
+	}
+	
 	@Descriptor("Get the resource at the specified path")
 	public Resource getResource(@Descriptor("Resource path") String path) throws InterruptedException {
 		startLatch.await(30, TimeUnit.SECONDS);
-		return appMan.getResourceAccess().getResource(path);
+		if (path.endsWith("/"))
+			path = path.substring(0, path.length()-1);
+		if (path.startsWith("/"))
+			path = path.substring(1);
+		final Resource parent = appMan.getResourceAccess().getResource(path);
+		if (parent == null) {
+			System.out.println("Resource " + path + " does not exist");
+			return null;
+		}
+		return parent;
 	}
 	
 	@SuppressWarnings("unchecked")
