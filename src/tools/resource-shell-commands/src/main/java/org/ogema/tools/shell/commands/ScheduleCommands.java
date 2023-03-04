@@ -29,6 +29,7 @@ import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
 import org.ogema.core.model.simple.TimeResource;
+import org.ogema.core.timeseries.InterpolationMode;
 import org.ogema.core.timeseries.ReadOnlyTimeSeries;
 import org.ogema.core.timeseries.TimeSeries;
 import org.osgi.framework.BundleContext;	
@@ -43,10 +44,12 @@ import org.osgi.service.component.annotations.Deactivate;
 				"osgi.command.scope=schedule",
 
 				"osgi.command.function=addValues",
+				"osgi.command.function=getInterpolationMode",
 				"osgi.command.function=getValues",
 				"osgi.command.function=printValues",
 				"osgi.command.function=firstTimestamp",
 				"osgi.command.function=lastTimestamp",
+				"osgi.command.function=setInterpolationMode",
 				"osgi.command.function=size",
 		}
 )
@@ -476,6 +479,44 @@ public class ScheduleCommands {
 		if (!r.exists())
 			r.create();
 		return addValues(activate, format, badQuality, (Schedule) r, values);
+	}
+	
+	@Descriptor("Set the interpolation mode of a timeseries")
+	public boolean setInterpolationMode(
+			@Descriptor("Timeseries/Schedule")
+			TimeSeries schedule,
+			@Descriptor("Interpolation mode, such as STEPS, LINEAR, NONE.")
+			String mode
+			) throws InterruptedException {
+		InterpolationMode modeEnum = InterpolationMode.valueOf(mode.toUpperCase());
+		return schedule.setInterpolationMode(modeEnum);
+	}
+	
+	@Descriptor("Set the interpolation mode of a timeseries")
+	public boolean setInterpolationMode(
+			@Descriptor("Schedule path")
+			String schedulePath,
+			@Descriptor("Interpolation mode, such as STEPS, LINEAR, NONE.")
+			String mode
+			) throws InterruptedException {
+		startLatch.await(30, TimeUnit.SECONDS);
+		return setInterpolationMode(appMan.getResourceAccess().<Schedule> getResource(schedulePath), mode);
+	}
+	
+	@Descriptor("Get the interpolation mode of a timeseries")
+	public InterpolationMode getInterpolationMode(
+			@Descriptor("Timeseries/Schedule")
+			ReadOnlyTimeSeries schedule
+			) throws InterruptedException {
+		return schedule.getInterpolationMode();
+	}
+	
+	@Descriptor("Get the interpolation mode of a timeseries")
+	public InterpolationMode getInterpolationMode(
+			@Descriptor("Schedule path")
+			String schedulePath
+			) throws InterruptedException {
+		return getInterpolationMode(getTimeseries(schedulePath));
 	}
 	
 	private ReadOnlyTimeSeries getTimeseries(String path) throws InterruptedException {

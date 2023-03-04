@@ -126,7 +126,7 @@ Options:
 
 ## Schedule commands
 
-All commands, except [addvalues](#addvalues), accept both schedules (timeseries resources), logged single value resources and other generic timeseries as input.
+All commands, except [addvalues](#addvalues) and [setinterpolationmode](#setinterpolationmode), accept both schedules (timeseries resources), logged single value resources and other generic timeseries as input.
 
 ### addvalues
 
@@ -171,6 +171,17 @@ Options:
 * `-s <START_TIME>`: start time. For formats see method [addvalues](#addvalues).
 
 
+### getinterpolationmode
+
+Example:
+
+```shell
+(getinterpolationmode path/to/schedule) tostring
+```
+
+Parameters:
+* Schedule or SingleValueResource or generic timeseries, or the corresponding resource path
+
 ### getvalues
 
 Get the values of the schedule. For purposes of visualizing the results it is usually more appropriate to use [printvalues](#printvalues) instead, see below.
@@ -206,6 +217,18 @@ Options:
 * `-e <END_TIME>`: end time. For formats see method [addvalues](#addvalues).
 * `-l <LIMIT>`: limit (int)
 * `-fb`: from-beginning: only relevant if a limit is set. If provided, then values from the beginning of the specified interval are returned, else from the end.
+
+### setinterpolationmode
+
+Example:
+
+```shell
+setinterpolationmode path/to/schedule STEPS
+```
+
+Parameters:
+* Schedule or SingleValueResource or generic timeseries, or the corresponding resource path
+* Interpolation mode: `STEPS`, `LINEAR`, or `NONE`
 
 ### size
 
