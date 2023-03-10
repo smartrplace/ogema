@@ -1,5 +1,8 @@
 package org.ogema.tools.shell.commands;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -9,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.felix.service.command.CommandSession;
 import org.apache.felix.service.command.Descriptor;
 import org.apache.felix.service.command.Parameter;
 import org.ogema.core.application.Application;
@@ -44,6 +49,7 @@ import org.osgi.service.component.annotations.Deactivate;
 				"osgi.command.scope=schedule",
 
 				"osgi.command.function=addValues",
+				"osgi.command.function=deleteValues",
 				"osgi.command.function=getInterpolationMode",
 				"osgi.command.function=getValues",
 				"osgi.command.function=printValues",
@@ -519,6 +525,66 @@ public class ScheduleCommands {
 		return getInterpolationMode(getTimeseries(schedulePath));
 	}
 	
+	@Descriptor("Delete schedule values")
+	public boolean deleteValues(CommandSession shell,
+			@Descriptor("Optional start time")
+			@Parameter(names= { "-s", "--start"}, absentValue = "")
+			String startTime,
+			@Descriptor("Optional end time")
+			@Parameter(names= { "-e", "--end"}, absentValue = "")
+			String endTime,
+			@Descriptor("Timeseries/Schedule")
+			TimeSeries schedule
+			) throws InterruptedException, IOException {
+		Long start = parseDatetimeWithExpression(startTime);
+		Long end = parseDatetimeWithExpression(endTime);
+		final StringBuilder confirmation = new StringBuilder("Do you really want to delete schedule values ");
+		if (start != null && end != null) {
+			confirmation.append("in the interval ")
+				.append(new SimpleDateFormat(PRINT_FORMAT).format(new Date(start))).append(" - ").append(new SimpleDateFormat(PRINT_FORMAT).format(new Date(end)));
+		} else if (start != null) {
+			confirmation.append("from ").append(new SimpleDateFormat(PRINT_FORMAT).format(new Date(start)));
+		} else if (end != null) {
+			confirmation.append("before ").append(new SimpleDateFormat(PRINT_FORMAT).format(new Date(end)));
+		}
+		confirmation.append(" for the time series ").append(schedule).append("? (y/n) ");
+		shell.getConsole().print(confirmation.toString());
+		try (BufferedReader br = new BufferedReader(new InputStreamReader(shell.getKeyboard()))) {
+			final String result = br.readLine();
+			if (!"y".equalsIgnoreCase(result.trim())) {
+				shell.getConsole().println("Aborted");
+				return false;
+			}
+        }
+		start = start != null ? start : Long.MIN_VALUE;
+		end = end != null ? end : Long.MAX_VALUE;
+		return schedule.deleteValues(start, end);
+	}
+	
+	@Descriptor("Delete schedule values")
+	public boolean deleteValues(CommandSession shell,
+			@Descriptor("Optional start time")
+			@Parameter(names= { "-s", "--start"}, absentValue = "")
+			String startTime,
+			@Descriptor("Optional end time")
+			@Parameter(names= { "-e", "--end"}, absentValue = "")
+			String endTime,
+			@Descriptor("Schedule path")
+			String schedulePath
+			) throws InterruptedException, IOException {
+		startLatch.await(30, TimeUnit.SECONDS);
+		final Resource r = appMan.getResourceAccess().getResource(schedulePath);
+		if (r == null) {
+			System.out.println("Resource not found: " + schedulePath);
+			return false;
+		}
+		if (!(r instanceof Schedule)) {
+			System.out.println("Resource " + r+ " is not a schedule, cannot delete datapoints");
+			return false;
+		}
+		return deleteValues(shell, startTime, endTime, (Schedule) r);
+	}
+	
 	private ReadOnlyTimeSeries getTimeseries(String path) throws InterruptedException {
 		startLatch.await(30, TimeUnit.SECONDS);
 		final Resource r = appMan.getResourceAccess().getResource(path);
@@ -559,6 +625,8 @@ public class ScheduleCommands {
 	}
 	
 	private Long parseDatetimeWithExpression(String datetime) throws InterruptedException {
+		if (datetime == null || datetime.isEmpty())
+			return null;
 		Long t = parseDatetime(datetime);
 		if (t != null)
 			return t;

@@ -126,7 +126,7 @@ Options:
 
 ## Schedule commands
 
-All commands, except [addvalues](#addvalues) and [setinterpolationmode](#setinterpolationmode), accept both schedules (timeseries resources), logged single value resources and other generic timeseries as input.
+All commands, except [addvalues](#addvalues), [deletevalues](#deletevalues) and [setinterpolationmode](#setinterpolationmode), accept both schedules (timeseries resources), logged single value resources and other generic timeseries as input.
 
 ### addvalues
 
@@ -155,6 +155,24 @@ Parameters:
 Options:
 * `-f <FORMAT>`: specify the value format. `f`: float (default), `d`: double, `i`: int, `l`: long, `b`: boolean, `s`: string
 * `-a`: activate schedule
+
+### deletevalues
+
+Example:
+
+```shell
+deletevalues path/to/schedule -s 2023-03-04T12:32:00Z -e 2023-03-10T10:01:00Z
+```
+
+Parameters:
+* Schedule or schedule path
+
+Options:
+* `-s <START_TIME>`: start time. For formats see method [addvalues](#addvalues).
+* `-e <END_TIME>`: end time. For formats see method [addvalues](#addvalues).
+
+If no start time and end time is specified, all values will be deleted.
+
 
 ### firsttimestamp
 
