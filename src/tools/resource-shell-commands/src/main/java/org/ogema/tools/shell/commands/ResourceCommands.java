@@ -1,5 +1,7 @@
 package org.ogema.tools.shell.commands;
 
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -35,6 +37,7 @@ import org.osgi.service.component.annotations.Deactivate;
 				"osgi.command.function=getSubResources",
 				"osgi.command.function=numResources", 
 				"osgi.command.function=numSubresources",
+				"osgi.command.function=optionalElements",
 				"osgi.command.function=resourcesBySize",
 				"osgi.command.function=subResources",
 				"osgi.command.function=toplevelResources"
@@ -69,6 +72,7 @@ public class ResourceCommands {
 		"Heater", "org.ogema.model.devices.generators.",
 		"ConnectionBox", "org.ogema.model.devices.connectiondevices.",
 	};
+	private static final String[] RESOURCE_METHODS = {"addDecorator", "addOptionalElement", "create", "getLocationResource", "getParent", "getSubResource", "setAsReference", };
 	private final CountDownLatch startLatch = new CountDownLatch(1);
 	private volatile ServiceRegistration<Application> appService;
 	private ApplicationManager appMan;
@@ -126,6 +130,25 @@ public class ResourceCommands {
 			return appMan.getResourceAccess().getToplevelResources(clazz).size();
 		else
 			return appMan.getResourceAccess().getResources(clazz).size();
+	}
+	
+	@Descriptor("Get the number of resources matching a path expression.")
+	public int numResources(
+			@Descriptor("Resource type (full class name, or abbreviated resource type, such as 'Room' for selected common types)")
+			@Parameter(names= { "-t", "--type"}, absentValue = "")
+			String type,
+			@Descriptor("Make the path expression case sensitive")
+			@Parameter(names= {"-c", "--case-sensitive"}, absentValue="false", presentValue="true")
+			boolean caseSensitive,
+			@Descriptor("Filter for active resources")
+			@Parameter(names= {"-a", "--active"}, absentValue="false", presentValue="true")
+			boolean active,
+			@Descriptor("Include virtual subresources")
+			@Parameter(names= {"-v", "--virtual"}, absentValue="false", presentValue="true")
+			boolean virtual,
+			@Descriptor("A path expression, such as 'myResource/*/reading', or 'my*/*'")
+			String pathExpression) throws InterruptedException {
+		return getResources(type, caseSensitive, active, virtual, pathExpression).size();
 	}
 	
 	@Descriptor("Count the number of subresources for a specific resource")
@@ -440,6 +463,113 @@ public class ResourceCommands {
 		return (List<Resource>) appMan.getResourceAccess().getResources(clazz);
 	}
 	
+	// here one could use Java pattern matching, but this is more cumbersome to use 
+	@SuppressWarnings("unchecked")
+	@Descriptor("Get resources based on a path expression.")
+	public List<Resource> getResources(
+			@Descriptor("Resource type (full class name, or abbreviated resource type, such as 'Room' for selected common types)")
+			@Parameter(names= { "-t", "--type"}, absentValue = "")
+			String type,
+			@Descriptor("Make the path expression case sensitive")
+			@Parameter(names= {"-c", "--case-sensitive"}, absentValue="false", presentValue="true")
+			boolean caseSensitive,
+			@Descriptor("Filter for active resources")
+			@Parameter(names= {"-a", "--active"}, absentValue="false", presentValue="true")
+			boolean active,
+			@Descriptor("Include virtual subresources")
+			@Parameter(names= {"-v", "--virtual"}, absentValue="false", presentValue="true")
+			boolean virtual,
+			@Descriptor("A path expression, such as 'myResource/*/reading' or 'my*/*'")
+			String pathExpression) throws InterruptedException {
+		pathExpression = pathExpression.trim();
+		if (pathExpression.isEmpty())
+			return getResources(type);
+		if (pathExpression.startsWith("/"))
+			pathExpression = pathExpression.substring(1);
+		if (pathExpression.endsWith("/"))
+			pathExpression = pathExpression.substring(0, pathExpression.length() - 1);
+		if (!caseSensitive)
+			pathExpression = pathExpression.toLowerCase();
+		startLatch.await(30, TimeUnit.SECONDS);
+		Class<? extends Resource> clazz = null;
+		if (!type.isEmpty()) {
+			clazz = loadResourceClass(appMan.getAppID().getBundle().getBundleContext(), type);
+			if (clazz == null)
+				return Collections.emptyList();
+		}
+		final String[] pathComponents = pathExpression.trim().split("/");
+		final String first = pathComponents[0];
+		final int wildcardIdx = first.indexOf("*");
+		List<Resource> currentResources;
+		if (wildcardIdx < 0 && caseSensitive) {
+			final Resource base = appMan.getResourceAccess().getResource(first);
+			if (base == null || 
+					(pathComponents.length == 1 && clazz != null && !clazz.isAssignableFrom(base.getResourceType())) ||
+					(!virtual && !base.exists())) {
+				return Collections.emptyList();
+			}
+			currentResources = new ArrayList<>(2);
+			currentResources.add(base);
+		} else if (first.lastIndexOf("*") == wildcardIdx) {
+			currentResources = (List<Resource>) appMan.getResourceAccess().getToplevelResources(pathComponents.length > 1 ? null : clazz);
+			if (!"*".equals(first)) {
+				final List<Resource> matches = new ArrayList<>(currentResources.size());
+				for (Resource r: currentResources) {
+					if (matches(first, wildcardIdx, r.getName(), caseSensitive))
+						matches.add(r);
+				}
+				currentResources = matches;
+			}			
+		} else {
+			throw new IllegalArgumentException("Path expression not supported: " + pathExpression);
+		}
+		for (int idx=1; idx<pathComponents.length; idx++) {
+			final String component = pathComponents[idx];
+			final int wildcardIdxSub = component.indexOf("*");
+			if (wildcardIdxSub != component.lastIndexOf("*"))
+				throw new IllegalArgumentException("Path expression not supported: " + component);
+			final List<Resource> subs = new ArrayList<>();
+			final boolean isFinalLevel = pathComponents.length == idx+1 && clazz != null;
+			for (Resource r: currentResources) {
+				if (wildcardIdxSub < 0 && caseSensitive) {
+					final Resource sub = r.getSubResource(component);
+					if (sub != null && (!isFinalLevel || clazz.isAssignableFrom(sub.getResourceType())) || (!virtual && !sub.exists())) 
+						subs.add(sub);
+				} else {
+					final List<Resource> localSubs = (List<Resource>) (isFinalLevel ? r.getSubResources(clazz, false) : r.getSubResources(false));
+					for (Resource sub: localSubs) {
+						if (matches(component, wildcardIdx, sub.getName(), caseSensitive) && (virtual || sub.exists()))
+							subs.add(sub);
+					}
+				}
+			}
+			currentResources = subs;
+		}
+		if (active && !currentResources.isEmpty()) {
+			final List<Resource> activeResources= new ArrayList<>(currentResources.size());
+			for (Resource r: currentResources) {
+				if (r.isActive())
+					activeResources.add(r);
+			}
+			currentResources = activeResources;
+		}
+		return currentResources;
+	}
+	
+	private static boolean matches(String pattern, int wildcardIdx, String name, boolean caseSensitive) {
+		if (!caseSensitive) // we assume that pattern is already in lower case
+			name = name.toLowerCase();
+		if ("*".equals(pattern))
+			return true;
+		if (wildcardIdx == 0)
+			return name.endsWith(pattern.substring(1));
+		if (wildcardIdx == pattern.length() - 1)
+			return name.startsWith(pattern.substring(0, pattern.length() - 1));
+		if (wildcardIdx < 0)
+			return name.equals(pattern);
+		return name.startsWith(pattern.substring(0, wildcardIdx)) && name.endsWith(pattern.substring(0, wildcardIdx+1));
+	}
+	
 	@Descriptor("Get toplevel resources sorted by the number of subresources")
 	public LinkedHashMap<Resource, Integer> resourcesBySize() throws InterruptedException {
 		startLatch.await(30, TimeUnit.SECONDS);
@@ -466,6 +596,38 @@ public class ResourceCommands {
 			candidateSize = -1;
 		}
 		return resourcesBySize;
+	}
+	
+	@Descriptor("Get declared optional elements (child resources) of a resource type")
+	@SuppressWarnings("unchecked")
+	public Map<String, Class<? extends Resource>> optionalElements(@Descriptor("Resource type") Class<? extends Resource> type) {
+		if (type == null)
+			return null;
+		final Method[] methods = type.getMethods();
+		final Map<String, Class<? extends Resource>> children = new HashMap<>();
+		outer: for (Method m: methods) {
+			final String name = m.getName();
+			final Class<?> returnType = m.getReturnType();
+			if (!Resource.class.isAssignableFrom(returnType))
+				continue;
+			for (String knownMethod: RESOURCE_METHODS) {
+				if (name.equals(knownMethod))
+					continue outer;
+			}
+			children.put(name, (Class<? extends Resource>) returnType);
+		}
+		return children;
+	}
+	
+	@Descriptor("Get declared optional elements (child resources) of a resource type")
+	public Map<String, Class<? extends Resource>> optionalElements(@Descriptor("A resource") Resource r) {
+		return optionalElements(r.getResourceType());
+	}
+	
+	@Descriptor("Get declared optional elements (child resources) of a resource type")
+	public Map<String, Class<? extends Resource>> optionalElements(@Descriptor("Resource type fully qualified name or short form") String type) throws InterruptedException {
+		startLatch.await(30, TimeUnit.SECONDS);
+		return optionalElements(loadResourceClass(appMan.getAppID().getBundle().getBundleContext(), type));
 	}
 	
 	private static void countSubresources(final Resource r, final Class<? extends Resource> type, final AtomicInteger cnt) {
