@@ -44,11 +44,12 @@ import org.osgi.service.component.annotations.Deactivate;
 		}
 )
 public class ResourceCommands {
-	
+
 	private static final String[] CLASS_PREFIXES = {
 		"Schedule", "org.ogema.core.model.schedule.", // "*Schedule", "org.ogema.core.model.schedule.*Schedule",
 		"ArrayResource", "org.ogema.core.model.array.",  // "*ArrayResource", "org.ogema.core.model.schedule.*ArrayResource",
 		"Resource", "org.ogema.core.model.simple.",
+		"ValueResource", "org.ogema.core.model.",
 		"Sensor", "org.ogema.model.sensors.",   // "*Sensor", "org.ogema.model.sensors.*Sensor",
 		"Actor", "org.ogema.model.actors.",
 		"Switch", "org.ogema.model.actors.",
@@ -640,7 +641,7 @@ public class ResourceCommands {
 		}
 	}
 	
-	private static Class<? extends Resource> loadResourceClass(final BundleContext ctx, final String className) {
+	static Class<? extends Resource> loadResourceClass(final BundleContext ctx, final String className) {
 		if (className == null || className.isEmpty())
 			return null;
 		if (className.indexOf(".") < 0) {

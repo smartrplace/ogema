@@ -30,10 +30,21 @@
                     <instructions>
                         <Import-Package>
                           org.apache.felix.service.command;resolution:=optional;version="[${felix.service.command.version.min},${felix.service.command.version.max})",
+                          org.jline.reader;resolution:=optional,
+                          org.apache.felix.gogo.jline;resolution:=optional,
                           *
                         </Import-Package>
                         <DynamicImport-Package>*</DynamicImport-Package>
                     </instructions>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>2.3.2</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
                 </configuration>
             </plugin>
         </plugins>
@@ -44,6 +55,20 @@
             <groupId>org.ogema.core</groupId>
             <artifactId>api</artifactId>
         </dependency>
+		<dependency>
+            <groupId>org.ogema.tools</groupId>
+            <artifactId>resource-utils</artifactId>
+        </dependency>
+		<dependency>
+			<groupId>org.jline</groupId>
+			<artifactId>jline</artifactId>
+			<version>3.9.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.felix</groupId>
+			<artifactId>org.apache.felix.gogo.jline</artifactId>
+			<version>1.1.0</version>
+		</dependency>
         <!--
         <dependency>
             <groupId>org.ogema.core</groupId>
