@@ -23,6 +23,8 @@ import org.ogema.core.timeseries.ReadOnlyTimeSeries;
  * 
  */
 public class IntegerValue implements Value {
+	
+	private static final long serialVersionUID = 1L;
 
 	public final static IntegerValue ZERO = new IntegerValue(0);
 	public final static IntegerValue ONE = new IntegerValue(1);

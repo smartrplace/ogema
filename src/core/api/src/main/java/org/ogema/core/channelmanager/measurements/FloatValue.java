@@ -24,6 +24,8 @@ import org.ogema.core.timeseries.ReadOnlyTimeSeries;
  */
 public class FloatValue implements Value {
 
+	private static final long serialVersionUID = 1L;
+
 	public static final FloatValue NAN = new FloatValue(Float.NaN);
 	public static final FloatValue ZERO = new FloatValue(0);
 	

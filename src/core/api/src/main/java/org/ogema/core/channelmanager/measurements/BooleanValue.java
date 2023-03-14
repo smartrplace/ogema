@@ -23,6 +23,8 @@ import org.ogema.core.timeseries.ReadOnlyTimeSeries;
  * 
  */
 public class BooleanValue implements Value {
+	
+	private static final long serialVersionUID = 1L;
 
 	public final static BooleanValue TRUE = new BooleanValue(true);
 	public final static BooleanValue FALSE = new BooleanValue(false);

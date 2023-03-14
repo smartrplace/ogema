@@ -15,11 +15,15 @@
  */
 package org.ogema.core.channelmanager.measurements;
 
+import java.io.Serializable;
+
 /**
  * Represents a sampled value. A sampled value always includes a quality and a timestamp attribute. The timestamp
  * represents the time when the sample was created.
  */
-public final class SampledValue implements Comparable<SampledValue> {
+public final class SampledValue implements Comparable<SampledValue>, Serializable {
+
+	private static final long serialVersionUID = 1L;
 
 	private final long timestamp;
 	private final Value value;

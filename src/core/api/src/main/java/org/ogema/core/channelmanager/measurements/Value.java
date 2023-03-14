@@ -15,13 +15,14 @@
  */
 package org.ogema.core.channelmanager.measurements;
 
+import java.io.Serializable;
 import org.ogema.core.timeseries.ReadOnlyTimeSeries;
 
 /**
  * Value type for the ChannelAPI.
  */
-public interface Value extends Cloneable {
-
+public interface Value extends Cloneable, Serializable {
+	
 	/**
 	 * Get the value as a float variable.
 	 * 

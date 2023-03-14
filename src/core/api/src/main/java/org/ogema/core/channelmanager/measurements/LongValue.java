@@ -23,6 +23,8 @@ import org.ogema.core.timeseries.ReadOnlyTimeSeries;
  * 
  */
 public class LongValue implements Value {
+	
+	private static final long serialVersionUID = 1L;
 
 	private final long value;
 
