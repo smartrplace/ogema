@@ -23,8 +23,11 @@ import static org.junit.Assert.assertTrue;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Before;
 import org.junit.Ignore;
@@ -443,4 +446,77 @@ public class ProgramEnforcerTest extends OsgiAppTestBase {
 		Thread.sleep(1000); // allow callbacks from delete methods to complete
 		sensor.delete();
 	}
+	
+	@Test
+	public void testMaxScheduleValueLifetimeWorks() throws InterruptedException {
+		final TemperatureSensor sensor = resman.createResource(newResourceName(), TemperatureSensor.class);
+		sensor.reading().program().create();
+		sensor.reading().program().setInterpolationMode(InterpolationMode.STEPS);
+		sensor.activate(true);
+		final int valuesCount = 5;
+		final CountDownLatch valuesLatch = new CountDownLatch(valuesCount);
+		final Set<Float> valuesSeen = new ConcurrentSkipListSet<>();
+		sensor.reading().addValueListener(new ResourceValueListener<FloatResource>() {
+
+			@Override
+			public void resourceChanged(FloatResource resource) {
+				if (valuesSeen.add(sensor.reading().getValue()))
+					valuesLatch.countDown();
+			}
+				
+		});
+		final AtomicInteger activationCnt = new AtomicInteger();
+		final AtomicInteger deactivationCnt = new AtomicInteger();
+		sensor.reading().addStructureListener(new ResourceStructureListener() {
+
+			@Override
+			public void resourceStructureChanged(ResourceStructureEvent event) {
+				switch (event.getType()) {
+				case RESOURCE_ACTIVATED:
+					activationCnt.getAndIncrement();
+					if (valuesSeen.add(sensor.reading().getValue()))
+						valuesLatch.countDown();
+					break;
+				case RESOURCE_DEACTIVATED:
+					deactivationCnt.getAndIncrement();
+					break;
+				default:
+					break;
+				}
+			}
+			
+		});
+		final ResourceManipulator tool = new ResourceManipulatorImpl(getApplicationManager());
+		tool.start();
+		ProgramEnforcer config = tool.createConfiguration(ProgramEnforcer.class);
+		// The max lifetime is set to 10ms, whereas the interval between two schedule points will be set to 200ms later on, which should ensure
+		// that the target resource gets deactivated between every two values updates, and reactivated every time a new schedule value becomes active 
+		config.setMaxScheduleValueLifetime(10); // 10 millis 
+		config.enforceProgram(sensor.reading(), -1l);
+		config.deactivateTargetIfProgramMissing(true);
+		config.commit();
+
+		final List<SampledValue> values = new ArrayList<>();
+		final long now = getApplicationManager().getFrameworkTime();
+		for (int idx=0;idx<valuesCount; idx++) {
+			final long t = now + idx*200;
+			final float value = 1 + idx;
+			values.add(new SampledValue(new FloatValue(value), t, Quality.GOOD));
+		}
+		sensor.reading().program().addValues(values);
+		valuesLatch.await(5, TimeUnit.SECONDS);
+		try {
+			assert valuesSeen.size() >= valuesCount: "A schedule value seems to have been missed in the enforced target resource: received: " + valuesSeen  + ", expected: "+ values;
+			assert deactivationCnt.get() >= valuesCount-1: "Enforced target resource did not get deactivated after schedule value lifetime elapsed";
+			assert activationCnt.get() >= valuesCount-1: "Enforced target resource did not get reactivated after new schedule value became active";
+		} finally {
+			tool.deleteAllConfigurations();
+			sensor.delete();
+		}
+		
+		
+	}
+	
+	
+	
 }

@@ -109,4 +109,20 @@ public interface ProgramEnforcer extends ManipulatorConfiguration {
 	 * the last activation status is retained. Default: true.
 	 */
 	void deactivateTargetIfProgramMissing(boolean deactivate);
+	
+	/**
+	 * Ensure that only schedule values newer than the passed lifetime are considered by the enforcer. 
+	 * If there is a gap between values greater than the passed duration, then the schedule will be considered inactive after this interval.
+	 * Pass a value <= 0 to deactivate, i.e. set the lifetime to infinity
+	 * @param millis
+	 */
+	void setMaxScheduleValueLifetime(long millis);
+	
+	/**
+	 * Maximum schedule value lifetime in milliseconds.
+	 * Returns -1 if the lifetime is infinite.
+	 * @return
+	 */
+	long getMaxScheduleValueLifetime();
+	
 }

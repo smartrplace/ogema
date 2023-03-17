@@ -49,7 +49,7 @@ import org.ogema.tools.resourcemanipulator.model.ResourceManipulatorModel;
  * or, in case of linear interpolation of the program, at least updates its
  * value to the one dictated by the program periodically.
  *
- * FIXME must react to changes of the target resource.
+ * FIXME must react to changes of the target resource.(??)
  *
  * @author Timo Fischer, Fraunhofer IWES
  */
@@ -183,10 +183,9 @@ public class ProgramEnforcerController implements Controller, ResourceValueListe
 		}
 
 		final long t0 = appMan.getFrameworkTime();
-		final SampledValue currentProgramValue = (program.isActive()) ? program.getValue(t0) : null;
-		final boolean hasGoodProgramValue = (currentProgramValue != null)
-				&& (currentProgramValue.getQuality() == Quality.GOOD);
+		final boolean hasGoodProgramValue = hasGoodProgramValue(t0);
 		if (hasGoodProgramValue) {
+			final SampledValue currentProgramValue = program.getValue(t0);
 			setProgramValue(currentProgramValue, rangeFilter);
 			//			target.activate(false);  // moved to setProgramValue method, since it may happen that target needs
 			// to be deactived, if filter condition not satisfied
@@ -200,6 +199,21 @@ public class ProgramEnforcerController implements Controller, ResourceValueListe
 			restartTimer(t0);
 		}
 	}
+	
+	private boolean hasGoodProgramValue(long t0) {
+		if (!program.isActive())
+			return false;
+		final SampledValue value = program.getValue(t0);
+		if (value == null || value.getQuality() == Quality.BAD)
+			return false;
+		final TimeResource maxLifetimeRes = this.config.maxScheduleValueLifetime(); 
+		final long maxLifetime = maxLifetimeRes.isActive() ? maxLifetimeRes.getValue() : -1;
+		if (maxLifetime < 0)
+			return true;
+		final SampledValue last = program.getPreviousValue(t0);
+		return last == null || t0-last.getTimestamp() < maxLifetime;
+	}
+	
 
 	/**
 	 * Set the timer to the next expected change event and re-start it.
@@ -209,11 +223,24 @@ public class ProgramEnforcerController implements Controller, ResourceValueListe
 	 */
 	@SuppressWarnings("fallthrough")
 	private void restartTimer(long t0) {
+		final long maxLifetime = config.maxScheduleValueLifetime().isActive() ? config.maxScheduleValueLifetime().getValue() : -1;
+		long lifetimeExpires = -1;
+		if (maxLifetime > 0 && program.isActive()) {
+			final SampledValue previous = program.getPreviousValue(t0);
+			if (previous != null) {
+				lifetimeExpires = previous.getTimestamp() + maxLifetime;
+				if (lifetimeExpires <= t0)
+					lifetimeExpires = -1;
+			}
+		}
+		long interval = lifetimeExpires > 0 ? lifetimeExpires - t0 : -1;
 		final InterpolationMode interpolation = program.getInterpolationMode();
+		
 		switch (interpolation) {
 		case LINEAR: {
 			if (updateInterval > 0) {
-				timer.setTimingInterval(updateInterval);
+				interval = interval > 0 ? Math.min(interval, updateInterval) : updateInterval;
+				timer.setTimingInterval(interval);
 				timer.resume();
 				return;
 			}
@@ -223,7 +250,11 @@ public class ProgramEnforcerController implements Controller, ResourceValueListe
 			final SampledValue nextProgramValue = program.getNextValue(t0 + 1);
 			if (nextProgramValue != null) {
 				final long t1 = nextProgramValue.getTimestamp();
-				timer.setTimingInterval(t1 - t0);
+				interval = interval > 0 ? Math.min(interval, t1-t0) : t1-t0; 
+				timer.setTimingInterval(interval);
+				timer.resume();
+			} else if (interval > 0) {
+				timer.setTimingInterval(interval);
 				timer.resume();
 			}
 			// note: timer may not have resumed here because schedule ended. An update of the schedule will re-create the timing sequence.
@@ -232,16 +263,25 @@ public class ProgramEnforcerController implements Controller, ResourceValueListe
 		case NEAREST: {
 			final SampledValue nextProgramValue = program.getNextValue(t0 + 1);
 			if (nextProgramValue == null) {
+				if (interval > 0) {
+					timer.setTimingInterval(interval);
+					timer.resume();
+				}
 				return;
 			}
 			final long t1 = nextProgramValue.getTimestamp();
 			final SampledValue nextToNextProgramValue = program.getNextValue(t1 + 1);
 			if (nextToNextProgramValue == null) {
+				if (interval > 0) {
+					timer.setTimingInterval(interval);
+					timer.resume();
+				}
 				return;
 			}
 			final long t2 = nextToNextProgramValue.getTimestamp();
 			final long tMid = ((t1 + t2) / 2) + ((t1 + t2) % 2);
-			timer.setTimingInterval(tMid - t0);
+			interval = interval > 0 ? Math.min(interval, tMid - t0) : tMid - t0;
+			timer.setTimingInterval(interval);
 			timer.resume();
 			return;
 		}

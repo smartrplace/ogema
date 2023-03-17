@@ -68,4 +68,10 @@ public interface ProgramEnforcerModel extends ResourceManipulatorModel {
 	 */
 	StringResource scheduleResourceName();
 	
+	/**
+	 * Default value -1 (infinite)
+	 * @return
+	 */
+	TimeResource maxScheduleValueLifetime();
+	
 }

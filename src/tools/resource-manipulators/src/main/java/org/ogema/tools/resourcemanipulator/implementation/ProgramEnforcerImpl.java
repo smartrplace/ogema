@@ -22,7 +22,10 @@ import java.util.Objects;
 
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ValueResource;
+import org.ogema.core.model.simple.FloatResource;
+import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.StringResource;
+import org.ogema.core.model.simple.TimeResource;
 import org.ogema.core.resourcemanager.AccessPriority;
 import org.ogema.tools.resourcemanipulator.configurations.ProgramEnforcer;
 import org.ogema.tools.resourcemanipulator.model.ProgramEnforcerModel;
@@ -40,6 +43,11 @@ public class ProgramEnforcerImpl implements ProgramEnforcer {
 	private boolean m_exclusiveAccessRequired;
 	private boolean m_deactivate;
 	private String m_scheduleName;
+	private long m_maxScheduleValueLifetime;
+	
+	private Float[] m_range = null;
+	private int m_rangeMode = 0;
+	
 
 	// Configuration this is connected to (null if not connected)
 	private ProgramEnforcerModel m_config;
@@ -57,6 +65,16 @@ public class ProgramEnforcerImpl implements ProgramEnforcer {
 		m_config = configResource;
 		m_deactivate = m_config.deactivateIfValueMissing().getValue();
 		m_scheduleName = m_config.scheduleResourceName().isActive() ? m_config.scheduleResourceName().getValue() : null;
+		m_maxScheduleValueLifetime = m_config.maxScheduleValueLifetime().isActive() ? m_config.maxScheduleValueLifetime().getValue() : -1;
+		final RangeFilter filter = m_config.range();
+		if (filter.isActive() && filter.range().isActive()) {
+			final Float upper = filter.range().upperLimit().isActive() ? filter.range().upperLimit().getValue() : null;
+			final Float lower = filter.range().lowerLimit().isActive() ? filter.range().lowerLimit().getValue() : null;
+			if (upper != null || lower != null) {
+				m_range = new Float[] {upper, lower};
+				m_rangeMode = filter.mode().isActive() ? filter.mode().getValue() : 0;
+			}
+		}
 	}
 
 	public ProgramEnforcerImpl(ResourceManipulatorImpl base) {
@@ -68,6 +86,7 @@ public class ProgramEnforcerImpl implements ProgramEnforcer {
 		m_deactivate = true;
 		m_config = null;
 		m_scheduleName = null;
+		m_maxScheduleValueLifetime = -1;
 	}
 
 	@Override
@@ -92,6 +111,17 @@ public class ProgramEnforcerImpl implements ProgramEnforcer {
 		m_config.deactivateIfValueMissing().setValue(m_deactivate);
 		if (m_scheduleName != null) {
 			m_config.scheduleResourceName().<StringResource> create().setValue(m_scheduleName);
+		}
+		if (m_maxScheduleValueLifetime > 0)
+			m_config.maxScheduleValueLifetime().<TimeResource> create().setValue(m_maxScheduleValueLifetime);
+		if (m_range != null) {
+			final RangeFilter filter = m_config.range();
+			if (m_range[0] != null && Float.isFinite(m_range[0]))
+				filter.range().lowerLimit().<FloatResource> create().setValue(m_range[0]);
+			if (m_range[1] != null && Float.isFinite(m_range[1]))
+				filter.range().upperLimit().<FloatResource> create().setValue(m_range[1]);
+			if (m_rangeMode != 0)
+				filter.mode().<IntegerResource> create().setValue(m_rangeMode);
 		}
 		m_config.activate(true);
 		return true;
@@ -143,9 +173,16 @@ public class ProgramEnforcerImpl implements ProgramEnforcer {
 	
 	@Override
 	public void setTargetScheduleName(String scheduleName) {
-		m_scheduleName = Objects.requireNonNull(scheduleName);
+		Objects.requireNonNull(scheduleName);
 		if (scheduleName.contains("/") || !ResourceUtils.isValidResourcePath(scheduleName))
 			throw new IllegalArgumentException("Illegal schedule name " +scheduleName);
+		m_scheduleName = scheduleName;
+		if (m_config != null && m_config.exists()) {
+			final StringResource nameCfg = m_config.scheduleResourceName().create(); 
+			nameCfg.setValue(m_scheduleName);
+			if (m_config.isActive())
+				nameCfg.activate(false);
+		}
 	}
 	
 	@Override
@@ -155,26 +192,38 @@ public class ProgramEnforcerImpl implements ProgramEnforcer {
 
 	@Override
 	public void setRangeFilter(float lowerBoundary, float upperBoundary, int mode) throws RuntimeException {
-		if (m_config == null || !m_config.exists())
-			throw new RuntimeException("Cannot set filter before ProgramEnforcer has been commited");
+		final boolean configExists = m_config != null && m_config.exists();
 		boolean lowerNaN = Float.isNaN(lowerBoundary);
 		boolean upperNaN = Float.isNaN(upperBoundary);
 		if (lowerNaN && upperNaN) {
-			m_config.range().delete();
+			if (configExists)
+				m_config.range().delete();
+			m_range = null;
+			m_rangeMode = 0;
 			return;
 		}
-		RangeFilter filter = m_config.range();
+		RangeFilter filter = configExists ? m_config.range() : null;
+		m_range = new Float[] {null, null};
+		m_rangeMode = mode;
 		if (!lowerNaN) {
-			filter.range().lowerLimit().create();
-			filter.range().lowerLimit().setValue(lowerBoundary);
+			if (configExists) {
+				filter.range().lowerLimit().create();
+				filter.range().lowerLimit().setValue(lowerBoundary);
+			}
+			m_range[0] = lowerBoundary;
 		}
 		if (!upperNaN) {
-			filter.range().upperLimit().create();
-			filter.range().upperLimit().setValue(upperBoundary);
+			if (configExists) {
+				filter.range().upperLimit().create();
+				filter.range().upperLimit().setValue(upperBoundary);
+			}
+			m_range[1] = upperBoundary;
 		}
-		filter.mode().create();
-		filter.mode().setValue(mode);
-		filter.activate(true);
+		if (configExists) {
+			filter.mode().create();
+			filter.mode().setValue(mode);
+			filter.activate(true);
+		}
 
 	}
 
@@ -189,6 +238,32 @@ public class ProgramEnforcerImpl implements ProgramEnforcer {
 		if (m_config != null && m_config.exists() && m_config.deactivateIfValueMissing().exists()) {
 			m_config.deactivateIfValueMissing().setValue(deactivate);
 		}
+	}
+	
+	@Override
+	public void setMaxScheduleValueLifetime(long millis) {
+		this.m_maxScheduleValueLifetime = millis > 0 ? millis : -1;
+		final boolean configExists = m_config != null && m_config.exists();
+		if (configExists) {
+			if (millis > 0) {
+				final TimeResource lifetimeRes = m_config.maxScheduleValueLifetime().create();
+				lifetimeRes.setValue(millis);
+				if (m_config.isActive())
+					lifetimeRes.activate(false);
+			} else {
+				m_config.maxScheduleValueLifetime().delete();
+			}
+		}
+	}
+	
+	/**
+	 * Maximum schedule value lifetime in milliseconds.
+	 * Returns -1 if the lifetime is infinite.
+	 * @return
+	 */
+	@Override
+	public long getMaxScheduleValueLifetime() {
+		return m_maxScheduleValueLifetime;
 	}
 
 	@Override
