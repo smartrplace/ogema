@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -26,6 +27,8 @@ import org.apache.felix.service.command.Parameter;
 import org.apache.felix.service.command.Process;
 import org.jline.reader.Candidate;
 import org.jline.reader.ParsedLine;
+import org.jline.terminal.Terminal;
+import org.jline.utils.InfoCmp;
 import org.ogema.core.application.Application;
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.core.model.Resource;
@@ -58,7 +61,10 @@ complete -c ogr:find -a '__resources'
 			"osgi.command.function=pcr",
 			"osgi.command.function=setvalue",
 			"osgi.command.function=sr",
-			"osgi.command.function=__resources",}
+			"osgi.command.function=__resources",
+		
+		"osgi.command.function=printtermcap",
+		}
 )
 public class ResourcePathCommands implements Application {
 
@@ -173,6 +179,8 @@ public class ResourcePathCommands implements Application {
 			@Descriptor("show size") boolean s,
 			String path
 	) {
+		Objects.requireNonNull(appman, "application manager is null");
+		Objects.requireNonNull(appman.getResourceAccess(), "resource access is null");
 		Process p = Process.Utils.current();
 		Resource r = (Resource) sess.get(CURRENT_RESOURCE);
 		if (!path.isEmpty()) {
@@ -273,7 +281,7 @@ public class ResourcePathCommands implements Application {
 		return rval;
 	}
 	
-	public Resource importJson(String file) throws IOException {
+	public Resource importJson(CommandSession sess, String file) throws IOException {
 		Path p = Paths.get(file);
 		if (!Files.exists(p)) {
 			System.err.println("import: file not found: " + file);
@@ -283,6 +291,32 @@ public class ResourcePathCommands implements Application {
 			Resource res = appman.getSerializationManager().createFromJson(r);
 			return res;
 		}
+	}
+	
+	public Object printTermCap(CommandSession session, String cap) {
+		try {
+			System.out.println(Shell.getTerminal(session).getBooleanCapability(InfoCmp.Capability.valueOf(cap)));
+		} catch (RuntimeException re) {}
+		try {
+			System.out.println(Shell.getTerminal(session).getNumericCapability(InfoCmp.Capability.valueOf(cap)));
+		} catch (RuntimeException re) {}
+		try {
+			System.out.println(Shell.getTerminal(session).getStringCapability(InfoCmp.Capability.valueOf(cap)));
+		} catch (RuntimeException re) {}
+		return null;
+	}
+	
+	public void printTermCap(CommandSession session) {
+		Terminal t = Shell.getTerminal(session);
+		Process p = Process.Utils.current();
+		Stream.of(InfoCmp.Capability.values()).forEach(cap -> {
+			Boolean bcap = t.getBooleanCapability(cap);
+			Number ncap = t.getNumericCapability(cap);
+			String scap = t.getStringCapability(cap);
+			if (bcap != null || ncap != null || scap != null) {
+				p.out().printf("%s: %s | %s | %s%n", cap, bcap, ncap, scap);
+			}
+		});
 	}
 
 	public List<Candidate> __resources(CommandSession session) {
@@ -481,7 +515,7 @@ public class ResourcePathCommands implements Application {
 			String path) throws Exception {
 		Resource r = (Resource) sess.get(CURRENT_RESOURCE);
 		r = getResource(r, path);
-		if (path != null && r == null) {
+		if (path != null && !path.equals("/") && r == null) {
 			sess.getConsole().printf("find: %s: resource not found.", path);
 			return null;
 		}
