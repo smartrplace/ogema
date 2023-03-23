@@ -173,7 +173,11 @@ public final class ResourceToString implements Converter {
 		Map<String, String> m = getMarkup();
 		String name = r.getName();
 		if (pathrel != null) {
-			name = r.getPath().substring(pathrel.length());
+			if (pathrel.isEmpty()) {
+				name = "/" + r.getPath();
+			} else {
+				name = r.getPath().substring(pathrel.length());
+			}
 		}
 		StringBuilder sb = new StringBuilder();
 		sb.append(m.getOrDefault("RESOURCE", "")).append(name)

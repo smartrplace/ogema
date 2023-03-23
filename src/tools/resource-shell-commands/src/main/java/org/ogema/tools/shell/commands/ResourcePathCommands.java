@@ -72,6 +72,7 @@ public class ResourcePathCommands implements Application {
 	BundleContext ctx;
 
 	final static String CURRENT_RESOURCE = "currentResource";
+	final static String REQUEST_PATH = "requestPath";
 	final static Comparator<Resource> RESOURCENAME_COMPARATOR = (r1, r2) -> String.CASE_INSENSITIVE_ORDER.compare(r1.getName(), r2.getName());
 
 	@Activate
@@ -91,7 +92,7 @@ public class ResourcePathCommands implements Application {
 	@Descriptor("Change current resource")
 	public void cr(CommandSession sess, String path) {
 		Resource r = (Resource) sess.get(CURRENT_RESOURCE);
-		r = getResource(r, path);
+		r = getResource(sess, r, path);
 		if (r == null && !"/".equals(path)) {
 			sess.getConsole().printf("cr: %s: resource not found%n", path);
 		} else {
@@ -102,7 +103,7 @@ public class ResourcePathCommands implements Application {
 	@Descriptor("Select resource")
 	public Resource sr(CommandSession sess, String path) {
 		Resource r = (Resource) sess.get(CURRENT_RESOURCE);
-		r = getResource(r, path);
+		r = getResource(sess, r, path);
 		if (r == null && !"/".equals(path)) {
 			sess.getConsole().printf("sr: %s: resource not found%n", path);
 			return null;
@@ -147,7 +148,8 @@ public class ResourcePathCommands implements Application {
 		out.println();
 	}
 
-	private Resource getResource(Resource current, String path) {
+	private Resource getResource(CommandSession sess, Resource current, String path) {
+		sess.put(REQUEST_PATH, path);
 		if (path == null) {
 			return current;
 		}
@@ -184,7 +186,7 @@ public class ResourcePathCommands implements Application {
 		Process p = Process.Utils.current();
 		Resource r = (Resource) sess.get(CURRENT_RESOURCE);
 		if (!path.isEmpty()) {
-			r = getResource(r, path);
+			r = getResource(sess, r, path);
 		}
 		if (r == null && !path.isEmpty() && !(path.equals("/") || path.equals("."))) {
 			p.out().printf("lr: %s: resource not found%n", path);
@@ -345,7 +347,7 @@ public class ResourcePathCommands implements Application {
 			@Descriptor("resource to activate")
 			String path) {
 		Resource base = (Resource) sess.get(CURRENT_RESOURCE);
-		Resource res = getResource(base, path);
+		Resource res = getResource(sess, base, path);
 		if (res == null) {
 			sess.getConsole().printf("activate: %s: resource not found%n", path);
 			return;
@@ -361,7 +363,7 @@ public class ResourcePathCommands implements Application {
 			@Descriptor("resource to deactivate")
 			String path) {
 		Resource base = (Resource) sess.get(CURRENT_RESOURCE);
-		Resource res = getResource(base, path);
+		Resource res = getResource(sess, base, path);
 		if (res == null) {
 			sess.getConsole().printf("deactivate: %s: resource not found%n", path);
 			return;
@@ -372,7 +374,7 @@ public class ResourcePathCommands implements Application {
 	@Descriptor("delete resource")
 	public void delete(CommandSession sess, String path) {
 		Resource base = (Resource) sess.get(CURRENT_RESOURCE);
-		Resource res = getResource(base, path);
+		Resource res = getResource(sess, base, path);
 		if (res == null) {
 			sess.getConsole().printf("delete: %s: resource not found%n", path);
 			return;
@@ -417,9 +419,24 @@ public class ResourcePathCommands implements Application {
 		} else {
 			s = res.getSubResources(true).stream();
 		}
-		String pathrel = res == null
-				? ""
-				: res.getPath() + "/";
+		
+		String requestBase = null;
+		Resource cwr = (Resource) sess.get(CURRENT_RESOURCE);
+		if (cwr != null && sess.get(REQUEST_PATH) != null) {
+			String rpath = String.valueOf(sess.get(REQUEST_PATH));
+			if (!rpath.startsWith("/")) {
+				requestBase = cwr.getPath() + "/";
+			} else {
+				requestBase = "";
+			}
+		}
+		String pathrel = requestBase != null
+				? requestBase
+				: res == null
+					? ""
+					: res.getPath() + "/";
+		
+				
 		if (!namerx.isEmpty()) {
 			if (namerx.startsWith("!")) {
 				s = s.filter(r -> !r.getName().matches(namerx.substring(1)));
@@ -514,7 +531,7 @@ public class ResourcePathCommands implements Application {
 			@Descriptor("Execute console command for each matched resource, e.g.: \"-exec '$it delete'\", return empty list (does not work with -print).") String exec,
 			String path) throws Exception {
 		Resource r = (Resource) sess.get(CURRENT_RESOURCE);
-		r = getResource(r, path);
+		r = getResource(sess, r, path);
 		if (path != null && !path.equals("/") && r == null) {
 			sess.getConsole().printf("find: %s: resource not found.", path);
 			return null;
