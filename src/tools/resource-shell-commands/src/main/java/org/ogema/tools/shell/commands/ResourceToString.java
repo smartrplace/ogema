@@ -139,7 +139,7 @@ public final class ResourceToString implements Converter {
 			case INSPECT:
 				return printInspect((Resource) o);
 			case LINE:
-				return printLine((Resource) o);
+				return printLine((Resource) o, "");
 			case PART: {
 				return printPart((Resource) o);
 			}
@@ -173,7 +173,7 @@ public final class ResourceToString implements Converter {
 		Map<String, String> m = getMarkup();
 		String name = r.getName();
 		if (pathrel != null) {
-			if (pathrel.isEmpty()) {
+			if (pathrel.isEmpty() || pathrel.equals("/")) {
 				name = "/" + r.getPath();
 			} else {
 				name = r.getPath().substring(pathrel.length());
