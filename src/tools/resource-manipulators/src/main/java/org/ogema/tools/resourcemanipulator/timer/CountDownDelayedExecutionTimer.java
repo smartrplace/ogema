@@ -26,6 +26,7 @@ import org.ogema.core.application.TimerListener;
 public abstract class CountDownDelayedExecutionTimer implements TimerListener {
 
 	private final Timer timer;
+	private final ApplicationManager appMan;
 	
 	public abstract void delayedExecution();
 
@@ -35,6 +36,7 @@ public abstract class CountDownDelayedExecutionTimer implements TimerListener {
 	 * */
 	public CountDownDelayedExecutionTimer(ApplicationManager appMan, long countDownTime) {
 		this.timer = appMan.createTimer(countDownTime, this);
+		this.appMan = appMan;
 	}
 
 	@Override
@@ -79,5 +81,14 @@ public abstract class CountDownDelayedExecutionTimer implements TimerListener {
 
 	public boolean isRunning() {
 		return timer.isRunning();
+	}
+	
+	public long getNextRunTime() {
+		return timer.getNextRunTime();
+	}
+	
+	public long getRemainingTime() {
+		long now = appMan.getFrameworkTime();
+		return getNextRunTime() - now;
 	}
 }
