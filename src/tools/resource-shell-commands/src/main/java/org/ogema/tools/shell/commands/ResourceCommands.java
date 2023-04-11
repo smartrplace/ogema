@@ -16,6 +16,9 @@ import org.apache.felix.service.command.Parameter;
 import org.ogema.core.application.Application;
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.core.model.Resource;
+import org.ogema.core.model.ResourceList;
+import org.ogema.core.model.simple.SingleValueResource;
+import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
@@ -30,7 +33,9 @@ import org.osgi.service.component.annotations.Deactivate;
 				"osgi.command.scope=resource",
 
 				"osgi.command.function=addSubResource",
+				"osgi.command.function=addToList",
 				"osgi.command.function=createResource",
+				"osgi.command.function=createResourceList",
 				"osgi.command.function=getResource",
 				"osgi.command.function=getResources",
 				"osgi.command.function=getSubResource",
@@ -191,6 +196,12 @@ public class ResourceCommands {
 
 	@Descriptor("Create a new resource")
 	public Resource createResource(
+			@Descriptor("Activate the new subresource immediately?")
+			@Parameter(names= { "-a", "--activate"}, absentValue = "false", presentValue="true")
+			boolean activate,
+			@Descriptor("Value to set. Only applicable to SingleValueResources. Must be convertible to the respective value type.")
+			@Parameter(names= { "-v", "--value"}, absentValue = "")
+			String value,
 			@Descriptor("Resource path")
 			String path,
 			@Descriptor("Full resource type, such as 'org.ogema.model.locations.Room', or abbreviated resource type, such as 'Room' for selected common types.")
@@ -211,10 +222,87 @@ public class ResourceCommands {
 		final Class<? extends Resource> resType = loadResourceClass(appMan.getAppID().getBundle().getBundleContext(), type);
 		if (resType == null) 
 			return null;
-		return appMan.getResourceManagement().createResource(path, resType);
+		final Resource resource = appMan.getResourceManagement().createResource(path, resType);
+		if (value != null && !value.isEmpty()) {
+			if (resource instanceof SingleValueResource)
+				ValueResourceUtils.setValue((SingleValueResource) resource, value);
+			else 
+				System.out.println("Not a single value resource: " + resource);
+		}
+		if (activate)
+			resource.activate(false);
+		return resource;
 	}
 	
-	// TODO option to set value
+	@SuppressWarnings("unchecked")
+	@Descriptor("Create a new resource list")
+	public <R extends Resource> ResourceList<R> createResourceList(
+			@Descriptor("Resource path")
+			String path,
+			@Descriptor("Resource list element type, such as 'org.ogema.model.locations.Room', or abbreviated resource type, such as 'Room' for selected common types.")
+			String elementType
+			) throws InterruptedException {
+		if (elementType.isEmpty() || path.isEmpty()) {
+			System.out.println("Type and path must not be empty");
+			return null;
+		}
+		startLatch.await(30, TimeUnit.SECONDS);
+		final Resource existing = appMan.getResourceAccess().getResource(path);
+		if (existing != null) {
+			if (!ResourceList.class.isAssignableFrom(existing.getResourceType())) {
+				System.out.println("Resource " + path + " already exists and is of incompatible type " + existing);
+				return null;
+			}
+			if (existing.exists())
+				return (ResourceList<R>) existing;
+		}
+		final ResourceList<R> list;
+		if (path.indexOf('/') < 0) {
+			list = appMan.getResourceManagement().createResource(path, ResourceList.class);
+		} else {
+			final Resource parent = appMan.getResourceAccess().getResource(path.substring(0, path.lastIndexOf('/')));
+			if (parent == null)
+				throw new IllegalArgumentException("Create parent resource " + path.substring(0, path.lastIndexOf('/')) + " first");
+			list = parent.addDecorator(path.substring(path.lastIndexOf('/')+1), ResourceList.class);
+		}
+		final Class<R> resType = (Class<R>) loadResourceClass(appMan.getAppID().getBundle().getBundleContext(), elementType);
+		if (resType == null) 
+			return null;
+		list.setElementType(resType);
+		return list;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Descriptor("Create a new resource list")
+	public <R extends Resource> R addToList(
+			@Descriptor("Name of the new subresource. If not specified, a default name will be generated.")
+			@Parameter(names= { "-n", "--name"}, absentValue = "")
+			String name,
+			@Descriptor("Resource list path")
+			String listPath
+			) throws InterruptedException {
+		startLatch.await(30, TimeUnit.SECONDS);
+		final Resource list = appMan.getResourceAccess().getResource(listPath);
+		if (list == null)
+			System.out.println("Resource list not found: " + listPath);
+		if (!ResourceList.class.isAssignableFrom(list.getResourceType()))
+			throw new IllegalArgumentException("Resource " + listPath + " is of incompatible type " + list.getResourceType());
+		return addToList(name, (ResourceList<R>) list);
+	}
+	
+	@Descriptor("Create a new resource list")
+	public <R extends Resource> R addToList(
+			@Descriptor("Name of the new subresource. If not specified, a default name will be generated.")
+			@Parameter(names= { "-n", "--name"}, absentValue = "")
+			String name,
+			@Descriptor("Resource list")
+			ResourceList<R> list
+			) throws InterruptedException {
+		if (name == null || name.isEmpty())
+			return list.add();
+		return list.getSubResource(name, list.getElementType()).create();
+	}
+	
 	@Descriptor("Add a subresource")
 	public Resource addSubResource(
 			@Descriptor("Activate the new subresource immediately?")
@@ -224,6 +312,9 @@ public class ResourceCommands {
 					+ "If absent, the subresource must exist as an optional element in the model declaration of the parent resource.")
 			@Parameter(names= { "-t", "--type"}, absentValue = "")
 			String type,
+			@Descriptor("Value to set. Only applicable to SingleValueResources. Must be convertible to the respective value type.")
+			@Parameter(names= { "-v", "--value"}, absentValue = "")
+			String value,
 			@Descriptor("Parent resource")
 			Resource parent,
 			@Descriptor("New resource name. Paths are allowed as well if all intermediate resources are declared in the model. E.g. 'reading/program' for a sensor.")
@@ -256,6 +347,12 @@ public class ResourceCommands {
 				sub.create();
 			sub = sub.addDecorator(pathComponents[pathComponents.length-1], resType);
 		} 
+		if (value != null && !value.isEmpty()) {
+			if (sub instanceof SingleValueResource)
+				ValueResourceUtils.setValue((SingleValueResource) sub, value);
+			else 
+				System.out.println("Not a single value resource: " + sub);
+		}
 		if (activate)
 			sub.activate(false);
 		return sub;
@@ -270,6 +367,9 @@ public class ResourceCommands {
 					+ "If absent, the subresource must exist as an optional element in the model declaration of the parent resource.")
 			@Parameter(names= { "-t", "--type"}, absentValue = "")
 			String type,
+			@Descriptor("Value to set. Only applicable to SingleValueResources. Must be convertible to the respective value type.")
+			@Parameter(names= { "-v", "--value"}, absentValue = "")
+			String value,
 			@Descriptor("Parent resource path")
 			String path,
 			@Descriptor("New resource name")
@@ -282,7 +382,7 @@ public class ResourceCommands {
 		final Resource parent = this.getResource(path);
 		if (parent == null)
 			return null;
-		return addSubResource(activate, type, parent, name);
+		return addSubResource(activate, type, value, parent, name);
 	}
 	
 	@Descriptor("Get a subresource")

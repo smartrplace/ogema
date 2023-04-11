@@ -32,6 +32,18 @@ Parameters:
 Options:
 * `-t <RESOURCE_TYPE>`: specify the resource type of the subresource. If the type is specified in the model declaration of the parent then the parameter can be skipped.
 * `-a`: activate the new subresource immediately
+* `-v <VALUE>`: for SingleValueResources: set the initial value for the new resource.
+
+### addtolist
+
+```shell
+addtolist path/to/resource/list -n childName
+```
+
+Parameters:
+* Resource list or resource list path
+Options:
+* `-n <CHILD_NAME>`: optionally, specify a name for the new subresource
 
 ### createresource
 
@@ -45,6 +57,24 @@ creates a new resource named *mySensor* of type `org.ogema.model.sensors.Tempera
 Parameters:
 * Resource path
 * Resource type
+
+Options:
+* `-a`: activate the new resource immediately
+* `-v <VALUE>`: for SingleValueResources: set the initial value for the new resource.
+
+### createresourcelist
+
+Example:
+
+```shell
+createresourcelist myTempSensors TemperatureSensor
+```
+creates a new resource list named *myTempSensors* with element type `org.ogema.model.sensors.TemperatureSensor`.  
+
+Parameters:
+* Resource path
+* Resource type
+
 
 ### getresource
 

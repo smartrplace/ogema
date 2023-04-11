@@ -7,14 +7,19 @@ package org.ogema.tools.shell.commands;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -26,10 +31,18 @@ import org.apache.felix.service.command.Parameter;
 import org.apache.felix.service.command.Process;
 import org.jline.reader.Candidate;
 import org.jline.reader.ParsedLine;
+import org.jline.terminal.Terminal;
+import org.jline.utils.InfoCmp;
 import org.ogema.core.application.Application;
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ValueResource;
+import org.ogema.core.model.simple.BooleanResource;
+import org.ogema.core.model.simple.FloatResource;
+import org.ogema.core.model.simple.IntegerResource;
+import org.ogema.core.model.simple.TimeResource;
+import org.ogema.core.recordeddata.RecordedData;
+import org.ogema.core.recordeddata.RecordedDataConfiguration;
 import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.annotations.Activate;
@@ -56,9 +69,11 @@ complete -c ogr:find -a '__resources'
 			"osgi.command.function=importJson",
 			"osgi.command.function=lr",
 			"osgi.command.function=pcr",
+			"osgi.command.function=record",
 			"osgi.command.function=setvalue",
 			"osgi.command.function=sr",
-			"osgi.command.function=__resources",}
+			"osgi.command.function=__resources",
+			"osgi.command.function=printtermcap",}
 )
 public class ResourcePathCommands implements Application {
 
@@ -66,6 +81,7 @@ public class ResourcePathCommands implements Application {
 	BundleContext ctx;
 
 	final static String CURRENT_RESOURCE = "currentResource";
+	final static String REQUEST_PATH = "requestPath";
 	final static Comparator<Resource> RESOURCENAME_COMPARATOR = (r1, r2) -> String.CASE_INSENSITIVE_ORDER.compare(r1.getName(), r2.getName());
 
 	@Activate
@@ -85,18 +101,18 @@ public class ResourcePathCommands implements Application {
 	@Descriptor("Change current resource")
 	public void cr(CommandSession sess, String path) {
 		Resource r = (Resource) sess.get(CURRENT_RESOURCE);
-		r = getResource(r, path);
+		r = getResource(sess, r, path);
 		if (r == null && !"/".equals(path)) {
 			sess.getConsole().printf("cr: %s: resource not found%n", path);
 		} else {
 			sess.put(CURRENT_RESOURCE, r);
 		}
 	}
-	
+
 	@Descriptor("Select resource")
 	public Resource sr(CommandSession sess, String path) {
 		Resource r = (Resource) sess.get(CURRENT_RESOURCE);
-		r = getResource(r, path);
+		r = getResource(sess, r, path);
 		if (r == null && !"/".equals(path)) {
 			sess.getConsole().printf("sr: %s: resource not found%n", path);
 			return null;
@@ -104,7 +120,7 @@ public class ResourcePathCommands implements Application {
 			return r;
 		}
 	}
-	
+
 	@Descriptor("Set resource value")
 	public void setValue(CommandSession sess, String path, String value) {
 		Resource r = sr(sess, path);
@@ -141,12 +157,17 @@ public class ResourcePathCommands implements Application {
 		out.println();
 	}
 
-	private Resource getResource(Resource current, String path) {
+	private Resource getResource(CommandSession sess, Resource current, String path) {
+		if (current == null) {
+			current = new RootResource(appman);
+		}
+		sess.put(REQUEST_PATH, path);
 		if (path == null) {
 			return current;
 		}
 		if ("/".equals(path)) {
-			return null;
+			//return null;
+			return new RootResource(appman);
 		}
 		if (".".equals(path)) {
 			return current;
@@ -164,39 +185,107 @@ public class ResourcePathCommands implements Application {
 			return appman.getResourceAccess().getResource(newPath);
 		}
 	}
-
+	
+	private List<String> expand(CommandSession sess, String[] args, String commandName) {
+		Resource cr = (Resource) sess.get(CURRENT_RESOURCE);
+		if (cr == null) {
+			cr = new RootResource(appman);
+		}
+		List<String> rval = new ArrayList<>(args.length);
+		for (String a: args) {
+			if (a.contains("*") || a.contains("?")) {
+				if (a.contains("/")) {
+					sess.getConsole().printf("%s: %s: unsupported glob expression%n", commandName, a);
+					continue;
+				}
+				PathMatcher m = FileSystems.getDefault().getPathMatcher("glob:" + a);
+				cr.getSubResources(false).stream().map(res -> Path.of(res.getName()))
+						.filter(m::matches).forEach(p -> {
+					rval.add(p.toString());
+				});
+			} else {
+				rval.add(a);
+			}
+		}
+		return rval;
+	}
+	
+	public Map<String, Resource> expandAndResolve(CommandSession sess, String[] args, String commandName) {
+		List<String> expandedNames = expand(sess, args, commandName);
+		Map<String, Resource> rval = new LinkedHashMap<>();
+		Resource current = (Resource) sess.get(CURRENT_RESOURCE);
+		for (String path: expandedNames) {
+			Resource r = getResource(sess, current, path);
+			if (r == null) {
+				sess.getConsole().printf("%s: %s: resource not found%n", commandName, path);
+			} else {
+				rval.put(path, r);
+			}
+		}
+		return rval;
+	}
+	
 	@Descriptor("List resources")
 	public void lr(CommandSession sess,
 			@Parameter(names = {"-l"}, absentValue = "false", presentValue = "true")
 			@Descriptor("long format") boolean l,
 			@Parameter(names = {"-s"}, absentValue = "false", presentValue = "true")
-			@Descriptor("show size") boolean s,
-			String path
+			@Descriptor("show number of subresources") boolean s,
+			String... path
 	) {
+		Objects.requireNonNull(appman, "application manager is null");
+		Objects.requireNonNull(appman.getResourceAccess(), "resource access is null");
 		Process p = Process.Utils.current();
-		Resource r = (Resource) sess.get(CURRENT_RESOURCE);
-		if (!path.isEmpty()) {
-			r = getResource(r, path);
-		}
-		if (r == null && !path.isEmpty() && !(path.equals("/") || path.equals("."))) {
-			p.out().printf("lr: %s: resource not found%n", path);
+		Resource cr = (Resource) sess.get(CURRENT_RESOURCE);
+
+		Map<String, Resource> reslist = new LinkedHashMap<>();
+		
+		List<String> pexp = expand(sess, path, "lr");
+		if (pexp.isEmpty() && path.length > 0) {
 			return;
 		}
+
+		for (String respath : pexp) {
+			Resource res = getResource(sess, cr, respath);
+			if (res == null) {
+				p.out().printf("lr: %s: resource not found%n", respath);
+			} else {
+				reslist.put(respath, res);
+			}
+		}
+		
+		if (reslist.isEmpty() && path.length > 0) {
+			return;
+		}
+
+		//Map<String, Resource> reslist = expandAndResolve(sess, path, "lr");
 		Consumer<Resource> print = s
 				? res -> {
 					p.out().format("%8d ", res.getSubResources(true).size());
 					printResource(p.out(), res, l);
 				}
 				: res -> printResource(p.out(), res, l);
-		if (r == null) {
+
+		if (reslist.isEmpty()) {
 			appman.getResourceAccess().getToplevelResources(null)
 					.stream().sorted(RESOURCENAME_COMPARATOR)
 					.forEach(print::accept);
-		} else {
-			r.getSubResources(false)
-					.stream().sorted(RESOURCENAME_COMPARATOR)
-					.forEach(print::accept);
 		}
+
+		reslist.forEach((respath, r) -> {
+			if (r == null) {
+				appman.getResourceAccess().getToplevelResources(null)
+						.stream().sorted(RESOURCENAME_COMPARATOR)
+						.forEach(print::accept);
+			} else {
+				if (path.length > 1 || pexp.size() > 1) {
+					sess.getConsole().printf("%n%s:%n", respath);
+				}
+				r.getSubResources(false)
+						.stream().sorted(RESOURCENAME_COMPARATOR)
+						.forEach(print::accept);
+			}
+		});
 	}
 
 	@Descriptor("List resources")
@@ -204,7 +293,7 @@ public class ResourcePathCommands implements Application {
 			@Parameter(names = {"-l"}, absentValue = "False", presentValue = "True")
 			@Descriptor("long format") boolean l,
 			@Parameter(names = {"-s"}, absentValue = "False", presentValue = "True")
-			@Descriptor("show size") boolean s
+			@Descriptor("show number of subresources") boolean s
 	) {
 		lr(sess, l, s, ".");
 	}
@@ -272,8 +361,8 @@ public class ResourcePathCommands implements Application {
 		}
 		return rval;
 	}
-	
-	public Resource importJson(String file) throws IOException {
+
+	public Resource importJson(CommandSession sess, String file) throws IOException {
 		Path p = Paths.get(file);
 		if (!Files.exists(p)) {
 			System.err.println("import: file not found: " + file);
@@ -283,6 +372,35 @@ public class ResourcePathCommands implements Application {
 			Resource res = appman.getSerializationManager().createFromJson(r);
 			return res;
 		}
+	}
+
+	public Object printTermCap(CommandSession session, String cap) {
+		try {
+			System.out.println(Shell.getTerminal(session).getBooleanCapability(InfoCmp.Capability.valueOf(cap)));
+		} catch (RuntimeException re) {
+		}
+		try {
+			System.out.println(Shell.getTerminal(session).getNumericCapability(InfoCmp.Capability.valueOf(cap)));
+		} catch (RuntimeException re) {
+		}
+		try {
+			System.out.println(Shell.getTerminal(session).getStringCapability(InfoCmp.Capability.valueOf(cap)));
+		} catch (RuntimeException re) {
+		}
+		return null;
+	}
+
+	public void printTermCap(CommandSession session) {
+		Terminal t = Shell.getTerminal(session);
+		Process p = Process.Utils.current();
+		Stream.of(InfoCmp.Capability.values()).forEach(cap -> {
+			Boolean bcap = t.getBooleanCapability(cap);
+			Number ncap = t.getNumericCapability(cap);
+			String scap = t.getStringCapability(cap);
+			if (bcap != null || ncap != null || scap != null) {
+				p.out().printf("%s: %s | %s | %s%n", cap, bcap, ncap, scap);
+			}
+		});
 	}
 
 	public List<Candidate> __resources(CommandSession session) {
@@ -302,43 +420,39 @@ public class ResourcePathCommands implements Application {
 			return null;
 		}
 	}
-	
+
 	@Descriptor("activate resource")
 	public void activate(CommandSession sess,
 			@Descriptor("recursive")
-			@Parameter(names = {"-r"}, absentValue = "false", presentValue = "true")
-			boolean rec,
-			@Descriptor("resource to activate")
-			String path) {
+			@Parameter(names = {"-r"}, absentValue = "false", presentValue = "true") boolean rec,
+			@Descriptor("resource to activate") String path) {
 		Resource base = (Resource) sess.get(CURRENT_RESOURCE);
-		Resource res = getResource(base, path);
+		Resource res = getResource(sess, base, path);
 		if (res == null) {
 			sess.getConsole().printf("activate: %s: resource not found%n", path);
 			return;
 		}
 		res.activate(rec);
 	}
-	
+
 	@Descriptor("deactivate resource")
 	public void deactivate(CommandSession sess,
 			@Descriptor("recursive")
-			@Parameter(names = {"-r"}, absentValue = "false", presentValue = "true")
-			boolean rec,
-			@Descriptor("resource to deactivate")
-			String path) {
+			@Parameter(names = {"-r"}, absentValue = "false", presentValue = "true") boolean rec,
+			@Descriptor("resource to deactivate") String path) {
 		Resource base = (Resource) sess.get(CURRENT_RESOURCE);
-		Resource res = getResource(base, path);
+		Resource res = getResource(sess, base, path);
 		if (res == null) {
 			sess.getConsole().printf("deactivate: %s: resource not found%n", path);
 			return;
 		}
 		res.deactivate(rec);
 	}
-	
+
 	@Descriptor("delete resource")
 	public void delete(CommandSession sess, String path) {
 		Resource base = (Resource) sess.get(CURRENT_RESOURCE);
-		Resource res = getResource(base, path);
+		Resource res = getResource(sess, base, path);
 		if (res == null) {
 			sess.getConsole().printf("delete: %s: resource not found%n", path);
 			return;
@@ -383,9 +497,10 @@ public class ResourcePathCommands implements Application {
 		} else {
 			s = res.getSubResources(true).stream();
 		}
-		String pathrel = res == null
-				? ""
-				: res.getPath() + "/";
+
+		Resource cwr = (Resource) sess.get(CURRENT_RESOURCE);
+		String pathrel = cwr != null && !cwr.getPath().isEmpty() ? "/" + cwr.getPath() : "";
+		
 		if (!namerx.isEmpty()) {
 			if (namerx.startsWith("!")) {
 				s = s.filter(r -> !r.getName().matches(namerx.substring(1)));
@@ -478,14 +593,118 @@ public class ResourcePathCommands implements Application {
 			@Descriptor("Print found resources with path, return empty list (does not work with -exec).") String print,
 			@Parameter(names = {"-exec"}, absentValue = "")
 			@Descriptor("Execute console command for each matched resource, e.g.: \"-exec '$it delete'\", return empty list (does not work with -print).") String exec,
-			String path) throws Exception {
+			String ... path) throws Exception {
+		/*
 		Resource r = (Resource) sess.get(CURRENT_RESOURCE);
-		r = getResource(r, path);
-		if (path != null && r == null) {
+		r = getResource(sess, r, path);
+		if (path != null && !path.equals("/") && r == null) {
 			sess.getConsole().printf("find: %s: resource not found.", path);
 			return null;
 		}
-		return find(sess, namerx, pathrx, locrx, type, time, value, print, exec, r);
+		*/
+
+		Map<String, Resource> res = expandAndResolve(sess, path, "find");
+		List<Resource> rval = new ArrayList<>();
+		res.forEach((p,r) -> {
+			sess.put(REQUEST_PATH, p);
+			try {
+				rval.addAll(find(sess, namerx, pathrx, locrx, type, time, value, print, exec, r));
+			} catch (ClassNotFoundException cnfe) {
+				sess.getConsole().printf("find: unloadable resource: %s%n", cnfe.getMessage());
+			}
+		});
+		return rval;
+
+		//return find(sess, namerx, pathrx, locrx, type, time, value, print, exec, r);
+	}
+
+	@Descriptor("Configure resource recording (default uses ON_VALUE_UPDATE).")
+	public void record(CommandSession sess, @Descriptor("Stop recording.")
+			@Parameter(names = {"-s", "--stop"}, presentValue = "true", absentValue = "false") boolean stop,
+			@Descriptor("Record at fixed interval (ms).")
+			@Parameter(names = {"-i"}, absentValue = "-1") long interval,
+			@Descriptor("Record on value change.")
+			@Parameter(names = {"-c"}, presentValue = "true", absentValue = "false") boolean onChange,
+			@Descriptor("Record manually.")
+			@Parameter(names = {"-m"}, presentValue = "true", absentValue = "false") boolean manual,
+			@Descriptor("Show recording setting (does not modify settings).")
+			@Parameter(names = {"-p"}, presentValue = "true", absentValue = "false") boolean printSettings,
+			@Descriptor("Resource") String path
+	) {
+		Resource r = (Resource) sess.get(CURRENT_RESOURCE);
+		r = getResource(sess, r, path);
+		if (r == null) {
+			sess.getConsole().printf("record: %s: resource not found%n", path);
+		} else {
+			record(sess, stop, interval, onChange, manual, printSettings, r);
+		}
+	}
+
+	@Descriptor("Configure resource recording (default uses ON_VALUE_UPDATE).")
+	public void record(CommandSession sess, @Descriptor("Stop recording.")
+			@Parameter(names = {"-s", "--stop"}, presentValue = "true", absentValue = "false") boolean stop,
+			@Descriptor("Record at fixed interval (ms).")
+			@Parameter(names = {"-i"}, absentValue = "-1") long interval,
+			@Descriptor("Record on value change.")
+			@Parameter(names = {"-c"}, presentValue = "true", absentValue = "false") boolean onChange,
+			@Descriptor("Record manually.")
+			@Parameter(names = {"-m"}, presentValue = "true", absentValue = "false") boolean manual,
+			@Descriptor("Show recording setting (does not modify settings).")
+			@Parameter(names = {"-p"}, presentValue = "true", absentValue = "false") boolean printSettings,
+			@Descriptor("Resource") Resource res
+	) {
+		if (onChange && interval > -1) {
+			sess.getConsole().printf("record: -i and -c are mutually exclusive%n");
+			return;
+		}
+		if (interval > -1 && interval == 0) {
+			sess.getConsole().printf("record: %d is not a legal interval value.%n", interval);
+			return;
+		}
+		RecordedData rd;
+		if (res instanceof BooleanResource) {
+			rd = ((BooleanResource) res).getHistoricalData();
+		} else if (res instanceof FloatResource) {
+			rd = ((FloatResource) res).getHistoricalData();
+		} else if (res instanceof IntegerResource) {
+			rd = ((IntegerResource) res).getHistoricalData();
+		} else if (res instanceof TimeResource) {
+			rd = ((TimeResource) res).getHistoricalData();
+		} else {
+			sess.getConsole().printf("record: %s: not a recordable resource type (%s)%n",
+					res.getPath(), res.getResourceType().getCanonicalName());
+			return;
+		}
+		if (printSettings) {
+			RecordedDataConfiguration rdc = rd.getConfiguration();
+			if (rdc == null) {
+				sess.getConsole().printf("%s: OFF%n", res.getPath());
+			} else {
+				if (rdc.getStorageType() == RecordedDataConfiguration.StorageType.FIXED_INTERVAL) {
+					sess.getConsole().printf("%s: %s, %dms%n", res.getPath(), rdc.getStorageType(), rdc.getFixedInterval());
+				} else {
+					sess.getConsole().printf("%s: %s%n", res.getPath(), rdc.getStorageType());
+				}
+			}
+			return;
+		}
+		if (stop) {
+			rd.setConfiguration(null);
+		} else {
+			RecordedDataConfiguration rdc = new RecordedDataConfiguration();
+			if (interval > -1) {
+				rdc.setStorageType(RecordedDataConfiguration.StorageType.FIXED_INTERVAL);
+				rdc.setFixedInterval(interval);
+			} else if (onChange) {
+				rdc.setStorageType(RecordedDataConfiguration.StorageType.ON_VALUE_CHANGED);
+			} else if (manual) {
+				rdc.setStorageType(RecordedDataConfiguration.StorageType.MANUAL);
+			} else {
+				rdc.setStorageType(RecordedDataConfiguration.StorageType.ON_VALUE_UPDATE);
+			}
+			rd.setConfiguration(rdc);
+			//sess.getConsole().printf("record: %s: configured for ON_VALUE_UPDATE recording.%n", res.getPath());
+		}
 	}
 
 }

@@ -31,11 +31,13 @@
                         <Import-Package>
                           org.apache.felix.service.command;resolution:=optional;version="[${felix.service.command.version.min},${felix.service.command.version.max})",
                           org.jline.reader;resolution:=optional,
+						  org.jline.utils;resolution:=optional,
                           org.apache.felix.gogo.jline;resolution:=optional,
                           *
                         </Import-Package>
                         <DynamicImport-Package>*</DynamicImport-Package>
                     </instructions>
+					<unpackBundle>true</unpackBundle>
                 </configuration>
             </plugin>
             <plugin>
