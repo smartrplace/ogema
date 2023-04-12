@@ -1,9 +1,8 @@
-package org.ogema.drivers.homematic.xmlrpc.hl.api;
+package org.ogema.tools.driver.api;
 
 import java.io.IOException;
 import java.util.List;
 
-import org.ogema.drivers.homematic.xmlrpc.hl.api.CCUAccessI.HomematicConnectionData;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmLogicInterface;
 
 public interface CCUAccessI {
