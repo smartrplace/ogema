@@ -885,7 +885,9 @@ public class HmConnection implements HomeMaticConnection {
 				logger.info("HomeMatic configuration removed: {}", config);
 			}
             //deregister logic interface
-            hm.init(client, null);
+			if (hm != null) {
+				hm.init(client, null);
+			}
 		} catch (XmlRpcException | RuntimeException e) {
 			if (logger != null) {
 				logger.error("HomeMatic XmlRpc driver shutdown failed", e);

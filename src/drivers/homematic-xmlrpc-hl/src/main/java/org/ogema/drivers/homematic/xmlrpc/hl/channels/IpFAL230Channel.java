@@ -132,8 +132,7 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
 		//System.out.println("parent type = " + desc.getParentType());
 		return (("HmIP-FAL230-C10".equalsIgnoreCase(desc.getParentType()) || "HmIP-FAL230-C6".equalsIgnoreCase(desc.getParentType()))
 				&& ("CLIMATECONTROL_FLOOR_TRANSCEIVER".equalsIgnoreCase(desc.getType())
-				|| "CLIMATECONTROL_FLOOR_PUMP_TRANSCEIVER".equalsIgnoreCase(desc.getType())))
-				|| ("HmIP-FALMOT-C12".equalsIgnoreCase(desc.getParentType()) && "CLIMATECONTROL_FLOOR_TRANSCEIVER".equalsIgnoreCase(desc.getType()));
+				|| "CLIMATECONTROL_FLOOR_PUMP_TRANSCEIVER".equalsIgnoreCase(desc.getType())));
 	}
 
     @Override
