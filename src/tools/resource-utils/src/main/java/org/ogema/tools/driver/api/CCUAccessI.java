@@ -55,8 +55,9 @@ public interface CCUAccessI {
 	 * Trigger a reboot of the connected CCU.
 	 * 
 	 * @param iface CCU interface
+	 * @return return value of the reboot command, 0 indicates success.
 	 * @throws IOException
 	 */
-	public void reboot(HmLogicInterface iface) throws IOException;
+	public int reboot(HmLogicInterface iface) throws IOException;
 
 }
