@@ -481,4 +481,32 @@ public abstract class ThermostatUtils {
         }
 
 	}
+
+	/* call after temperature setpoint feedback was received and stored. */
+	static void checkForAdaptionFailure(HomeMaticConnection conn, Thermostat th, String address, Logger logger) {
+		long lastSetpointFb = th.temperatureSensor().deviceFeedback().setpoint().getLastUpdateTime();
+		long lastTempFb = th.temperatureSensor().reading().getLastUpdateTime();
+		if (lastSetpointFb == -1 || lastTempFb == -1) {
+			return;
+		}
+		final int MAX_D = 180 * 60 * 1000;
+		long d = lastSetpointFb - lastTempFb;
+		if (d > MAX_D) {
+			logger.warn("Thermostat {} ({}) may be in a failed adaption state, trying to read error state", th.getPath(), address);
+			try {
+				Number err = conn.getValue(address, "VALVE_STATE");
+				FloatResource valveState = th.valve().getSubResource("eq3state", FloatResource.class);
+				if (!valveState.exists()) {
+					valveState.create();
+					valveState.activate(false);
+				}
+				logger.debug("received VALVE_STATE for Thermostat {} ({}): {}", th.getPath(), address, valveState);
+				valveState.setValue(err.floatValue());
+			} catch (RuntimeException | IOException ex) {
+				logger.warn("reading of VALVE_STATE failed for {} ({}): {}", th.getPath(), address, ex.getMessage());
+				logger.debug("reading of VALVE_STATE failed for {} ({})", th.getPath(), address, ex);
+			}
+		}
+	}
+	
 }

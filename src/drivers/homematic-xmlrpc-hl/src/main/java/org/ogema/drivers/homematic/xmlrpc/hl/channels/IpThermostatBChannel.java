@@ -117,10 +117,12 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
 
         final Map<String, SingleValueResource> resources;
         final String address;
+		final Thermostat thermos;
 
-        public WeatherEventListener(Map<String, SingleValueResource> resources, String address) {
+        public WeatherEventListener(Map<String, SingleValueResource> resources, Thermostat thermos, String address) {
             this.resources = resources;
             this.address = address;
+			this.thermos = thermos;
         }
 
         @Override
@@ -137,6 +139,9 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
                     PARAMS p = PARAMS.valueOf(e.getValueKey());
                     ValueResourceUtils.setValue(res, p.convertInput(e.getValueFloat()));
                     logger.debug("resource updated ({}/{}): {} = {}", p, e, res.getPath(), e.getValue());
+					if (p == PARAMS.SET_POINT_TEMPERATURE) {
+						ThermostatUtils.checkForAdaptionFailure(conn, thermos, address, logger);
+					}
                 } catch (IllegalArgumentException ex) {
                     //this block intentionally left blank
                 }
@@ -261,7 +266,7 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
         conn.registerControlledResource(conn.getChannel(parent, deviceAddress), thermos.temperatureSensor());
         ThermostatUtils.setupControlModeResource(thermos, conn, deviceAddress);
         ThermostatUtils.setupProgramListener(deviceAddress, conn, thermos, logger);
-        conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
+        conn.addEventListener(new WeatherEventListener(resources, thermos, desc.getAddress()));
         setupHmParameterValues(thermos, desc.getAddress());
 		ThermostatUtils.setupShutterContactLinking(thermos, conn, logger);
         setupTempSensLinking(thermos, conn, logger);

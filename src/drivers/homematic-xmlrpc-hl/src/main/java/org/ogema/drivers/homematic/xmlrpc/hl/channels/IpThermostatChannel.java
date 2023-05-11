@@ -116,14 +116,16 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
 
     }
 
-    class WeatherEventListener implements HmEventListener {
+    class ThermostatEventListener implements HmEventListener {
 
         final Map<String, SingleValueResource> resources;
         final String address;
+		final Thermostat thermos;
 
-        public WeatherEventListener(Map<String, SingleValueResource> resources, String address) {
+        public ThermostatEventListener(Map<String, SingleValueResource> resources, Thermostat t, String address) {
             this.resources = resources;
             this.address = address;
+			this.thermos = t;
         }
 
         @Override
@@ -141,6 +143,9 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
                     ValueResourceUtils.setValue(res, p.convertInput(e.getValueFloat()));
                     //((FloatResource) res).setValue(p.convertInput(e.getValueFloat()));
                     logger.debug("resource updated ({}/{}): {} = {}", p, e, res.getPath(), e.getValue());
+					if (p == PARAMS.SET_POINT_TEMPERATURE) {
+						ThermostatUtils.checkForAdaptionFailure(conn, thermos, address, logger);
+					}
                 } catch (IllegalArgumentException ex) {
                     //this block intentionally left blank
                 }
@@ -263,7 +268,7 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
         conn.registerControlledResource(conn.getChannel(parent, deviceAddress), thermos.temperatureSensor());
         ThermostatUtils.setupControlModeResource(thermos, conn, deviceAddress);
         ThermostatUtils.setupProgramListener(deviceAddress, conn, thermos, logger);
-        conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
+        conn.addEventListener(new ThermostatEventListener(resources, thermos, desc.getAddress()));
         setupHmParameterValues(thermos, desc.getAddress());
 		ThermostatUtils.setupShutterContactLinking(thermos, conn, logger);
         IpThermostatBChannel.setupTempSensLinking(thermos, conn, logger);
