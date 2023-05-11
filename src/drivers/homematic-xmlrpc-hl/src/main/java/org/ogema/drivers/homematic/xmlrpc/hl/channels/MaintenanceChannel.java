@@ -18,6 +18,7 @@ package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.ogema.core.model.simple.BooleanResource;
+import org.ogema.core.model.simple.FloatResource;
+import org.ogema.core.model.simple.IntegerResource;
+import org.ogema.core.model.simple.SingleValueResource;
+import org.ogema.core.model.units.TemperatureResource;
 
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmMaintenance;
@@ -68,6 +73,16 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
         UNREACH
 
     }
+	
+	private final static Map<String, Class<? extends SingleValueResource>> PARAMETERS;
+
+	static {
+		PARAMETERS = new LinkedHashMap<>();
+		PARAMETERS.put("CYCLIC_INFO_MSG_OVERDUE_THRESHOLD", IntegerResource.class);
+		PARAMETERS.put("CYCLIC_INFO_MSG", IntegerResource.class);
+		PARAMETERS.put("CYCLIC_INFO_MSG_DIS_UNCHANGED", IntegerResource.class);
+		PARAMETERS.put("CYCLIC_INFO_MSG_DIS", IntegerResource.class);
+	}
 
     Logger logger = LoggerFactory.getLogger(getClass());
     Collection<KnownDevice> knownDevices = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -282,6 +297,9 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                 }, true);
             }
         }
+		
+		ChannelUtils.setupParameterResources(parent, desc, paramSets,
+				ParameterDescription.SET_TYPES.MASTER, PARAMETERS, conn, mnt, logger);
         
         conn.addEventListener(new MaintenanceEventListener(parent, mnt, desc.getAddress()));
         knownDevices.add(new KnownDevice(mnt, desc, values));
