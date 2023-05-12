@@ -130,6 +130,7 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
 
         @Override
         public void event(List<HmEvent> events) {
+			boolean setpointTempRead = false;
             for (HmEvent e : events) {
                 if (!address.equals(e.getAddress())) {
                     continue;
@@ -143,13 +144,14 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
                     ValueResourceUtils.setValue(res, p.convertInput(e.getValueFloat()));
                     //((FloatResource) res).setValue(p.convertInput(e.getValueFloat()));
                     logger.debug("resource updated ({}/{}): {} = {}", p, e, res.getPath(), e.getValue());
-					if (p == PARAMS.SET_POINT_TEMPERATURE) {
-						ThermostatUtils.checkForAdaptionFailure(conn, thermos, address, logger);
-					}
+					setpointTempRead |= p == PARAMS.SET_POINT_TEMPERATURE;
                 } catch (IllegalArgumentException ex) {
                     //this block intentionally left blank
                 }
             }
+			if (setpointTempRead) {
+				ThermostatUtils.checkForAdaptionFailure(conn, thermos, address, logger);
+			}
         }
 
     }

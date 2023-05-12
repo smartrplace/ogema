@@ -486,7 +486,7 @@ public abstract class ThermostatUtils {
 	static void checkForAdaptionFailure(HomeMaticConnection conn, Thermostat th, String address, Logger logger) {
 		long lastSetpointFb = th.temperatureSensor().deviceFeedback().setpoint().getLastUpdateTime();
 		long lastTempFb = th.temperatureSensor().reading().getLastUpdateTime();
-		if (lastSetpointFb == -1 || lastTempFb == -1) {
+		if (lastSetpointFb == -1 && lastTempFb == -1) {
 			return;
 		}
 		final int MAX_D = 180 * 60 * 1000;
