@@ -26,7 +26,6 @@ import java.util.concurrent.Executor;
 import org.ogema.core.application.Timer;
 import org.ogema.core.application.TimerListener;
 import org.ogema.core.channelmanager.measurements.BooleanValue;
-import org.ogema.core.channelmanager.measurements.DoubleValue;
 import org.ogema.core.channelmanager.measurements.FloatValue;
 import org.ogema.core.channelmanager.measurements.IntegerValue;
 import org.ogema.core.channelmanager.measurements.LongValue;
@@ -42,7 +41,6 @@ import org.ogema.core.recordeddata.RecordedDataConfiguration.StorageType;
 import org.ogema.core.recordeddata.ReductionMode;
 import org.ogema.core.timeseries.InterpolationMode;
 import org.ogema.persistence.DBConstants;
-import org.ogema.persistence.impl.mem.MemoryTreeElement;
 import org.ogema.recordeddata.DataRecorder;
 import org.ogema.recordeddata.DataRecorderException;
 import org.ogema.recordeddata.RecordedDataStorage;
@@ -239,9 +237,11 @@ public class DefaultRecordedData implements RecordedData {
 	private void setNewConfig(RecordedDataConfiguration configuration) {
 		try {
 			if (config == null) {
-				data = dataAccess.getRecordedDataStorage(id);
-				if (data == null || data instanceof EmptyRecordedData) {
+				RecordedDataStorage storedData = dataAccess.getRecordedDataStorage(id);
+				if (storedData == null || storedData instanceof EmptyRecordedData) {
 					data = dataAccess.createRecordedDataStorage(id, configuration);
+				} else {
+					data = storedData;
 				}
 			}
 			if (!configuration.equals(data.getConfiguration())) {
@@ -262,9 +262,10 @@ public class DefaultRecordedData implements RecordedData {
 	}
 
 	private void disable() {
-		data = dataAccess.getRecordedDataStorage(id);
-		if (data != null) {
-			data.setConfiguration(null);
+		RecordedDataStorage storedData = dataAccess.getRecordedDataStorage(id);
+		if (storedData != null) {
+			storedData.setConfiguration(null);
+			data = storedData;
 		} else {
 			data = new EmptyRecordedData();
 		}
