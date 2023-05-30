@@ -42,9 +42,14 @@ public class DefaultBooleanArrayResource extends ResourceBase implements Boolean
 		checkReadPermission();
 		return getEl().getData().getBooleanArr().clone();
 	}
-
+	
 	@Override
 	public boolean setValues(boolean[] values) {
+		return setValues(values, -1);
+	}
+
+	@Override
+	public boolean setValues(boolean[] values, long timestamp) {
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
@@ -54,7 +59,7 @@ public class DefaultBooleanArrayResource extends ResourceBase implements Boolean
 			checkWritePermission();
 			el.getData().setBooleanArr(values);
 			//FIXME no change check!
-			handleResourceUpdateInternal(true);
+			handleResourceUpdateInternal(true, timestamp);
 		} finally {
 			resMan.unlockRead();
 		}
@@ -77,7 +82,7 @@ public class DefaultBooleanArrayResource extends ResourceBase implements Boolean
 		boolean changed = arr[index] != value;
 		arr[index] = value;
 		getTreeElement().fireChangeEvent();
-		handleResourceUpdate(changed);
+		handleResourceUpdate(changed, -1);
 	}
 
 	@Override

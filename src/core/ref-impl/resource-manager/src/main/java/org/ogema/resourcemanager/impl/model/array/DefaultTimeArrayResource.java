@@ -41,9 +41,14 @@ public class DefaultTimeArrayResource extends ResourceBase implements TimeArrayR
 		checkReadPermission();
 		return getEl().getData().getLongArr().clone();
 	}
-
+	
 	@Override
 	public boolean setValues(long[] values) {
+		return setValues(values, -1);
+	}
+
+	@Override
+	public boolean setValues(long[] values, long timestamp) {
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
@@ -53,7 +58,7 @@ public class DefaultTimeArrayResource extends ResourceBase implements TimeArrayR
 			checkWritePermission();
 			el.getData().setLongArr(values);
 			//FIXME no change check!
-			handleResourceUpdateInternal(true);
+			handleResourceUpdateInternal(true, timestamp);
 		} finally {
 			resMan.unlockRead();
 		}
@@ -76,7 +81,7 @@ public class DefaultTimeArrayResource extends ResourceBase implements TimeArrayR
 		boolean changed = arr[index] != value;
 		arr[index] = value;
 		getTreeElement().fireChangeEvent();
-		handleResourceUpdate(changed);
+		handleResourceUpdate(changed, -1);
 	}
 
 	@Override

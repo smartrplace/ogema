@@ -119,7 +119,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 			m_dbMan.finishTransaction();
 		}
 		getSchedule().setLastUpdateTime(m_appMan.getFrameworkTime());
-		handleResourceUpdate(true);
+		handleResourceUpdate(true, -1);
 		return true;
 	}
 
@@ -136,7 +136,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 			m_dbMan.finishTransaction();
 		}
 		getSchedule().setLastUpdateTime(m_appMan.getFrameworkTime());
-		handleResourceUpdate(true);
+		handleResourceUpdate(true, -1);
 		return true;
 	}
 
@@ -159,7 +159,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 			m_dbMan.finishTransaction();
 		}
 		getSchedule().setLastUpdateTime(m_appMan.getFrameworkTime());
-		handleResourceUpdate(true);
+		handleResourceUpdate(true, -1);
 		return true;
 	}
 
@@ -176,7 +176,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 			m_dbMan.finishTransaction();
 		}
 		getSchedule().setLastUpdateTime(m_appMan.getFrameworkTime());
-		handleResourceUpdate(true);
+		handleResourceUpdate(true, -1);
 		return true;
 	}
 
@@ -193,7 +193,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 			m_dbMan.finishTransaction();
 		}
 		getSchedule().setLastUpdateTime(m_appMan.getFrameworkTime());
-		handleResourceUpdate(true);
+		handleResourceUpdate(true, -1);
 		return true;
 	}
 
@@ -216,7 +216,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 			m_dbMan.finishTransaction();
 		}
 		getSchedule().setLastUpdateTime(m_appMan.getFrameworkTime());
-		handleResourceUpdate(true);
+		handleResourceUpdate(true, -1);
 		return true;
 	}
 
@@ -238,7 +238,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 			m_dbMan.finishTransaction();
 		}
 		getSchedule().setLastUpdateTime(m_appMan.getFrameworkTime());
-		handleResourceUpdate(true);
+		handleResourceUpdate(true, -1);
 		return true;
 	}
 
@@ -255,7 +255,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 			m_dbMan.finishTransaction();
 		}
 		getSchedule().setLastUpdateTime(m_appMan.getFrameworkTime());
-		handleResourceUpdate(true);
+		handleResourceUpdate(true, -1);
 		return true;
 	}
 
@@ -272,7 +272,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 			m_dbMan.finishTransaction();
 		}
 		getSchedule().setLastUpdateTime(m_appMan.getFrameworkTime());
-		handleResourceUpdate(true);
+		handleResourceUpdate(true, -1);
 		return true;
 	}
 
@@ -289,7 +289,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 			m_dbMan.finishTransaction();
 		}
 		getSchedule().setLastUpdateTime(m_appMan.getFrameworkTime());
-		handleResourceUpdate(true);
+		handleResourceUpdate(true, -1);
 		return true;
 	}
 
@@ -300,7 +300,7 @@ public class DefaultSchedule extends ResourceBase implements org.ogema.core.mode
 		}
 		checkWritePermission();
 		getSchedule().setInterpolationMode(mode);
-		handleResourceUpdate(true);
+		handleResourceUpdate(true, -1);
 		return true;
 	}
 

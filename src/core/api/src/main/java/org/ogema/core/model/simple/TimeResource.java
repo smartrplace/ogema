@@ -44,6 +44,18 @@ public interface TimeResource extends SingleValueResource {
 	boolean setValue(long value);
 	
 	/**
+	 * Sets the resource value to value with the given timestamp. Timestamp should
+	 * not be greater than current framework time. If the resource is recorded,
+	 * the timeseries database may only record values that are newer than the last
+	 * recorded value. The timestamp will also be returned as {@link #getLastUpdateTime()}
+	 * 
+	 * @param value
+	 * @param timestamp framework time, -1 to use current framework time.
+	 * @return returns true if the value could be written, false if not (e.g. if access mode is read-only).	 
+	 */
+	boolean setValue(long value, long timestamp);
+	
+	/**
 	 * Atomically sets to the given value and returns the previous value.
 	 * 
 	 * @param value

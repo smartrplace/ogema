@@ -51,27 +51,14 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 	
 	@Override
 	public boolean setValue(float value) {
+		return setValue(value, -1);
+	}
+	
+	@Override
+	public boolean setValue(float value, long timestamp) {
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
-			/*
-			String resToTest = System.getProperty("org.ogema.resourcemanager.impl.model.simple.testForNaN");
-			if(resToTest != null && Float.isNaN(value) && el.getLocation().contains(resToTest))
-				System.out.println("Writing NaN to "+el.getLocation());
-			String resToTest2 = System.getProperty("org.ogema.resourcemanager.impl.model.simple.writeToConsole");
-			if(resToTest2 != null && el.getLocation().contains(resToTest2)) {
-				System.out.println("Writing "+value+" to "+el.getLocation());
-				new IllegalStateException("Writing "+value+" to "+el.getLocation()).printStackTrace();
-			}
-			Long minIntreval = Long.getLong("org.ogema.resourcemanager.impl.model.simple.minWriteInterval");
-			if(minIntreval != null && resToTest != null && el.getLocation().contains(resToTest)) {
-				long now = System.currentTimeMillis();
-				if((now - lastMinInterval) < minIntreval) {
-					new IllegalStateException("Written too quickly:"+resToTest+":"+value+" after "+(now - lastMinInterval)+" msec").printStackTrace();
-				}
-				lastMinInterval = now;
-			}
-			*/
 			if (el.isVirtual() || getAccessModeInternal() == AccessMode.READ_ONLY) {
 				return false;
 			}
@@ -79,7 +66,7 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 			final SimpleResourceData data = el.getData();
 			boolean changed = value != data.getFloat();
 			data.setFloat(value);
-			handleResourceUpdateInternal(changed);
+			handleResourceUpdateInternal(changed, timestamp);
 		} finally {
 			resMan.unlockRead();
 		}

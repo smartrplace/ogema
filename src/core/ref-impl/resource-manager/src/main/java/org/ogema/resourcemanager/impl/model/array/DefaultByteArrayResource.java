@@ -41,9 +41,14 @@ public class DefaultByteArrayResource extends ResourceBase implements ByteArrayR
 		checkReadPermission();
 		return getEl().getData().getByteArr().clone();
 	}
-
+	
 	@Override
 	public boolean setValues(byte[] values) {
+		return setValues(values, -1);
+	}
+
+	@Override
+	public boolean setValues(byte[] values, long timestamp) {
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
@@ -53,7 +58,7 @@ public class DefaultByteArrayResource extends ResourceBase implements ByteArrayR
 			checkWritePermission();
 			el.getData().setByteArr(values);
 			//FIXME no change check!
-			handleResourceUpdateInternal(true);
+			handleResourceUpdateInternal(true, timestamp);
 		} finally {
 			resMan.unlockRead();
 		}
@@ -76,7 +81,7 @@ public class DefaultByteArrayResource extends ResourceBase implements ByteArrayR
 		boolean changed = arr[index] != value;
 		arr[index] = value;
 		getTreeElement().fireChangeEvent();
-		handleResourceUpdate(changed);
+		handleResourceUpdate(changed, -1);
 	}
 
 	@Override

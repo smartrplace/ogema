@@ -41,9 +41,14 @@ public class DefaultStringResource extends SingleValueResourceBase implements St
 		checkReadPermission();
 		return getEl().getData().getString();
 	}
-
+	
 	@Override
 	public boolean setValue(String value) {
+		return setValue(value, -1);
+	}
+
+	@Override
+	public boolean setValue(String value, long timestamp) {
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
@@ -54,7 +59,7 @@ public class DefaultStringResource extends SingleValueResourceBase implements St
 			final SimpleResourceData data = el.getData();
 			boolean changed = !value.equals(data.getString());
 			data.setString(value);
-			handleResourceUpdateInternal(changed);
+			handleResourceUpdateInternal(changed, timestamp);
 		} finally {
 			resMan.unlockRead();
 		}

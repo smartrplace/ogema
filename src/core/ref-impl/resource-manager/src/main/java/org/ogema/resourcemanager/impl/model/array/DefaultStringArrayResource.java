@@ -41,9 +41,14 @@ public class DefaultStringArrayResource extends ResourceBase implements StringAr
 		checkReadPermission();
 		return getEl().getData().getStringArr().clone();
 	}
-
+	
 	@Override
 	public boolean setValues(String[] values) {
+		return setValues(values, -1);
+	}
+
+	@Override
+	public boolean setValues(String[] values, long timestamp) {
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
@@ -53,7 +58,7 @@ public class DefaultStringArrayResource extends ResourceBase implements StringAr
 			checkWritePermission();
 			el.getData().setStringArr(values);
 			//FIXME no change check!
-			handleResourceUpdateInternal(true);
+			handleResourceUpdateInternal(true, timestamp);
 		} finally {
 			resMan.unlockRead();
 		}
@@ -77,7 +82,7 @@ public class DefaultStringArrayResource extends ResourceBase implements StringAr
 		boolean changed = !arr[index].equals(value);
 		arr[index] = value;
 		getTreeElement().fireChangeEvent();
-		handleResourceUpdate(changed);
+		handleResourceUpdate(changed, -1);
 	}
 
 	@Override

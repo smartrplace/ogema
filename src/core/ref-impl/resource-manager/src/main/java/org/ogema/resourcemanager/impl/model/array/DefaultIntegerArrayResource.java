@@ -41,9 +41,14 @@ public class DefaultIntegerArrayResource extends ResourceBase implements Integer
 		checkReadPermission();
 		return getEl().getData().getIntArr().clone();
 	}
-
+	
 	@Override
 	public boolean setValues(int[] values) {
+		return setValues(values, -1);
+	}
+
+	@Override
+	public boolean setValues(int[] values, long timestamp) {
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
@@ -53,7 +58,7 @@ public class DefaultIntegerArrayResource extends ResourceBase implements Integer
 			checkWritePermission();
 			el.getData().setIntArr(values);
 			//FIXME no change check!
-			handleResourceUpdateInternal(true);
+			handleResourceUpdateInternal(true, timestamp);
 		} finally {
 			resMan.unlockRead();
 		}
@@ -76,7 +81,7 @@ public class DefaultIntegerArrayResource extends ResourceBase implements Integer
 		boolean changed = arr[index] != value;
 		arr[index] = value;
 		getTreeElement().fireChangeEvent();
-		handleResourceUpdate(changed);
+		handleResourceUpdate(changed, -1);
 	}
 
 	@Override

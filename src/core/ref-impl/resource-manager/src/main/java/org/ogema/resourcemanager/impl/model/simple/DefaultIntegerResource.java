@@ -41,9 +41,14 @@ public class DefaultIntegerResource extends SingleValueResourceBase implements I
 		checkReadPermission();
 		return getEl().getData().getInt();
 	}
-
+	
 	@Override
 	public boolean setValue(int value) {
+		return setValue(value, -1);
+	}
+
+	@Override
+	public boolean setValue(int value, long timestamp) {
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
@@ -54,7 +59,7 @@ public class DefaultIntegerResource extends SingleValueResourceBase implements I
 			final SimpleResourceData data = el.getData();
 			boolean changed = value != data.getInt();
 			data.setInt(value);
-			handleResourceUpdateInternal(changed);
+			handleResourceUpdateInternal(changed, timestamp);
 		} finally {
 			resMan.unlockRead();
 		}

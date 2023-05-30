@@ -39,16 +39,21 @@ public class DefaultOpaqueResource extends SingleValueResourceBase implements or
 		checkReadPermission();
 		return getEl().getData().getByteArr().clone();
 	}
-
+	
 	@Override
 	public boolean setValue(byte[] value) {
+		return setValue(value, -1);
+	}
+
+	@Override
+	public boolean setValue(byte[] value, long timestamp) {
 		if (!exists() || !hasWriteAccess()) {
 			return false;
 		}
 		checkWritePermission();
 		getTreeElement().getData().setByteArr(value);
 		//FIXME no change check
-		handleResourceUpdate(true);
+		handleResourceUpdate(true, timestamp);
 		return true;
 	}
 	

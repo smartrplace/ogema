@@ -44,6 +44,11 @@ public class DefaultBooleanResource extends SingleValueResourceBase implements B
 	
 	@Override
 	public boolean setValue(boolean value) {
+		return setValue(value, -1);
+	}
+	
+	@Override
+	public boolean setValue(boolean value, long timestamp) {
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
@@ -54,7 +59,7 @@ public class DefaultBooleanResource extends SingleValueResourceBase implements B
 			final SimpleResourceData data = el.getData();
 			boolean changed = value != data.getBoolean();
 			data.setBoolean(value);
-			handleResourceUpdateInternal(changed);
+			handleResourceUpdateInternal(changed, timestamp);
 		} finally {
 			resMan.unlockRead();
 		}

@@ -41,9 +41,14 @@ public class DefaultTimeResource extends SingleValueResourceBase implements Time
 		checkReadPermission();
 		return getEl().getData().getLong();
 	}
-
+	
 	@Override
 	public boolean setValue(long value) {
+		return setValue(value, -1);
+	}
+
+	@Override
+	public boolean setValue(long value, long timestamp) {
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
@@ -54,7 +59,7 @@ public class DefaultTimeResource extends SingleValueResourceBase implements Time
 			final SimpleResourceData data = el.getData();
 			boolean changed = value != data.getLong();
 			data.setLong(value);
-			handleResourceUpdateInternal(changed);
+			handleResourceUpdateInternal(changed, timestamp);
 		} finally {
 			resMan.unlockRead();
 		}

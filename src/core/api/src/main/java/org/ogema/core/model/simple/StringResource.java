@@ -32,9 +32,22 @@ public interface StringResource extends SingleValueResource {
 	/**
 	 * Sets a new text in the resource that equals a copy of the parameter
 	 * passed.
+	 * @param value
 	 * @return returns true if the value could be written, false if not (e.g. if access mode is read-only).* 
 	 */
 	boolean setValue(String value);
+	
+	/**
+	 * Sets the resource value to value with the given timestamp. Timestamp should
+	 * not be greater than current framework time. If the resource is recorded,
+	 * the timeseries database may only record values that are newer than the last
+	 * recorded value. The timestamp will also be returned as {@link #getLastUpdateTime()}
+	 * 
+	 * @param value
+	 * @param timestamp framework time, -1 to use current framework time.
+	 * @return returns true if the value could be written, false if not (e.g. if access mode is read-only).	 
+	 */
+	boolean setValue(String value, long timestamp);
 	
 	/**
 	 * Atomically sets to the given value and returns the previous value.

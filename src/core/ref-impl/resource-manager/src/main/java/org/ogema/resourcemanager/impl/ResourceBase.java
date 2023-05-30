@@ -103,24 +103,30 @@ public abstract class ResourceBase implements ConnectedResource {
 	}
 
 	// called when resource has been updated
-	protected void handleResourceUpdate(boolean valueChanged) {
-		setLastUpdateTime();
+	protected void handleResourceUpdate(boolean valueChanged, long timestamp) {
+		if (timestamp == -1) {
+			timestamp = resMan.getApplicationManager().getFrameworkTime();
+		}
+		setLastUpdateTime(timestamp);
 		if (!el.isActive()) {
 			return;
 		}
 		resMan.getDatabaseManager().getElementInfo(getEl()).fireResourceChanged(this,
-				resMan.getApplicationManager().getFrameworkTime(), valueChanged);
+				timestamp, valueChanged);
 	}
 
 	/*
 	 * Use instead of handleResourceUpdate when holding the resource lock
 	 */
-	protected void handleResourceUpdateInternal(final boolean valueChanged) {
-		setLastUpdateTime();
+	protected void handleResourceUpdateInternal(final boolean valueChanged, long timestamp) {
+		if (timestamp == -1) {
+			timestamp = resMan.getApplicationManager().getFrameworkTime();
+		}
+		setLastUpdateTime(timestamp);
 		if (!el.isActive())
 			return;
 		resMan.getDatabaseManager().getElementInfo(el).fireResourceChanged(this,
-				resMan.getApplicationManager().getFrameworkTime(), valueChanged);
+				timestamp, valueChanged);
 	}
 
 	@Override
@@ -1796,12 +1802,12 @@ public abstract class ResourceBase implements ConnectedResource {
 		return resMan.getDatabaseManager();
 	}
 
-	protected void setLastUpdateTime() {
+	protected void setLastUpdateTime(long time) {
         TreeElement te = getTreeElement();
         while (te.isReference()) {
             te = te.getReference();
         }
-		te.setLastModified(resMan.getApplicationManager().getFrameworkTime());
+		te.setLastModified(time);
 	}
 
 	protected long getLastUpdateTime() {
