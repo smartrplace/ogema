@@ -26,6 +26,7 @@ import java.util.Queue;
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.model.Resource;
+import org.ogema.core.model.ValueResource;
 import org.ogema.core.model.array.BooleanArrayResource;
 import org.ogema.core.model.array.ByteArrayResource;
 import org.ogema.core.model.array.FloatArrayResource;
@@ -179,7 +180,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 	public void setFloat(FloatResource resource, float value, WriteConfiguration configuration) {
 		checkStatus();
 //		addAction(new FloatWriteAction(resource, value, configuration));
-		addAction(new ResourceWriteAction<Float, FloatResource>(resource, value, configuration));
+		addAction(new ResourceWriteAction<Float, FloatResource>(resource, value, configuration, -1, appMan));
 	}
 
 	@Override
@@ -204,7 +205,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 	@Override
 	public void setInteger(IntegerResource resource, int value, WriteConfiguration configuration) {
 		checkStatus();
-		addAction(new ResourceWriteAction<Integer, IntegerResource>(resource, value, configuration));
+		addAction(new ResourceWriteAction<Integer, IntegerResource>(resource, value, configuration, -1, appMan));
 	}
 
 	@Override
@@ -228,7 +229,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 	@Override
 	public void setBoolean(BooleanResource resource, boolean value, WriteConfiguration configuration) {
 		checkStatus();
-		addAction(new ResourceWriteAction<Boolean, BooleanResource>(resource, value, configuration));
+		addAction(new ResourceWriteAction<Boolean, BooleanResource>(resource, value, configuration, -1, appMan));
 	}
 
 	@Override
@@ -252,7 +253,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 	@Override
 	public void setString(StringResource resource, String value, WriteConfiguration configuration) {
 		checkStatus();
-		addAction(new ResourceWriteAction<String, StringResource>(resource, value, configuration));
+		addAction(new ResourceWriteAction<String, StringResource>(resource, value, configuration, -1, appMan));
 	}
 
 	@Override
@@ -276,7 +277,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 	@Override
 	public void setTime(TimeResource resource, long value, WriteConfiguration configuration) {
 		checkStatus();
-		addAction(new ResourceWriteAction<Long, TimeResource>(resource, value, configuration));
+		addAction(new ResourceWriteAction<Long, TimeResource>(resource, value, configuration, -1, appMan));
 	}
 
 	@Override
@@ -300,7 +301,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 	@Override
 	public void setByteArray(ByteArrayResource resource, byte[] value, WriteConfiguration configuration) {
 		checkStatus();
-		addAction(new ResourceWriteAction<byte[], ByteArrayResource>(resource, value, configuration));
+		addAction(new ResourceWriteAction<byte[], ByteArrayResource>(resource, value, configuration, -1, appMan));
 	}
 
 	@Override
@@ -324,7 +325,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 	@Override
 	public void setIntegerArray(IntegerArrayResource resource, int[] value, WriteConfiguration configuration) {
 		checkStatus();
-		addAction(new ResourceWriteAction<int[], IntegerArrayResource>(resource, value, configuration));
+		addAction(new ResourceWriteAction<int[], IntegerArrayResource>(resource, value, configuration, -1, appMan));
 
 	}
 
@@ -349,7 +350,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 	@Override
 	public void setBooleanArray(BooleanArrayResource resource, boolean[] value, WriteConfiguration configuration) {
 		checkStatus();
-		addAction(new ResourceWriteAction<boolean[], BooleanArrayResource>(resource, value, configuration));
+		addAction(new ResourceWriteAction<boolean[], BooleanArrayResource>(resource, value, configuration, -1, appMan));
 
 	}
 
@@ -374,7 +375,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 	@Override
 	public void setFloatArray(FloatArrayResource resource, float[] value, WriteConfiguration configuration) {
 		checkStatus();
-		addAction(new ResourceWriteAction<float[], FloatArrayResource>(resource, value, configuration));
+		addAction(new ResourceWriteAction<float[], FloatArrayResource>(resource, value, configuration, -1, appMan));
 	}
 
 	@Override
@@ -398,7 +399,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 	@Override
 	public void setStringArray(StringArrayResource resource, String[] value, WriteConfiguration configuration) {
 		checkStatus();
-		addAction(new ResourceWriteAction<String[], StringArrayResource>(resource, value, configuration));
+		addAction(new ResourceWriteAction<String[], StringArrayResource>(resource, value, configuration, -1, appMan));
 	}
 
 	@Override
@@ -422,7 +423,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 	@Override
 	public void setTimeArray(TimeArrayResource resource, long[] value, WriteConfiguration configuration) {
 		checkStatus();
-		addAction(new ResourceWriteAction<long[], TimeArrayResource>(resource, value, configuration));
+		addAction(new ResourceWriteAction<long[], TimeArrayResource>(resource, value, configuration, -1, appMan));
 	}
 
 	@Override
@@ -447,7 +448,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 	@Override
 	public void setSchedule(Schedule schedule, ReadOnlyTimeSeries function, WriteConfiguration configuration) {
 		checkStatus();
-		addAction(new ResourceWriteAction<List<SampledValue>, Schedule>(schedule, function.getValues(Long.MIN_VALUE), configuration));
+		addAction(new ResourceWriteAction<List<SampledValue>, Schedule>(schedule, function.getValues(Long.MIN_VALUE), configuration, -1, appMan));
 	}
 	
 	@Override
@@ -468,7 +469,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 	@Override
 	public void addScheduleValues(Schedule schedule, Collection<SampledValue> values, WriteConfiguration configuration) {
 		checkStatus();
-		addAction(new ScheduleAddAction(schedule, values, configuration));
+		addAction(new ScheduleAddAction(schedule, values, configuration, -1, appMan));
 	}
 	
 	@Override
@@ -479,7 +480,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 	@Override
 	public void replaceScheduleValues(Schedule schedule, long starttime, long endtime, Collection<SampledValue> values,	WriteConfiguration configuration) {
 		checkStatus();
-		addAction(new ScheduleReplaceAction(schedule, values, configuration, starttime, endtime));
+		addAction(new ScheduleReplaceAction(schedule, values, configuration, starttime, endtime, -1, appMan));
 	}
 	
 	@Override
@@ -503,6 +504,12 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 		ScheduleReadAction action = new ScheduleReadAction(resource, configuration, starttime, endtime);
 		addAction(action);
 		return new TransactionFutureImpl<>(action);
+	}
+
+	@Override
+	public void setValue(ValueResource res, Object value, WriteConfiguration conf, long timestamp) {
+		checkStatus();
+		addAction(new ResourceWriteAction<>(res, value, conf, timestamp, appMan));
 	}
 	
 	@Override

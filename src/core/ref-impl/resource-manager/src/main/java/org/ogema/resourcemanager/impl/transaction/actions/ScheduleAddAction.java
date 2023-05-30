@@ -16,6 +16,7 @@
 package org.ogema.resourcemanager.impl.transaction.actions;
 
 import java.util.Collection;
+import org.ogema.core.application.ApplicationManager;
 
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.model.schedule.Schedule;
@@ -23,8 +24,8 @@ import org.ogema.core.resourcemanager.transaction.WriteConfiguration;
 
 public class ScheduleAddAction extends ResourceWriteAction<Collection<SampledValue>, Schedule> {
 
-	public ScheduleAddAction(Schedule resource, Collection<SampledValue> value, WriteConfiguration config) {
-		super(resource, value, config);
+	public ScheduleAddAction(Schedule resource, Collection<SampledValue> value, WriteConfiguration config, long timestamp, ApplicationManager appman) {
+		super(resource, value, config, timestamp, appman);
 	}
 
 	@Override

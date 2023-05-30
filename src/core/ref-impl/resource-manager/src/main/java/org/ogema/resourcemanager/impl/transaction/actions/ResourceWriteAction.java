@@ -16,12 +16,28 @@
 package org.ogema.resourcemanager.impl.transaction.actions;
 
 import java.util.ArrayDeque;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.Objects;
 import java.util.Queue;
+import org.ogema.core.application.ApplicationManager;
+import org.ogema.core.channelmanager.measurements.SampledValue;
 
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ValueResource;
+import org.ogema.core.model.array.ArrayResource;
+import org.ogema.core.model.array.BooleanArrayResource;
+import org.ogema.core.model.array.ByteArrayResource;
+import org.ogema.core.model.array.FloatArrayResource;
+import org.ogema.core.model.array.IntegerArrayResource;
+import org.ogema.core.model.array.StringArrayResource;
+import org.ogema.core.model.array.TimeArrayResource;
+import org.ogema.core.model.schedule.Schedule;
+import org.ogema.core.model.simple.BooleanResource;
+import org.ogema.core.model.simple.FloatResource;
+import org.ogema.core.model.simple.IntegerResource;
+import org.ogema.core.model.simple.StringResource;
+import org.ogema.core.model.simple.TimeResource;
 import org.ogema.core.resourcemanager.ResourceOperationException.Type;
 import org.ogema.core.resourcemanager.VirtualResourceException;
 import org.ogema.core.resourcemanager.transaction.WriteConfiguration;
@@ -50,14 +66,18 @@ public class ResourceWriteAction<T, V extends ValueResource> implements AtomicAc
 	private boolean setBack = false;
 	private final Queue<AtomicAction> subactions = new ArrayDeque<>();  // creation, activation
 	private final Deque<AtomicAction> subactionsDone = new ArrayDeque<>();
+	private final ApplicationManager appman;
+	private final long timestamp;
 	
-	public ResourceWriteAction(V resource, T value, WriteConfiguration config) {
+	public ResourceWriteAction(V resource, T value, WriteConfiguration config, long timestamp, ApplicationManager appman) {
 		Objects.requireNonNull(resource);
 		Objects.requireNonNull(value);
 		Objects.requireNonNull(config);
 		this.resource = resource;
 		this.config = config;
 		this.value = value;
+		this.timestamp = timestamp;
+		this.appman = appman;
 	}
 	
 	@Override
@@ -75,8 +95,42 @@ public class ResourceWriteAction<T, V extends ValueResource> implements AtomicAc
 		return (T) ValueResourceUtils.getValue(resource);
 	}
 	
+	@SuppressWarnings("deprecation")
 	protected void write(V resource, T value) {
-		ValueResourceUtils.setValue(resource, value);
+		//ValueResourceUtils.setValue(resource, value);
+		long ts = timestamp == -1 ? appman.getFrameworkTime() : timestamp;
+		if (resource instanceof ArrayResource) {
+			if (resource instanceof BooleanArrayResource) {
+				((BooleanArrayResource) resource).setValues((boolean[]) value, ts);
+			} else if (resource instanceof ByteArrayResource) {
+				((ByteArrayResource) resource).setValues((byte[]) value, ts);
+			} else if (resource instanceof FloatArrayResource) {
+				((FloatArrayResource) resource).setValues((float[]) value, ts);
+			} else if (resource instanceof IntegerArrayResource) {
+				((IntegerArrayResource) resource).setValues((int[]) value, ts);
+			} else if (resource instanceof StringArrayResource) {
+				((StringArrayResource) resource).setValues((String[]) value, ts);
+			} else if (resource instanceof TimeArrayResource) {
+				((TimeArrayResource) resource).setValues((long[]) value, ts);
+			} else {
+				throw new RuntimeException("unsupported array resource type: " + resource);
+			}
+		} else if (resource instanceof BooleanResource) {
+			((BooleanResource) resource).setValue((boolean) value, ts);
+		} else if (resource instanceof FloatResource) {
+			((FloatResource) resource).setValue((float) value, ts);
+		} else if (resource instanceof IntegerResource) {
+			((IntegerResource) resource).setValue((int) value, ts);
+		} else if (resource instanceof org.ogema.core.model.simple.OpaqueResource) {
+			((org.ogema.core.model.simple.OpaqueResource) resource).setValue((byte[]) value, ts);
+		} else if (resource instanceof StringResource) {
+			((StringResource) resource).setValue((String) value, ts);
+		} else if (resource instanceof TimeResource) {
+			((TimeResource) resource).setValue((long) value, ts);
+		} else if (resource instanceof Schedule) {
+			((Schedule) resource).deleteValues();
+			((Schedule) resource).addValues((Collection<SampledValue>)value);
+		}
 	}
 	
 	/**

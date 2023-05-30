@@ -19,6 +19,7 @@ import java.util.Collection;
 
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.model.Resource;
+import org.ogema.core.model.ValueResource;
 import org.ogema.core.model.array.BooleanArrayResource;
 import org.ogema.core.model.array.ByteArrayResource;
 import org.ogema.core.model.array.FloatArrayResource;
@@ -262,6 +263,8 @@ public interface ResourceTransaction {
 	 * See {@link #setFloat(FloatResource, float, WriteConfiguration)}
 	 */
 	void setBooleanArray(BooleanArrayResource resource, boolean[] value, WriteConfiguration configuration);
+	
+	void setValue(ValueResource res, Object value, WriteConfiguration conf, long timestamp);
 
 	/**
 	 * See {@link #getFloat(org.ogema.core.model.simple.FloatResource)}

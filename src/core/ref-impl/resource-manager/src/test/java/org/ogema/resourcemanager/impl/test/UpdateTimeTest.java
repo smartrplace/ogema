@@ -21,6 +21,8 @@ import static org.junit.Assert.assertEquals;
 import org.junit.Test;
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.recordeddata.RecordedDataConfiguration;
+import org.ogema.core.resourcemanager.transaction.ResourceTransaction;
+import org.ogema.core.resourcemanager.transaction.WriteConfiguration;
 import org.ogema.model.sensors.TemperatureSensor;
 import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
 import org.ops4j.pax.exam.spi.reactors.PerClass;
@@ -54,6 +56,19 @@ public class UpdateTimeTest extends OsgiTestBase {
 		SampledValue sv = res.reading().getHistoricalData().getPreviousValue(Long.MAX_VALUE);
 		Assert.assertNotNull(sv);
 		assertEquals(testTs, sv.getTimestamp());
+	}
+	
+	@Test
+	public void lastUpdateTimeWorksInTransactions() throws Exception {
+		TemperatureSensor res = resMan.createResource(newResourceName(), TemperatureSensor.class);
+		res.reading().create();
+		res.activate(true);
+		long testTs = getApplicationManager().getFrameworkTime() - 5000;
+		assertEquals(-1, res.reading().getLastUpdateTime());
+		ResourceTransaction t = getApplicationManager().getResourceAccess().createResourceTransaction();
+		t.setValue(res.reading(), 47.11f, WriteConfiguration.CREATE_AND_ACTIVATE, testTs);
+		t.commit();
+		assertEquals(testTs, res.reading().getLastUpdateTime());
 	}
     
 }

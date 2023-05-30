@@ -16,6 +16,7 @@
 package org.ogema.resourcemanager.impl.transaction.actions;
 
 import java.util.Collection;
+import org.ogema.core.application.ApplicationManager;
 
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.model.schedule.Schedule;
@@ -25,8 +26,8 @@ public class ScheduleReplaceAction extends ResourceWriteAction<Collection<Sample
 
 	private final long[] interval;
 	
-	public ScheduleReplaceAction(Schedule resource, Collection<SampledValue> value, WriteConfiguration config, long t0, long t1) {
-		super(resource, value, config);
+	public ScheduleReplaceAction(Schedule resource, Collection<SampledValue> value, WriteConfiguration config, long t0, long t1, long timestamp, ApplicationManager appman) {
+		super(resource, value, config, timestamp, appman);
 		this.interval = new long[]{t0,t1};
 	}
 
