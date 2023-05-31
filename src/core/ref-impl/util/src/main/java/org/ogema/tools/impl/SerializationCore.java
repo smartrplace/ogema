@@ -86,6 +86,7 @@ import javax.xml.stream.XMLStreamReader;
 import org.ogema.core.model.ValueResource;
 import org.ogema.core.resourcemanager.transaction.ResourceTransaction;
 import org.ogema.core.resourcemanager.transaction.WriteConfiguration;
+import org.ogema.core.tools.SerializationOptions;
 
 /**
  * Conversion tool between OGEMA objects and text strings. This is a singleton
@@ -100,6 +101,7 @@ import org.ogema.core.resourcemanager.transaction.WriteConfiguration;
 final class SerializationCore {
 
 	final ObjectMapper mapper;
+	final SerializationManagerImpl sm;
 
 	// experimental json serializer; note: non-fast serializer fails on
 	// schedules (even worse than the fast one)
@@ -154,10 +156,11 @@ final class SerializationCore {
     }
 
     @SuppressWarnings("deprecation")
-	private SerializationCore(ResourceAccess resacc, ResourceManagement resman, Logger logger) {
+	private SerializationCore(SerializationManagerImpl sm, ResourceAccess resacc, ResourceManagement resman, Logger logger) {
 		mapper = createJacksonMapper(true);
 		this.resacc = resacc;
 		this.resman = resman;
+		this.sm = sm;
 		try {
 			marshaller = MARSHALLING_CONTEXT.createMarshaller();
 			marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
@@ -169,8 +172,8 @@ final class SerializationCore {
 		}
 	}
 
-	protected SerializationCore(ResourceAccess resacc, ResourceManagement resman) {
-		this(resacc, resman, org.slf4j.LoggerFactory.getLogger(SerializationCore.class));
+	protected SerializationCore(SerializationManagerImpl sm, ResourceAccess resacc, ResourceManagement resman) {
+		this(sm, resacc, resman, org.slf4j.LoggerFactory.getLogger(SerializationCore.class));
 	}
 	
 	private static JAXBContext createCollectionsMarshallingContext() {
@@ -740,7 +743,7 @@ final class SerializationCore {
 	}
 	
 	@SuppressWarnings("deprecation")
-	protected static void saveSimpleTypeData(org.ogema.serialization.jaxb.Resource input, Resource target, boolean forceUpdate,
+	protected void saveSimpleTypeData(org.ogema.serialization.jaxb.Resource input, Resource target, boolean forceUpdate,
 			ResourceTransaction trans) throws ClassNotFoundException {
 		Class<?> inputType = Class.forName(input.getType());
 		if (!target.getResourceType().isAssignableFrom(inputType)
@@ -750,59 +753,44 @@ final class SerializationCore {
 		}
 		long inputLastUpdate = LASTUPDATE_UNSET;
 		Object inputValue = null;
-		Object targetValue = null;
 		if (input instanceof org.ogema.serialization.jaxb.BooleanResource) {
 			inputLastUpdate = ((org.ogema.serialization.jaxb.BooleanResource) input).getLastUpdateTime();
 			inputValue = ((org.ogema.serialization.jaxb.BooleanResource) input).isValue();
-			targetValue = ((BooleanResource) target).getValue();
 		} else if (input instanceof org.ogema.serialization.jaxb.FloatResource) {
 			inputLastUpdate = ((org.ogema.serialization.jaxb.FloatResource) input).getLastUpdateTime();
 			inputValue = ((org.ogema.serialization.jaxb.FloatResource) input).getValue();
-			targetValue = ((FloatResource) target).getValue();
 		} else if (input instanceof org.ogema.serialization.jaxb.IntegerResource) {
 			inputLastUpdate = ((org.ogema.serialization.jaxb.IntegerResource) input).getLastUpdateTime();
 			inputValue = ((org.ogema.serialization.jaxb.IntegerResource) input).getValue();
-			targetValue = ((IntegerResource) target).getValue();
 		} else if (input instanceof org.ogema.serialization.jaxb.OpaqueResource) {
 			inputLastUpdate = ((org.ogema.serialization.jaxb.OpaqueResource) input).getLastUpdateTime();
 			inputValue = ((org.ogema.serialization.jaxb.OpaqueResource) input).getValue();
-			targetValue = ((org.ogema.core.model.simple.OpaqueResource) target).getValue();
 		} else if (input instanceof org.ogema.serialization.jaxb.StringResource) {
 			inputLastUpdate = ((org.ogema.serialization.jaxb.StringResource) input).getLastUpdateTime();
 			inputValue = ((org.ogema.serialization.jaxb.StringResource) input).getValue();
-			targetValue = ((StringResource) target).getValue();
 		} else if (input instanceof org.ogema.serialization.jaxb.TimeResource) {
 			inputLastUpdate = ((org.ogema.serialization.jaxb.TimeResource) input).getLastUpdateTime();
 			inputValue = ((org.ogema.serialization.jaxb.TimeResource) input).getValue();
-			targetValue = ((TimeResource) target).getValue();
-			/*
-			if (((org.ogema.serialization.jaxb.TimeResource) input).getLastUpdateTime() == LASTUPDATE_UNSET) {
-				return;
-			}
-			if (!forceUpdate && (((TimeResource) target)
-					.getValue() == ((org.ogema.serialization.jaxb.TimeResource) input).getValue())) {
-				return;
-			}
-			trans.addResource(target);// XXX
-			trans.setTime((TimeResource) target, ((org.ogema.serialization.jaxb.TimeResource) input).getValue());
-			*/
 		}
 		
 		if (inputLastUpdate == LASTUPDATE_UNSET) {
 			return;
 		}
-		long targetTime = ((ValueResource) target).getLastUpdateTime();
-		//FIXME changes old default behaviour, control with serialization manager property
-		/*
-		if (targetTime != LASTUPDATE_UNSET && targetTime >= inputLastUpdate) {
+		if (sm.options.contains(SerializationOptions.DESERIALIZE_VALUES_NEVER)) {
 			return;
 		}
-		*/
+		long targetTime = ((ValueResource) target).getLastUpdateTime();
+		if (sm.options.contains(SerializationOptions.DESERIALIZE_VALUES_NEWER)) {
+			if (targetTime != LASTUPDATE_UNSET && targetTime >= inputLastUpdate) {
+				return;
+			}
+		}
+		
 		//void setValue(ValueResource res, Object value, WriteConfiguration conf, long timestamp);
 		trans.setValue((ValueResource) target, inputValue, WriteConfiguration.CREATE, inputLastUpdate);
 	}
 
-	private static void saveScheduleData(org.ogema.serialization.jaxb.Resource input, Resource target,
+	private void saveScheduleData(org.ogema.serialization.jaxb.Resource input, Resource target,
 			ResourceTransaction trans) {
 		ScheduleResource jaxbSchedule = (ScheduleResource) input;
 		Schedule ogemaSchedule = (Schedule) target;
@@ -823,6 +811,20 @@ final class SerializationCore {
 		// XXX unsure about null values and XSD nillable and/or optional
 		// elements, requires investigation (+ separate
 		// unit tests)
+		Long inputLastUpdateO = jaxbSchedule.getLastUpdateTime();
+		long inputLastUpdate = inputLastUpdateO == null ? -1 : inputLastUpdateO;
+		if (inputLastUpdate == LASTUPDATE_UNSET) {
+			return;
+		}
+		if (sm.options.contains(SerializationOptions.DESERIALIZE_VALUES_NEVER)) {
+			return;
+		}
+		long targetTime = ((ValueResource) target).getLastUpdateTime();
+		if (sm.options.contains(SerializationOptions.DESERIALIZE_VALUES_NEWER)) {
+			if (targetTime != LASTUPDATE_UNSET && targetTime >= inputLastUpdate) {
+				return;
+			}
+		}
 		
 		if (jaxbSchedule.getStart() != null) {
 			long end = jaxbSchedule.getEnd() == null || jaxbSchedule.getEnd() == -1
@@ -835,11 +837,31 @@ final class SerializationCore {
 			//ogemaSchedule.addValues(ogemaValues);
 		}
 	}
-
+	
+	boolean writeValue(long inputLastUpdate, Resource target) {
+		if (inputLastUpdate == LASTUPDATE_UNSET) {
+			return false;
+		}
+		if (sm.options.contains(SerializationOptions.DESERIALIZE_VALUES_NEVER)) {
+			return false;
+		}
+		long targetTime = ((ValueResource) target).getLastUpdateTime();
+		if (sm.options.contains(SerializationOptions.DESERIALIZE_VALUES_NEWER)) {
+			if (targetTime != LASTUPDATE_UNSET && targetTime >= inputLastUpdate) {
+				return false;
+			}
+		}
+		return true;
+	}
+	
     @SuppressWarnings("deprecation")
-	private static void saveArrayTypeData(org.ogema.serialization.jaxb.Resource input, Resource target, boolean forceUpdate,
+	private void saveArrayTypeData(org.ogema.serialization.jaxb.Resource input, Resource target, boolean forceUpdate,
 			@SuppressWarnings("deprecation") ResourceTransaction trans) throws ClassNotFoundException {
 		Class<?> inputType = Class.forName(input.getType());
+		if (sm.options.contains(SerializationOptions.DESERIALIZE_VALUES_NEVER)) {
+			return;
+		}
+		//FIXME: lastUpdateTime not serialized for array resources!
 		if (input instanceof org.ogema.serialization.jaxb.BooleanArrayResource) {
 			List<Boolean> values = ((org.ogema.serialization.jaxb.BooleanArrayResource) input).getValues();
 			boolean[] arr = new boolean[values.size()];

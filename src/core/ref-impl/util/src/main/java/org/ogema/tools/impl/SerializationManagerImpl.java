@@ -37,6 +37,9 @@ import org.ogema.core.tools.SerializationManager;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
+import java.util.EnumSet;
+import java.util.Objects;
+import org.ogema.core.tools.SerializationOptions;
 
 /**
  * Implementation of the SerializationManager. This class only holds the
@@ -50,14 +53,28 @@ public class SerializationManagerImpl implements SerializationManager {
     private int maxDepth;
     private boolean followReferences, parseSubschedules;
     private final SerializationCore core;
+	
+	private final EnumSet<SerializationOptions> defaults = EnumSet.of(SerializationOptions.DESERIALIZE_VALUES_VALID);
+	EnumSet<SerializationOptions> options = defaults;
 
     public SerializationManagerImpl(ResourceAccess resacc, ResourceManagement resman) {
         // XXX allow resacc==null for tests =/
-        core = new SerializationCore(resacc, resman);
+        core = new SerializationCore(this, resacc, resman);
         maxDepth = 1000;
         followReferences = true;
         parseSubschedules = false;
     }
+
+	@Override
+	public SerializationManager setOptions(SerializationOptions... sos) {
+		Objects.requireNonNull(sos);
+		if (sos.length == 0) {
+			options = defaults;
+		} else {
+			options = EnumSet.of(sos[0], sos);
+		}
+		return this;
+	}
 
     @Override
     public void setMaxDepth(int value) {

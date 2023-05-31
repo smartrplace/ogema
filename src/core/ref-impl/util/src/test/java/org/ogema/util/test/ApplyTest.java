@@ -43,6 +43,7 @@ import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.tools.SerializationManager;
+import org.ogema.core.tools.SerializationOptions;
 import org.ogema.exam.OsgiAppTestBase;
 import org.ogema.exam.ResourceAssertions;
 import org.ogema.model.devices.connectiondevices.ElectricityConnectionBox;
@@ -106,8 +107,21 @@ public class ApplyTest extends OsgiAppTestBase {
 		assertTrue(s.contains("47.11"));
 		s = s.replace("47.11", "82.00");
 		assertTrue(s.contains("82.00"));
-		sman.applyJson(s, meter, true);
+		sman.setOptions(SerializationOptions.DESERIALIZE_VALUES_VALID).applyJson(s, meter, true);
 		assertEquals(82, meter.connection().powerSensor().reading().getValue(), 0.5);
+	}
+	
+	@Test
+	public void deserializeOption_ValuesNewer_Works() throws IOException {
+		sman.setSerializeSchedules(true);
+		String s = sman.toJson(meter);
+		System.out.println(s);
+		assertTrue(s.contains("47.11"));
+		s = s.replace("47.11", "82.00");
+		assertTrue(s.contains("82.00"));
+		sman.setOptions(SerializationOptions.DESERIALIZE_VALUES_NEWER).applyJson(s, meter, true);
+		assertFalse(82 == meter.connection().powerSensor().reading().getValue());
+		assertEquals(47.11, meter.connection().powerSensor().reading().getValue(), 0.1f);
 	}
 
 	@Test
@@ -198,7 +212,7 @@ public class ApplyTest extends OsgiAppTestBase {
 		return sw.toString();
 	}
 
-	static FloatSchedule createTestSchedule() {
+	FloatSchedule createTestSchedule() {
 		FloatSchedule schedule = new FloatSchedule();
 		schedule.setName("data");
 		schedule.setType(AbsoluteSchedule.class);
@@ -218,7 +232,7 @@ public class ApplyTest extends OsgiAppTestBase {
 		v.setTime(3);
 		v.setValue(new FloatValue(44));
 		schedule.getEntry().add(v);
-
+		schedule.setLastUpdateTime(getApplicationManager().getFrameworkTime());
 		return schedule;
 	}
 
@@ -229,7 +243,6 @@ public class ApplyTest extends OsgiAppTestBase {
 		floatRes.setType(FloatResource.class);
 		// floatRes.setDecorating(Boolean.TRUE);
 		FloatSchedule schedule = createTestSchedule();
-
 		floatRes.getSubresources().add(schedule);
 		Resource meter1 = unmarshal(sman.toXml(meter), Resource.class);
 		meter1.getSubresources().add(floatRes);
@@ -372,7 +385,7 @@ public class ApplyTest extends OsgiAppTestBase {
 		meter2.getSubResource("intSub", IntegerResource.class).program().addValue(1, new IntegerValue(23));
 		meter2.getSubResource("intSub", IntegerResource.class).program().addValue(4, new IntegerValue(-65));
 		meter2.getSubResource("intSub", IntegerResource.class).program().addValue(System.currentTimeMillis(), new IntegerValue(234));
-		
+		assertFalse(meter2.getSubResource("intSub", IntegerResource.class).program().getLastUpdateTime() == -1);
 		String str2 = sman.toXml(meter2);
 		String str1 = str2.replace("meter" + id + "8", "meter" + id + "7"); 
 		System.out.println("  --- Updating resource with xml: " + str1);

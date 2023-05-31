@@ -476,5 +476,12 @@ public interface SerializationManager {
 	 * @return the newly created sub-resources.
 	 */
 	Collection<Resource> createResourcesFromJson(Reader json, Resource parent, Resource linkBase);
-
+	
+	/**
+	 * Sets the {@link SerializationOptions } for this object.
+	 * @param options
+	 * @return this object.
+	 */
+	SerializationManager setOptions(SerializationOptions ... options);
+	
 }

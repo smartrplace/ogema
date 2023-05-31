@@ -95,7 +95,7 @@ public class ResourceWriteAction<T, V extends ValueResource> implements AtomicAc
 		return (T) ValueResourceUtils.getValue(resource);
 	}
 	
-	@SuppressWarnings("deprecation")
+	@SuppressWarnings({"deprecation", "unchecked"})
 	protected void write(V resource, T value) {
 		//ValueResourceUtils.setValue(resource, value);
 		long ts = timestamp == -1 ? appman.getFrameworkTime() : timestamp;
