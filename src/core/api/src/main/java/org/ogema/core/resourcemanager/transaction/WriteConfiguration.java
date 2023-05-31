@@ -34,6 +34,12 @@ public enum WriteConfiguration {
 	ACTIVATE,
 	
 	/**
+	 * Create a resource if it does not exist, but do not activate.
+	 */
+	CREATE,
+
+	
+	/**
 	 * Create and activate a resource if it does not exist, respectively
 	 * is inactive.
 	 */

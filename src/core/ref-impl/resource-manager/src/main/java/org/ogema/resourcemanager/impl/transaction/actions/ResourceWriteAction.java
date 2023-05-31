@@ -112,6 +112,8 @@ public class ResourceWriteAction<T, V extends ValueResource> implements AtomicAc
 				((StringArrayResource) resource).setValues((String[]) value, ts);
 			} else if (resource instanceof TimeArrayResource) {
 				((TimeArrayResource) resource).setValues((long[]) value, ts);
+			} else if (resource instanceof org.ogema.core.model.simple.OpaqueResource) {
+				((org.ogema.core.model.simple.OpaqueResource) resource).setValue((byte[]) value, ts);
 			} else {
 				throw new RuntimeException("unsupported array resource type: " + resource);
 			}
@@ -121,8 +123,6 @@ public class ResourceWriteAction<T, V extends ValueResource> implements AtomicAc
 			((FloatResource) resource).setValue((float) value, ts);
 		} else if (resource instanceof IntegerResource) {
 			((IntegerResource) resource).setValue((int) value, ts);
-		} else if (resource instanceof org.ogema.core.model.simple.OpaqueResource) {
-			((org.ogema.core.model.simple.OpaqueResource) resource).setValue((byte[]) value, ts);
 		} else if (resource instanceof StringResource) {
 			((StringResource) resource).setValue((String) value, ts);
 		} else if (resource instanceof TimeResource) {
@@ -149,12 +149,16 @@ public class ResourceWriteAction<T, V extends ValueResource> implements AtomicAc
 		boolean activate = false;
 		boolean create = false;
 		switch (config) {
-		case CREATE_AND_ACTIVATE:
-			create = true;
-		case ACTIVATE:
-			activate = true;
-			break;
-		default:
+			case CREATE: {
+				create = true;
+				break;
+			}
+			case CREATE_AND_ACTIVATE:
+				create = true;
+			case ACTIVATE:
+				activate = true;
+				break;
+			default:
 		}
 		if (activate)
 			subactions.add(new ActivationAction(resource, true, false, create));

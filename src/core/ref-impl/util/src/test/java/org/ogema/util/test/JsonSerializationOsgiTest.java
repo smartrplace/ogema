@@ -226,7 +226,7 @@ public class JsonSerializationOsgiTest extends OsgiAppTestBase {
 		Assert.assertTrue(0 > f.getValue());
 	}
 
-	@Ignore
+	//@Ignore
 	@Test
 	public void listOrderIsPreserved() throws IOException {
 		@SuppressWarnings("unchecked")

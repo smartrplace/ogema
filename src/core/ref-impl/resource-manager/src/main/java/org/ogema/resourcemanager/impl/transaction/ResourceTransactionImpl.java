@@ -94,7 +94,7 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 					action.execute();
 				} catch (Exception e) {
 					// will be rethrown after rollback
-					appMan.getLogger().warn("Transaction failed at action {} for resource {}",action.getType(), action.getSource());
+					appMan.getLogger().warn("Transaction failed at action {} for resource {}",action.getType(), action.getSource(), e);
 					rollback(done,action,e);
 					return;
 				}

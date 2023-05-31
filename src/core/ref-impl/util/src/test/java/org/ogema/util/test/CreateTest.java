@@ -103,6 +103,7 @@ public class CreateTest extends OsgiAppTestBase {
 
 		Assert.assertFalse(sw.settings().isActive());
 		sw.settings().controlLimits().activate(false);
+		assertFalse(sw.settings().controlLimits().upperLimit().isActive());
 		String xml = sman.toXml(sw);
 
 		String newName = sw.getName() + "_copy";
@@ -117,6 +118,8 @@ public class CreateTest extends OsgiAppTestBase {
 		assertEquals(f, swNew.settings().controlLimits().upperLimit().getValue(), 0.1f);
 		assertFalse(swNew.settings().isActive());
 		assertTrue(swNew.settings().controlLimits().isActive());
+		assertFalse("inactive resource deserialized as active",
+				swNew.settings().controlLimits().upperLimit().isActive());
 	}
     
     @Test public void createWorksForTopLevelCustomResourceLists() {
