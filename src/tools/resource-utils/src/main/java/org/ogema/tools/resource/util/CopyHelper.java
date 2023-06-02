@@ -77,6 +77,26 @@ class CopyHelper {
 		}
 	}
 	
+	ResourceTransaction prepare() {
+		if (transaction == null)
+			throw new IllegalStateException("No need to use a transaction if activation state is not copied");
+		try {
+			copy(source, target);
+		} catch (Exception e) {
+			Resource r = null;
+			for (ListIterator<Resource> it=newlyCreated.listIterator();it.hasPrevious();r=it.previous()) {
+				try {
+					r.delete();
+				} catch (Exception ee) {
+					LoggerFactory.getLogger(CopyHelper.class).warn("Failed to rollback resource creation for {}: {}",r,ee.toString());
+				}
+			}
+			throw e;
+		}
+		return transaction;
+	}
+	
+	
 	void copy(final Resource source, final Resource copy) {
 		if (source.isReference(false)) {
 			if (config.isCopyReferences()) {

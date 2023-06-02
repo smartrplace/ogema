@@ -27,6 +27,7 @@ import org.ogema.core.model.ResourceList;
 import org.ogema.core.resourcemanager.ResourceAccess;
 import org.ogema.core.resourcemanager.ResourceOperationException;
 import org.ogema.core.resourcemanager.pattern.ResourcePattern;
+import org.ogema.core.resourcemanager.transaction.ResourceTransaction;
 import org.ogema.model.locations.Room;
 import org.ogema.model.prototypes.PhysicalElement;
 import org.ogema.tools.activation.impl.ActivationVisitor;
@@ -598,6 +599,29 @@ public class ResourceUtils {
 	 */
 	public static void copy(Resource source, Resource target, ResourceAccess ra, ResourceCopyConfiguration config) {
 		new CopyHelper(config, source, target, ra).commit();
+	}
+	
+	/**
+	 * Copy resources using a transaction, but do not commit the latter, yet.
+	 * @param source
+	 * @param target
+	 * @param ra
+	 * @return
+	 */
+	public static ResourceTransaction prepareCopy(Resource source, Resource target, ResourceAccess ra) {
+		return prepareCopy(source, target, ra, null);
+	}
+	
+	/**
+	 * Copy resources using a transaction, but do not commit the latter, yet.
+	 * @param source
+	 * @param target
+	 * @param ra
+	 * @param config
+	 * @return
+	 */
+	public static ResourceTransaction prepareCopy(Resource source, Resource target, ResourceAccess ra, ResourceCopyConfiguration config) {
+		return new CopyHelper(config, source, target, ra).prepare();
 	}
 	
 	/**
