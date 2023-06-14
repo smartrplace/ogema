@@ -486,14 +486,17 @@ public abstract class ThermostatUtils {
 	static void checkForAdaptionFailure(HomeMaticConnection conn, Thermostat th, String address, Logger logger) {
 		long lastSetpointFb = th.temperatureSensor().deviceFeedback().setpoint().getLastUpdateTime();
 		long lastTempFb = th.temperatureSensor().reading().getLastUpdateTime();
+		long d = lastSetpointFb - lastTempFb;
+		logger.trace("checking update time for setpoint feedback and temperature measurement: {} - {} = {}",
+				lastSetpointFb, lastTempFb, d);
 		if (lastSetpointFb == -1 && lastTempFb == -1) {
 			return;
 		}
 		final int MAX_D = 180 * 60 * 1000;
-		long d = lastSetpointFb - lastTempFb;
 		if (d > MAX_D) {
-			logger.warn("Thermostat {} ({}) may be in a failed adaption state, trying to read error state", th.getPath(), address);
+			logger.warn("Thermostat {} ({}) may be in a failed adaption state, trying to read error state and temperature", th.getPath(), address);
 			try {
+				/*
 				Number err = conn.getValue(address, "VALVE_STATE");
 				FloatResource valveState = th.valve().getSubResource("eq3state", FloatResource.class);
 				if (!valveState.exists()) {
@@ -502,6 +505,27 @@ public abstract class ThermostatUtils {
 				}
 				logger.debug("received VALVE_STATE for Thermostat {} ({}): {}", th.getPath(), address, valveState);
 				valveState.setValue(err.floatValue());
+				*/
+				Map<String, Object> values = conn.getParamset(address, "VALUES");
+				Number err = (Number) values.get("VALVE_STATE");
+				if (err != null) {
+					FloatResource valveState = th.valve().getSubResource("eq3state", FloatResource.class);
+					if (!valveState.exists()) {
+						valveState.create();
+						valveState.activate(false);
+					}
+					logger.debug("received VALVE_STATE for Thermostat {} ({}): {}", th.getPath(), address, valveState);
+					valveState.setValue(err.floatValue());
+				} else {
+					logger.debug("no VALVE_STATE received for Thermostat {} ({})", th.getPath(), address);
+				}
+				Number actualTemp = (Number) values.get("ACTUAL_TEMPERATURE");
+				if (actualTemp != null) {
+					logger.debug("received ACTUAL_TEMPERATURE for Thermostat {} ({}): {}", th.getPath(), address, actualTemp);
+					th.temperatureSensor().reading().setCelsius(actualTemp.floatValue());
+				} else {
+					logger.debug("no ACTUAL_TEMPERATURE received for Thermostat {} ({})", th.getPath(), address);
+				}
 			} catch (RuntimeException | IOException ex) {
 				logger.warn("reading of VALVE_STATE failed for {} ({}): {}", th.getPath(), address, ex.getMessage());
 				logger.debug("reading of VALVE_STATE failed for {} ({})", th.getPath(), address, ex);

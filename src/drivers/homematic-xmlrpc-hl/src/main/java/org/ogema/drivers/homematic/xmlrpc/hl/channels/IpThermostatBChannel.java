@@ -124,31 +124,43 @@ public class IpThermostatBChannel extends AbstractDeviceHandler {
             this.address = address;
 			this.thermos = thermos;
         }
-
+		
         @Override
         public void event(List<HmEvent> events) {
 			boolean setpointTempRead = false;
-            for (HmEvent e : events) {
-                if (!address.equals(e.getAddress())) {
-                    continue;
-                }
-                SingleValueResource res = resources.get(e.getValueKey());
-                if (res == null) {
-                    continue;
-                }
-                try {
-                    PARAMS p = PARAMS.valueOf(e.getValueKey());
-                    ValueResourceUtils.setValue(res, p.convertInput(e.getValueFloat()));
-                    logger.debug("resource updated ({}/{}): {} = {}", p, e, res.getPath(), e.getValue());
-					setpointTempRead |= p == PARAMS.SET_POINT_TEMPERATURE;
-                } catch (IllegalArgumentException ex) {
-                    //this block intentionally left blank
-                }
-            }
-			if (setpointTempRead) {
-				ThermostatUtils.checkForAdaptionFailure(conn, thermos, address, logger);
+			try {
+				for (HmEvent e : events) {
+					if (!address.equals(e.getAddress())) {
+						continue;
+					}
+					SingleValueResource res = resources.get(e.getValueKey());
+					if (res == null) {
+						continue;
+					}
+					try {
+						PARAMS p = PARAMS.valueOf(e.getValueKey());
+						float eventValue;
+						if (e.getValue() instanceof Number) {
+							eventValue = e.getValueFloat();
+						} else {
+							logger.debug("event value is not a number for {}/{}: {}", address, p.name(), e.getValue());
+							eventValue = Float.parseFloat(e.getValueString());
+						}
+						ValueResourceUtils.setValue(res, p.convertInput(eventValue));
+						logger.debug("resource updated ({}/{}): {} = {}", p, e, res.getPath(), e.getValue());
+						setpointTempRead |= PARAMS.SET_POINT_TEMPERATURE.equals(p);
+					} catch (IllegalArgumentException ex) {
+						//this block intentionally left blank
+					}
+				}
+			} catch (RuntimeException re) {
+				logger.error("bug in HmEventListener", re);
+			} finally {
+				if (setpointTempRead) {
+					ThermostatUtils.checkForAdaptionFailure(conn, thermos, address, logger);
+				}
 			}
-        }
+		}
 
     }
     

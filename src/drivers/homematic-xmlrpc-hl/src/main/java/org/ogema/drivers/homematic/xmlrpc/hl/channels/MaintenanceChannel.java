@@ -28,10 +28,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.ogema.core.model.simple.BooleanResource;
-import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
-import org.ogema.core.model.units.TemperatureResource;
 
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmMaintenance;
@@ -114,7 +112,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                 lastRead = now;
             }
         }
-
+		
     }
 
     public MaintenanceChannel(HomeMaticConnection conn) {
@@ -373,8 +371,24 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
         }
         return false;
     }
+	
+	boolean isCyclicInfoDisabled(HmMaintenance resource) {
+		try {
+			IntegerResource cyclicMsg = resource.getSubResource("CYCLIC_INFO_MSG");
+			IntegerResource cyclicMsgFb = resource.getSubResource("CYCLIC_INFO_MSG_FEEDBACK");
+			return (cyclicMsg != null && cyclicMsg.isActive() && cyclicMsg.getValue() == 0)
+					|| (cyclicMsgFb != null && cyclicMsgFb.isActive() && cyclicMsgFb.getValue() == 0);
+		} catch (RuntimeException re) {
+			logger.debug("bug!", re);
+			return false;
+		}
+	}
 
     private boolean update(HmMaintenance m, String channelAddress) {
+		if (isCyclicInfoDisabled(m)) {
+			logger.trace("not updating RSSI on {}: cyclic updates are disabled.", m.getPath());
+			return false;
+		}
         boolean updated = false;
         try {
             if (m.rssiDevice().exists()) { // available resources should be created in setup()

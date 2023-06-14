@@ -385,6 +385,9 @@ public class HmConnection implements HomeMaticConnection {
 						logger.debug("ping OK for {}", baseResource.getName());
 						return true;
 					} else {
+						if (executor.isShutdown()) {
+							return false;
+						}
 						logger.warn("Homematic service for {} does not respond, registering again...", baseResource.getName());
 						performConnect(true);
 						return false;
@@ -851,6 +854,9 @@ public class HmConnection implements HomeMaticConnection {
 
 	protected void close() {
 		HmLogicInterface config = baseResource;
+		if (pingCheck != null) {
+			pingCheck.cancel(true);
+		}
 		try {
 			executor.shutdownNow();
 			if (appman != null) {
