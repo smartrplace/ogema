@@ -19,9 +19,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import org.ogema.core.model.Resource;
 
-import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.SingleValueResource;
 import org.ogema.core.resourcemanager.ResourceStructureEvent;
@@ -40,7 +40,6 @@ import org.ogema.model.devices.buildingtechnology.Thermostat;
 import org.ogema.model.devices.connectiondevices.ThermalValve;
 import org.ogema.model.devices.sensoractordevices.SensorDevice;
 import org.ogema.tools.resource.util.ResourceUtils;
-import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.osgi.framework.Constants;
 import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
@@ -69,37 +68,39 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
     public IpFAL230Channel(HomeMaticConnection conn) {
         super(conn);
     }
-    
-    enum PARAMS {
-		STATE() {
-			@Override
-			public void setEventValue(HmEvent e, SingleValueResource res) {
-				// FAL230 provides only false / true values for the valve state
-				((FloatResource) res).setValue(e.getValueBoolean() ? 1.0f : 0.0f);
-			}
-		},
-		LEVEL() {
-			@Override
-			public void setEventValue(HmEvent e, SingleValueResource res) {
-				// FALMOT provides valve state as 0..100%
-				((FloatResource) res).setValue(e.getValueFloat() / 100f);
-			}
-		};
-
-        public void setEventValue(HmEvent e, SingleValueResource res) {
-            ValueResourceUtils.setValue(res, e.getValueString());
-        }
-
-    }
+	
+	BiConsumer<HmEvent, SingleValueResource> SetStateDefault = (e, res) -> {
+		((FloatResource) res).setValue(e.getValueBoolean() ? 1.0f : 0.0f);
+	};
+	
+	BiConsumer<HmEvent, SingleValueResource> SetLevelDefault = (e, res) -> {
+		((FloatResource) res).setValue(e.getValueFloat() / 100f);
+	};
+	
+	BiConsumer<HmEvent, SingleValueResource> SetLevelFalmotC12 = (e, res) -> {
+		((FloatResource) res).setValue(e.getValueFloat());
+	};
+	
+	Map<String, BiConsumer<HmEvent, SingleValueResource>> parameterSettersDefault = Map.of(
+			"STATE", SetStateDefault,
+			"LEVEL", SetLevelDefault
+	);
+	
+	Map<String, BiConsumer<HmEvent, SingleValueResource>> parameterSettersFalmotC12 = Map.of(
+			"STATE", SetStateDefault,
+			"LEVEL", SetLevelFalmotC12
+	);
 
     class WeatherEventListener implements HmEventListener {
 
         final Map<String, SingleValueResource> resources;
         final String address;
+		final Map<String, BiConsumer<HmEvent, SingleValueResource>> parameterSetters;
 
-        public WeatherEventListener(Map<String, SingleValueResource> resources, String address) {
+        public WeatherEventListener(Map<String, SingleValueResource> resources, Map<String, BiConsumer<HmEvent, SingleValueResource>> parameterSetters, String address) {
             this.resources = resources;
             this.address = address;
+			this.parameterSetters = parameterSetters;
         }
 
         @Override
@@ -113,9 +114,11 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
                     continue;
                 }
                 try {
-                    PARAMS p = PARAMS.valueOf(e.getValueKey());
-					p.setEventValue(e, res);
-                    logger.debug("resource updated: {} = {}", res.getPath(), e.getValue());
+					BiConsumer<HmEvent, SingleValueResource> c = parameterSetters.get(e.getValueKey());
+					if (c != null) {
+						c.accept(e, res);
+						logger.debug("resource updated: {} = {}", res.getPath(), e.getValue());
+					}
                 } catch (IllegalArgumentException ex) {
                     //this block intentionally left blank
                 }
@@ -130,6 +133,9 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
 	@Override
 	public boolean accept(DeviceDescription desc) {
 		//System.out.println("parent type = " + desc.getParentType());
+		if ("HmIP-FALMOT-C12".equalsIgnoreCase(desc.getParentType()) && "CLIMATECONTROL_FLOOR_TRANSCEIVER".equalsIgnoreCase(desc.getType())) {
+			return true;
+		}
 		return (("HmIP-FAL230-C10".equalsIgnoreCase(desc.getParentType()) || "HmIP-FAL230-C6".equalsIgnoreCase(desc.getParentType()))
 				&& ("CLIMATECONTROL_FLOOR_TRANSCEIVER".equalsIgnoreCase(desc.getType())
 				|| "CLIMATECONTROL_FLOOR_PUMP_TRANSCEIVER".equalsIgnoreCase(desc.getType())));
@@ -171,8 +177,11 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
         }
         
         valve.activate(true);
-        
-        conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
+        Map<String, BiConsumer<HmEvent, SingleValueResource>> parameterSetters =
+				"HmIP-FALMOT-C12".equalsIgnoreCase(desc.getParentType())
+				? parameterSettersFalmotC12
+				: parameterSettersDefault;
+        conn.addEventListener(new WeatherEventListener(resources, parameterSetters, desc.getAddress()));
         ThermostatUtils.setupParameterResources(parent, desc, paramSets, conn, valve, logger);
         setupThermostatLinking(valve, deviceAddress, conn, logger);
     }
@@ -219,6 +228,7 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
 			Optional<HmDevice> senderChannel = findDeviceChannel(conn, tempSens, TEMPERATURE_SENDER_CHANNEL, logger);
 			senderChannel.ifPresent(sender -> {
 				String senderAddress = sender.address().getValue();
+				logger.debug("adding temperature sensor link {} => {}", senderAddress, falmotChannel);
 				conn.performAddLink(senderAddress, falmotChannel, "Valve-Thermostat-Link", "Link wall thermostat - floor heating");
 			});
 		}
