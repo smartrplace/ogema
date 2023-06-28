@@ -383,7 +383,7 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 	@Override
 	public Optional<HomeMaticConnection> getConnection(HmDevice device) {
 		return acceptedDevices.values().stream()
-				.filter(cd -> cd.device.equalsLocation(device))
+				.filter(cd -> cd.device.equalsLocation(device) || cd.toplevelDevice.equalsLocation(device))
 				.map(cd -> cd.connection).findAny();
 	}
 
