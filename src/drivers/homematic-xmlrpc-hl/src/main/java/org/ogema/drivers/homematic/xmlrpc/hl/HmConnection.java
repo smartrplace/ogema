@@ -985,5 +985,23 @@ public class HmConnection implements HomeMaticConnection {
 	public String getConnectionUrl() {
 		return clientUrl;
 	}
+
+	@Override
+	public void deleteDevice(String address, int flags) throws IOException {
+		try {
+			client.deleteDevice(address, flags);
+		} catch (XmlRpcException xe) {
+			throw new IOException(xe.getMessage(), xe);
+		}
+	}
+
+	@Override
+	public void setInstallMode(boolean on, int time, int mode) throws IOException {
+		try {
+			client.setInstallMode(on, time, mode);
+		} catch (XmlRpcException xe) {
+			throw new IOException(xe.getMessage(), xe);
+		}
+	}
 	
 }
