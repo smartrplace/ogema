@@ -27,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+import org.ogema.core.model.Resource;
 import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
@@ -374,8 +375,12 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
 	
 	boolean isCyclicInfoDisabled(HmMaintenance resource) {
 		try {
-			IntegerResource cyclicMsg = resource.getSubResource("CYCLIC_INFO_MSG");
-			IntegerResource cyclicMsgFb = resource.getSubResource("CYCLIC_INFO_MSG_FEEDBACK");
+			Resource hmParametersMaster = resource.getSubResource("HmParametersMaster");
+			if (hmParametersMaster == null) {
+				return false;
+			}
+			IntegerResource cyclicMsg = hmParametersMaster.getSubResource("CYCLIC_INFO_MSG");
+			IntegerResource cyclicMsgFb = hmParametersMaster.getSubResource("CYCLIC_INFO_MSG_FEEDBACK");
 			return (cyclicMsg != null && cyclicMsg.isActive() && cyclicMsg.getValue() == 0)
 					|| (cyclicMsgFb != null && cyclicMsgFb.isActive() && cyclicMsgFb.getValue() == 0);
 		} catch (RuntimeException re) {
