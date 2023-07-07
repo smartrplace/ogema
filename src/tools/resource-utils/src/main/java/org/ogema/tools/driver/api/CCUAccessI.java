@@ -6,6 +6,13 @@ import java.util.List;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmLogicInterface;
 
 public interface CCUAccessI {
+	/** Get HomeMaticConnectionI to trigger special teach-in mode and reset devices
+	 * 
+	 * @param iface
+	 * @return
+	 */
+	public HomeMaticConnectionI getConnection(HmLogicInterface iface);
+	
 	/**
 	 * Get the addresses of all devices lost on all known CCUs
 	 *

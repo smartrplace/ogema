@@ -23,6 +23,7 @@ import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEventListener;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
+import org.ogema.tools.driver.api.HomeMaticConnectionI;
 
 /**
  * Used by {@link DeviceHandler} implementations to communicate with its HomeMatic
@@ -30,7 +31,7 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
  *
  * @author jlapp
  */
-public interface HomeMaticConnection {
+public interface HomeMaticConnection extends HomeMaticConnectionI {
 
     /**
      * Register an event listener with this connection.
@@ -119,7 +120,8 @@ public interface HomeMaticConnection {
      * @param time time to remain active in seconds
      * @param mode 1: normal mode, 2: set all MASTER parameters to their default value and delete all links.
      * @throws IOException 
-     */    
+     */ 
+	@Override
     void setInstallMode(boolean on, int time, int mode) throws IOException;
 	
 	/**
@@ -133,6 +135,7 @@ public interface HomeMaticConnection {
      * @param flags see javadoc
      * @throws IOException
      */
+	@Override
     void deleteDevice(String address, int flags) throws IOException;
     
 }
