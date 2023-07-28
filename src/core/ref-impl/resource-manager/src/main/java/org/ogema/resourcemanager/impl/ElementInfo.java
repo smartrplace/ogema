@@ -15,6 +15,7 @@
  */
 package org.ogema.resourcemanager.impl;
 
+import java.lang.ref.SoftReference;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -64,6 +65,12 @@ public class ElementInfo {
 	static final int INITIAL_ACCESSREQUESTS_QUEUE_SIZE = 5;
 	private final Object accessLock = new Object();
 	PriorityQueue<AccessModeRequest> accessRequests;
+	
+	static class ListElementsCache {
+		@SuppressWarnings("rawtypes")
+		SoftReference<List> list;
+		int revision = -1;
+	}
 
 	public ElementInfo(ResourceDBManager man, TreeElement el) {
         //System.out.printf("NEW ELEMENTINFO %s: %s (%s)%n", this, el.getPath(), el.getLocation());
@@ -72,12 +79,12 @@ public class ElementInfo {
 		this.man = man;
 	}
 
-	private <T> Collection<T> getListeners(Class<T> type) {
+	private <T> List<T> getListeners(Class<T> type) {
 		synchronized (listenersLock) {
 	        if (listeners == null) {
 	            return Collections.emptyList();
 	        }
-	        Collection<T> listenersOfRequestedType = new ArrayList<>();
+	        List<T> listenersOfRequestedType = new ArrayList<>();
 	        for (Object listener : listeners) {
 	            if (type.isAssignableFrom(listener.getClass())) {
 	                listenersOfRequestedType.add(type.cast(listener));
@@ -117,6 +124,40 @@ public class ElementInfo {
 			}
 		}
 		return null;
+	}
+	
+	@SuppressWarnings("unchecked")
+	public <T extends Resource> List<T> getListElements(int revision) {
+		synchronized (listenersLock) {
+			List<ListElementsCache> l = getListeners(ListElementsCache.class);
+			if (!l.isEmpty()) {
+				ListElementsCache c = l.get(0);
+				if (c.revision != revision) {
+					c.list.clear();
+					return null;
+				}
+				//List<?> list = c.list.get();
+				//System.out.println("return cached list elements: " + (list == null ? 0 : list.size()));
+				return (List<T>) c.list.get();
+			}
+		}
+		return null;
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public void setListElements(List list, int revision) {
+		synchronized (listenersLock) {
+			List<ListElementsCache> l = getListeners(ListElementsCache.class);
+			ListElementsCache c;
+			if (l.isEmpty()) {
+				c = new ListElementsCache();
+				addListener(c);
+			} else {
+				c = l.get(0);
+			}
+			c.revision = revision;
+			c.list = new SoftReference<>(list);
+		}
 	}
 
 	public Collection<InternalValueChangedListenerRegistration> getResourceListeners() {
