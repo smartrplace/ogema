@@ -23,6 +23,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
@@ -118,6 +119,21 @@ public class DeleteTest extends OsgiTestBase {
 		assertExists(loc);
 		pe.location().delete();
 		assertDeleted(loc);
+	}
+	
+	@Ignore("TODO")
+	@Test
+	public void deleteAfterReferenceWorks() {
+		@SuppressWarnings("unchecked")
+		final ResourceList<PhysicalElement> list = resMan.createResource(newResourceName(), ResourceList.class);
+		list.setElementType(PhysicalElement.class);
+		PhysicalElement pe = list.addDecorator("a", PhysicalElement.class);
+		pe.location().name().<StringResource> create().setValue("a");
+		PhysicalElement pe2 = list.addDecorator("b", PhysicalElement.class);
+		pe2.location().name().<StringResource> create().setValue("b");
+		pe.location().setAsReference(pe2.location());
+		pe.location().name().delete();
+		assertIsVirtual(pe.location().name());
 	}
 
 	@Test
