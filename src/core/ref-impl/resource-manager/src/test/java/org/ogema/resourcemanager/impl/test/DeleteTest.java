@@ -23,7 +23,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import org.junit.Ignore;
 import org.junit.Test;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
@@ -121,7 +120,6 @@ public class DeleteTest extends OsgiTestBase {
 		assertDeleted(loc);
 	}
 	
-	@Ignore("TODO")
 	@Test
 	public void deleteAfterReferenceWorks() {
 		@SuppressWarnings("unchecked")
