@@ -320,7 +320,8 @@ public class DefaultVirtualTreeElement implements VirtualTreeElement {
     protected synchronized DefaultVirtualTreeElement getVirtualChild(String name) {
         DefaultVirtualTreeElement child = virtualSubresources.get(name);
         if (child != null) {
-        	assert child.getParent().equals(this) : "Child resource has multiple parents";
+        	assert child.getParent().equals(this) : "Child resource has multiple parents: p1="
+					+ getPath()+ ", p2=" + child.getParent().getPath() + ", child=" + child.getName();
         	assert child.el instanceof MemoryTreeElement : "Virtual resource has invalid tree element; this: " + getPath() 
         		+ ", child: " + child.el.getPath() + "; type: " + child.el.getClass().getSimpleName();
             return child;
