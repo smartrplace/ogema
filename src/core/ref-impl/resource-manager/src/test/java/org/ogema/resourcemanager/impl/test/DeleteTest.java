@@ -176,6 +176,28 @@ public class DeleteTest extends OsgiTestBase {
 		assertDeleted(pe.location());
 		assertFalse(pe.location().isReference(false));
 	}
+	
+	@Test
+	public void deletingAReferencedResourceLeavesReferenceAccessible() {
+		//bug was: deleting a referenced resource left the reference path broken
+		final PhysicalElement pe = resMan.createResource(newResourceName(), PhysicalElement.class);
+		final PhysicalElement pe2 = resMan.createResource(newResourceName(), PhysicalElement.class);
+
+		pe.location().room().create();
+		pe2.location().room().create();
+		System.out.println("resources created...");
+				
+		pe.location().setAsReference(pe2.location());
+		
+		System.out.println("reference set...");
+		System.out.println(pe.location().room());
+		System.out.println(pe2.location().room());
+		
+		pe.location().room().delete();
+		System.out.println("deleted...");
+		System.out.println(pe.location().room());
+		assertDeleted(pe.location().room());
+	}
 
 	@Test
 	public void deletedResourcesAreVirtualAndInactive() {

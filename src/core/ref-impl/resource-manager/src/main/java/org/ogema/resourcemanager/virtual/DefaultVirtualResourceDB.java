@@ -153,16 +153,18 @@ public class DefaultVirtualResourceDB implements VirtualResourceDB {
             if (oldResRef != null) {
                 replacement.setResRef(oldResRef);
             }
+			virtualElement.virtualSubresources.clear();
             virtualElement.setEl(replacement);
             if (elem.isToplevel()) {
                 topLevelElementCache.invalidate(elem.getName());
             }
             realResources.deleteResource(realElement);
             for (DefaultVirtualTreeElement child : virtualElement.getVirtualChildren()) {
-            	if (child.isVirtual()) {
-            		((MemoryTreeElement) child.getEl()).setParent(replacement);
-            	}
-            	
+                if (child.isVirtual()) {
+                    // remove as child of old virtual element
+                    //virtualElement.virtualSubresources.remove(child.getName());
+                    ((MemoryTreeElement) child.getEl()).setParent(replacement);
+                }
             }
         }
     }
