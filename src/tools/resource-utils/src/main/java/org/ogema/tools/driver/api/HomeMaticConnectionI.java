@@ -20,7 +20,8 @@ public interface HomeMaticConnectionI {
      * <dt>0x02</dt> <dd>DELETE_FLAG_FORCE - delete even if device is not reachable</dd>
      * <dt>0x04</dt> <dd>DELETE_FLAG_DEFER - delete as soon as device is reachable</dd>
      * </dl>
-     * @param address device address (This is the resource name of the HmDevice)
+     * @param address device address (This is the full numeric device id, e.g. 000A1D89B0FEA2. This is 
+     * 		the last part of the resource name of the HmDevice, after the last underscore.)
      * @param flags see javadoc
      * @throws IOException
      */
