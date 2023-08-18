@@ -1,9 +1,16 @@
 package org.ogema.tools.shell.commands;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,8 +22,11 @@ import org.apache.felix.service.command.Descriptor;
 import org.apache.felix.service.command.Parameter;
 import org.ogema.core.application.Application;
 import org.ogema.core.application.ApplicationManager;
+import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
+import org.ogema.core.model.ValueResource;
+import org.ogema.core.model.schedule.Schedule;
 import org.ogema.core.model.simple.SingleValueResource;
 import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.osgi.framework.Bundle;
@@ -43,6 +53,7 @@ import org.osgi.service.component.annotations.Deactivate;
 				"osgi.command.function=numResources", 
 				"osgi.command.function=numSubresources",
 				"osgi.command.function=optionalElements",
+				"osgi.command.function=resourceContainer",
 				"osgi.command.function=resourcesBySize",
 				"osgi.command.function=subResources",
 				"osgi.command.function=toplevelResources"
@@ -729,6 +740,119 @@ public class ResourceCommands {
 	public Map<String, Class<? extends Resource>> optionalElements(@Descriptor("Resource type fully qualified name or short form") String type) throws InterruptedException {
 		startLatch.await(30, TimeUnit.SECONDS);
 		return optionalElements(loadResourceClass(appMan.getAppID().getBundle().getBundleContext(), type));
+	}
+	
+	@Descriptor("Print a container view of a resource")
+	public String resourceContainer(
+			@Descriptor("Max depth in the resource tree. Default: 10.")
+			@Parameter(names= { "-d", "--depth"}, absentValue = "10")
+			int depth,
+			@Descriptor("Traverse references subresources?")
+			@Parameter(names= { "-fr", "--follow-references"}, absentValue = "false", presentValue="true")
+			boolean followReferences,
+			@Descriptor("Show schedule values?")
+			@Parameter(names= { "-s", "--schedules"}, absentValue = "false", presentValue="true")
+			boolean showSchedules,
+			@Descriptor("Resource") Resource resource
+			) throws InterruptedException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException {
+		if (resource == null)
+			return null;
+		startLatch.await(30, TimeUnit.SECONDS);
+		final StringBuilder sb = new StringBuilder();
+		appendResourceContainer(resource, sb, "", true, depth, followReferences, showSchedules);
+		return sb.toString();
+	}
+	
+	@Descriptor("Print a container view of a resource")
+	public String resourceContainer(
+			@Descriptor("Max depth in the resource tree. Default: 10.")
+			@Parameter(names= { "-d", "--depth"}, absentValue = "10")
+			int depth,
+			@Descriptor("Traverse references subresources?")
+			@Parameter(names= { "-fr", "--follow-references"}, absentValue = "false", presentValue="true")
+			boolean followReferences,
+			@Descriptor("Show schedule values?")
+			@Parameter(names= { "-s", "--schedules"}, absentValue = "false", presentValue="true")
+			boolean showSchedules,
+			@Descriptor("Resource path") String resourcePath
+			) throws InterruptedException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException {
+		startLatch.await(30, TimeUnit.SECONDS);
+		final Resource base = appMan.getResourceAccess().getResource(resourcePath);
+		if (base == null) {
+			System.out.println("Resource not found: " + resourcePath);
+			return null;
+		}
+		return resourceContainer(depth, followReferences, showSchedules, base);
+	}
+	
+	private static void appendResourceContainer(Resource r, StringBuilder sb, String indent, boolean fullPath,
+			int depth, boolean followReferences, boolean showSchedules) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException {
+		if (depth < 0)
+			return;
+		sb.append(indent).append(fullPath ? r.getPath() : r.getName()).append(": ");
+		try {
+			if (!followReferences && r.isReference(false) && !"".equals(indent)) {
+				sb.append("(Link => ").append(r.getLocation());
+				if (r instanceof SingleValueResource)
+					sb.append(", ").append(ValueResourceUtils.getValue((SingleValueResource) r));
+				sb.append(')');
+				return;
+			}
+			if (r instanceof SingleValueResource) {
+				sb.append(ValueResourceUtils.getValue((SingleValueResource) r));
+			} else if (r instanceof Schedule) {
+				if (!showSchedules) {
+					sb.append(r.getResourceType());
+				} else {
+					final DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ");
+					final Iterator<SampledValue> it = ((Schedule) r).iterator();
+					int cnt = 0;
+					long lastT = Long.MIN_VALUE;
+					while (it.hasNext()) {
+						final SampledValue sv = it.next();
+						lastT = sv.getTimestamp();
+						if (cnt > 0)
+							sb.append(", ");
+						printSampledValue(sv, sb, format);
+						if (cnt++ > 3)
+							break;
+					}
+					if (cnt > 0) {
+						final SampledValue sv = ((Schedule) r).getPreviousValue(Long.MAX_VALUE);
+						if (sv.getTimestamp() > lastT) {
+							sb.append(", ..., ");
+							printSampledValue(sv, sb, format);
+						}
+					}
+				}
+			} else if (r instanceof ValueResource) {
+				final Object o = ValueResourceUtils.getValue((ValueResource) r);
+				final Class<?> arrayType = o.getClass();
+				sb.append((String) Arrays.class.getMethod("toString", arrayType).invoke(null, o));
+			} else {
+				sb.append('{');
+				int cnt = 0;
+				for (Resource sub: r.getSubResources(false)) {
+					if (cnt > 0)
+						sb.append(',');
+					sb.append('\n');
+					appendResourceContainer(sub, sb, indent + "    ", false, depth-1, followReferences, showSchedules);
+					cnt++;
+				}
+				if (cnt > 0)
+					sb.append('\n').append(indent);
+				sb.append('}');
+			}
+		} catch (Exception e) {
+			sb.append("(Error => ").append(e).append(')');
+		}
+		
+	}
+	
+	private static void printSampledValue(final SampledValue sv, final StringBuilder sb, final DateTimeFormatter format) {
+		sb.append(format.format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(sv.getTimestamp()), ZoneId.systemDefault())))
+			.append(" => ")
+			.append(sv.getValue().getStringValue());
 	}
 	
 	private static void countSubresources(final Resource r, final Class<? extends Resource> type, final AtomicInteger cnt) {

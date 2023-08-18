@@ -92,7 +92,8 @@ public class IpShutterContact extends AbstractDeviceHandler implements DeviceHan
 
     @Override
     public boolean accept(DeviceDescription desc) {
-        return ("HMIP-SWDO".equalsIgnoreCase(desc.getParentType()) || "HMIP-SWDM".equalsIgnoreCase(desc.getParentType()))
+        //return ("HMIP-SWDO".equalsIgnoreCase(desc.getParentType()) || "HMIP-SWDM".equalsIgnoreCase(desc.getParentType()))
+		return (desc.getParentType().toUpperCase().startsWith("HMIP-SWDO") || "HMIP-SWDM".equalsIgnoreCase(desc.getParentType()))
                 && "SHUTTER_CONTACT".equalsIgnoreCase(desc.getType());
     }
 

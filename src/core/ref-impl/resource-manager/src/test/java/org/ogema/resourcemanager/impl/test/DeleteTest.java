@@ -119,6 +119,20 @@ public class DeleteTest extends OsgiTestBase {
 		pe.location().delete();
 		assertDeleted(loc);
 	}
+	
+	@Test
+	public void deleteAfterReferenceWorks() {
+		@SuppressWarnings("unchecked")
+		final ResourceList<PhysicalElement> list = resMan.createResource(newResourceName(), ResourceList.class);
+		list.setElementType(PhysicalElement.class);
+		PhysicalElement pe = list.addDecorator("a", PhysicalElement.class);
+		pe.location().name().<StringResource> create().setValue("a");
+		PhysicalElement pe2 = list.addDecorator("b", PhysicalElement.class);
+		pe2.location().name().<StringResource> create().setValue("b");
+		pe.location().setAsReference(pe2.location());
+		pe.location().name().delete();
+		assertIsVirtual(pe.location().name());
+	}
 
 	@Test
 	public void deleteCausesResourceUnavailableCallbacks() throws InterruptedException {
@@ -175,6 +189,28 @@ public class DeleteTest extends OsgiTestBase {
 		assertDeleted(pe2.location());
 		assertDeleted(pe.location());
 		assertFalse(pe.location().isReference(false));
+	}
+	
+	@Test
+	public void deletingAReferencedResourceLeavesReferenceAccessible() {
+		//bug was: deleting a referenced resource left the reference path broken
+		final PhysicalElement pe = resMan.createResource(newResourceName(), PhysicalElement.class);
+		final PhysicalElement pe2 = resMan.createResource(newResourceName(), PhysicalElement.class);
+
+		pe.location().room().create();
+		pe2.location().room().create();
+		System.out.println("resources created...");
+				
+		pe.location().setAsReference(pe2.location());
+		
+		System.out.println("reference set...");
+		System.out.println(pe.location().room());
+		System.out.println(pe2.location().room());
+		
+		pe.location().room().delete();
+		System.out.println("deleted...");
+		System.out.println(pe.location().room());
+		assertDeleted(pe.location().room());
 	}
 
 	@Test
