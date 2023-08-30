@@ -935,10 +935,10 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 			final String user = req.getParameter(Constants.OTUNAME);
 			final String pw = req.getParameter(Constants.OTPNAME);
 			if (user != null && pw != null	&& isAuthenticatorAdmitted(user, Authenticator.DEFAULT_USER_PW_ID)) {
-				if (authenticate(user, pw, isNatural != null ? isNatural : isNatural(user)))
+				if (authenticate(user, pw, isNatural != null ? isNatural : isNatural(user))) {
 					return user;
-				else
-					return null;
+				}
+				//else: allow pluggable authenticators...
 			}
 		}
 		for (Map.Entry<String, Authenticator> entry : authenticators.entrySet()) {

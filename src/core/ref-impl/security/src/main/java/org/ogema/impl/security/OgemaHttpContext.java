@@ -219,11 +219,20 @@ public class OgemaHttpContext implements HttpContext {
 			response.flushBuffer();
 			return false;
 		}
+		
+		if (request.getSession(false) != null && request.getSession().getAttribute("Authenticator") != null) {
+			Authenticator auth = (Authenticator) request.getSession().getAttribute("Authenticator");
+			if (!auth.sessionStillValid(request)) {
+				HttpSession invalidSession = request.getSession();
+				invalidSession.invalidate();
+			}
+		}
         
         if (request.getSession(false) == null || request.getSession().getAttribute(Constants.AUTH_ATTRIBUTE_NAME) == null) {
 			tryPluggableAuthenticators(request);
             //tryBasicAuthLogin(request);
         }
+		
 		HttpSession httpses = request.getSession();
 		SessionAuth sesAuth;
 
@@ -260,7 +269,7 @@ public class OgemaHttpContext implements HttpContext {
 				// and the user getting blocked...
 				if ("GET".equals(request.getMethod())) {
 					if (Configuration.DEBUG) {
-						logger.debug("New Session is forwarded to Login page.");
+						logger.debug("New Session is forwarded to Login page: {}", LoginServlet.LOGIN_SERVLET_PATH);
                     }
 					request.getRequestDispatcher(LoginServlet.LOGIN_SERVLET_PATH).forward(request, response);
                     return false;
@@ -428,6 +437,7 @@ public class OgemaHttpContext implements HttpContext {
 						Authorization author = admin.getAuthorization(user);
 						SessionAuth sauth = new SessionAuth(author, permMan.getAccessManager(), ses);
 						ses.setAttribute(Constants.AUTH_ATTRIBUTE_NAME, sauth);
+						ses.setAttribute("Authenticator", auth);
 						logger.debug("login succeeded with authenticator {} for {}", authId, username);
 						break;
 					} catch (NullPointerException npe) {

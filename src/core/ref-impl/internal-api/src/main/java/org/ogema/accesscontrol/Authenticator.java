@@ -20,46 +20,63 @@ import javax.servlet.http.HttpServletRequest;
 import org.ogema.accesscontrol.RestAccess.LoginViaNaturalUserChecker;
 
 /**
-* Register as OSGi service with property {@link #AUTHENTICATOR_ID} set.
-*/
+ * Register as OSGi service with property {@link #AUTHENTICATOR_ID} set.
+ */
 public interface Authenticator {
 
-     public static final String AUTHENTICATOR_ID = "authenticator.id";
+	public static final String AUTHENTICATOR_ID = "authenticator.id";
 
-     /**
-      * Id of the default built-in user/pw based authentication.
-      */
-     public static final String DEFAULT_USER_PW_ID = "userpw";
-     
-     /**
-      * Id of the built-in basic authentication provider
-      */
-     public static final String DEFAULT_BASIC_AUTH = "basicauth";
-     
-     /**
-     * Validate the login credentials associated to a servlet request, and determine the
-     * associated user.
-     * 
-     * @param req
-     * @return
-     *     null if the request could not be authenticated, the user name otherwise
-     */
-     String authenticate(HttpServletRequest req);
-     
-     public interface UserTypeChecker {
-    	 boolean isExpectedUserType(String userName);
-     }
-     /**
-     * Validate the login credentials associated to a servlet request, and determine the
-     * associated user.
-     * 
-     * @param req
-     * @param userTypeChecker if not null the initial result will be tested via isExpectedUserType. If
-     * 		the caller does not confirm, then also the user "_rest" is tested
-     * @return
-     *     null if the request could not be authenticated, the user name otherwise
-     */
-     default String authenticate(HttpServletRequest req, UserTypeChecker userTypeChecker) {
-    	return authenticate(req);
-     }
+	/**
+	 * Id of the default built-in user/pw based authentication.
+	 */
+	public static final String DEFAULT_USER_PW_ID = "userpw";
+
+	/**
+	 * Id of the built-in basic authentication provider
+	 */
+	public static final String DEFAULT_BASIC_AUTH = "basicauth";
+
+	/**
+	 * Validate the login credentials associated to a servlet request, and
+	 * determine the associated user.
+	 *
+	 * @param req
+	 * @return null if the request could not be authenticated, the user name
+	 * otherwise
+	 */
+	String authenticate(HttpServletRequest req);
+
+	@FunctionalInterface
+	public interface UserTypeChecker {
+
+		boolean isExpectedUserType(String userName);
+	}
+
+	/**
+	 * Validate the login credentials associated to a servlet request, and
+	 * determine the associated user.
+	 *
+	 * @param req
+	 * @param userTypeChecker if not null the initial result will be tested via
+	 * isExpectedUserType. If the caller does not confirm, then also the user
+	 * "_rest" is tested
+	 * @return null if the request could not be authenticated, the user name
+	 * otherwise
+	 */
+	default String authenticate(HttpServletRequest req, UserTypeChecker userTypeChecker) {
+		return authenticate(req);
+	}
+	
+	/**
+	 * Callback for logged in sessions, used to confirm that the session is still
+	 * valid. The default implementation returns true, in case of false, the session
+	 * will be invalidated.
+	 * 
+	 * @param req current request.
+	 * @return false iff the current session should be invalidated.
+	 */
+	default boolean sessionStillValid(HttpServletRequest req) {
+		return true;
+	}
+	
 }
