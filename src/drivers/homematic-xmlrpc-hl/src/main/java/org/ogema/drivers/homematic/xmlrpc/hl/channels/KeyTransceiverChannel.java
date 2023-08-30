@@ -1,5 +1,8 @@
 package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -7,6 +10,8 @@ import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandler;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandlerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
+import org.ogema.drivers.homematic.xmlrpc.hl.channels.KeyTransceiverChannel.Config;
+import static org.ogema.drivers.homematic.xmlrpc.hl.channels.KeyTransceiverChannel.PID;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
@@ -14,7 +19,11 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEventListener;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.ogema.model.actors.EventPushButton;
 import org.ogema.model.actors.EventPushButtonDevice;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.metatype.annotations.Designate;
+import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,10 +38,33 @@ import org.slf4j.LoggerFactory;
  * 
  * @author jlapp
  */
-@Component(service = {DeviceHandlerFactory.class} /*, property = {Constants.SERVICE_RANKING + ":Integer=1"}*/ )
+@Designate(ocd = Config.class)
+@Component(service = {DeviceHandlerFactory.class}, configurationPid = PID)
 public class KeyTransceiverChannel extends AbstractDeviceHandler implements DeviceHandlerFactory {
+	
+	public static final String PID = "homematic.xmlrpc.hl.channels.KeyTransceiverChannel";
+	String[] ignoredTypes = { "HmIP-RCV-50" };
+	String[] ignoredDevices = {};
     
     Logger logger = LoggerFactory.getLogger(getClass());
+	
+	@ObjectClassDefinition
+	public static @interface Config {
+		String[] ignoredDeviceTypes() default { "HmIP-RCV-50" };
+		String[] ignoredDevices() default {};
+	}
+	
+	@Activate
+	protected void activate(Config cfg) {
+		if (cfg != null) {
+			ignoredTypes = cfg.ignoredDeviceTypes();
+			ignoredDevices = cfg.ignoredDevices();
+		}
+	}
+	
+	@Deactivate
+	protected void deactivate(Config cfg) {
+	}
     
     @Override
     public DeviceHandler createHandler(HomeMaticConnection connection) {
@@ -81,6 +113,10 @@ public class KeyTransceiverChannel extends AbstractDeviceHandler implements Devi
 
     @Override
     public boolean accept(DeviceDescription desc) {
+		if (Arrays.asList(ignoredTypes).contains(desc.getParentType())
+				|| Arrays.asList(ignoredDevices).contains(desc.getParent())) {
+			return false;
+		}
         return "KEY_TRANSCEIVER".equalsIgnoreCase(desc.getType());
     }
 

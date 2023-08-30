@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.Dictionary;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -68,7 +69,13 @@ public class HomeMaticService {
     private HmBackend backend;
     
     public HomeMaticService(BundleContext ctx, String urlBase, String alias) {
-        this.interfaceUrl = urlBase + alias;
+		Objects.requireNonNull(urlBase, "url base must not be null");
+		Objects.requireNonNull(alias, "alias must not be null");
+		if (!(urlBase.endsWith("/") || alias.startsWith("/"))) {
+			this.interfaceUrl = urlBase + "/" + alias;
+		} else {
+			this.interfaceUrl = urlBase + alias;
+		}
         servlet = new HomeMaticXmlRpcServlet(procfac);
         @SuppressWarnings("UseOfObsoleteCollectionType")
         Dictionary<String, Object> parameters = new java.util.Hashtable<>();
