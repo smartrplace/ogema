@@ -23,6 +23,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
@@ -132,8 +133,24 @@ public class DeleteTest extends OsgiTestBase {
 		pe.location().setAsReference(pe2.location());
 		pe.location().name().delete();
 		assertIsVirtual(pe.location().name());
+		list.delete();
 	}
-
+	
+	@Ignore
+	@Test
+	public void deleteReferenceSubresWorks() {
+		@SuppressWarnings("unchecked")
+		final ResourceList<PhysicalElement> list = resMan.createResource(newResourceName(), ResourceList.class);
+		list.setElementType(PhysicalElement.class);
+		final PhysicalElement pe = list.addDecorator("a", PhysicalElement.class);
+		final PhysicalElement pe2 = list.addDecorator("b", PhysicalElement.class);
+		pe.setAsReference(pe2);
+		pe.name().<StringResource> create().setValue("test");
+		pe.name().delete();
+		assertIsVirtual(pe.name());
+		list.delete();
+	}
+	
 	@Test
 	public void deleteCausesResourceUnavailableCallbacks() throws InterruptedException {
 		final PhysicalElement pe = resMan.createResource(newResourceName(), PhysicalElement.class);
