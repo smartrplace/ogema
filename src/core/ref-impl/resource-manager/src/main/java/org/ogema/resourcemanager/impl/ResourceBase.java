@@ -1549,18 +1549,26 @@ public abstract class ResourceBase implements ConnectedResource {
 			parent = link.getParentPrivileged();
 			path = link.getElInternal().getReference().getPath();
 		}
+
+		@Override
+		public String toString() {
+			return String.format("[%s,%s: %s]", parent.getPath(), name, path);
+		}
+		
 	}
 
 	protected Map<String, DeletedLinkInfo> deleteInternal(Map<String, DeletedLinkInfo> danglingLinks) {
         if (danglingLinks == null){
             //first call
-            notifyDelete(this, false, new HashSet<>(computeAliasesForPath()), new HashSet<String>());
+			List<String> aliases = computeAliasesForPath();
+			//System.out.printf("aliases of %s: %s%n", getPath(), aliases);
+            notifyDelete(this, false, new HashSet<>(aliases), new HashSet<String>());
             danglingLinks = new HashMap<>();
         }
         if (!exists()) {
             return danglingLinks;
         }
-
+		//System.out.println("incoming: " + incoming());
         for (Map.Entry<Resource, String> inc: incoming()) {
             ResourceBase sub = inc.getKey().getSubResource(inc.getValue());
             if (!sub.equals(this) && sub.isReference(false)) {
@@ -1587,7 +1595,7 @@ public abstract class ResourceBase implements ConnectedResource {
         } else {
         	pathsToVirtualize = getSubpathsRecursive();
         }
-
+		//System.out.println("virtualize: " + pathsToVirtualize);
         deleteTreeElement(pathsToVirtualize);
         return danglingLinks;
     }

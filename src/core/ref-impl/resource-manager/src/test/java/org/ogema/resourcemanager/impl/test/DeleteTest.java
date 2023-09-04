@@ -23,7 +23,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import org.junit.Ignore;
 import org.junit.Test;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
@@ -43,6 +42,7 @@ import org.ogema.model.prototypes.PhysicalElement;
 import org.ogema.model.sensors.PowerSensor;
 import org.ogema.model.targetranges.PowerTargetRange;
 import org.ogema.resourcemanager.impl.ConnectedResource;
+import org.ogema.resourcemanager.impl.ResourceBase;
 import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
 import org.ops4j.pax.exam.spi.reactors.PerClass;
 
@@ -136,18 +136,22 @@ public class DeleteTest extends OsgiTestBase {
 		list.delete();
 	}
 	
-	@Ignore
 	@Test
 	public void deleteReferenceSubresWorks() {
 		@SuppressWarnings("unchecked")
-		final ResourceList<PhysicalElement> list = resMan.createResource(newResourceName(), ResourceList.class);
-		list.setElementType(PhysicalElement.class);
-		final PhysicalElement pe = list.addDecorator("a", PhysicalElement.class);
-		final PhysicalElement pe2 = list.addDecorator("b", PhysicalElement.class);
+		//final ResourceList<PhysicalElement> list = resMan.createResource(newResourceName(), ResourceList.class);
+		//list.setElementType(PhysicalElement.class);
+		final Resource list = resMan.createResource(newResourceName(), Resource.class);
+		final PhysicalElement pe = list.getSubResource("a", PhysicalElement.class);
+		final PhysicalElement pe2 = list.getSubResource("b", PhysicalElement.class).create();
 		pe.setAsReference(pe2);
 		pe.name().<StringResource> create().setValue("test");
+
 		pe.name().delete();
+		assertIsVirtual(resAcc.getResource(list.getName() + "/a/name"));
 		assertIsVirtual(pe.name());
+		assertIsVirtual(resAcc.getResource(list.getName() + "/b/name"));
+		assertIsVirtual(pe2.name());
 		list.delete();
 	}
 	
