@@ -13,17 +13,23 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.Spliterator;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import org.apache.felix.gogo.jline.Shell;
 import org.apache.felix.service.command.CommandSession;
 import org.apache.felix.service.command.Descriptor;
@@ -185,14 +191,14 @@ public class ResourcePathCommands implements Application {
 			return appman.getResourceAccess().getResource(newPath);
 		}
 	}
-	
+
 	private List<String> expand(CommandSession sess, String[] args, String commandName) {
 		Resource cr = (Resource) sess.get(CURRENT_RESOURCE);
 		if (cr == null) {
 			cr = new RootResource(appman);
 		}
 		List<String> rval = new ArrayList<>(args.length);
-		for (String a: args) {
+		for (String a : args) {
 			if (a.contains("*") || a.contains("?")) {
 				if (a.contains("/")) {
 					sess.getConsole().printf("%s: %s: unsupported glob expression%n", commandName, a);
@@ -209,12 +215,12 @@ public class ResourcePathCommands implements Application {
 		}
 		return rval;
 	}
-	
+
 	public Map<String, Resource> expandAndResolve(CommandSession sess, String[] args, String commandName) {
 		List<String> expandedNames = expand(sess, args, commandName);
 		Map<String, Resource> rval = new LinkedHashMap<>();
 		Resource current = (Resource) sess.get(CURRENT_RESOURCE);
-		for (String path: expandedNames) {
+		for (String path : expandedNames) {
 			Resource r = getResource(sess, current, path);
 			if (r == null) {
 				sess.getConsole().printf("%s: %s: resource not found%n", commandName, path);
@@ -224,7 +230,7 @@ public class ResourcePathCommands implements Application {
 		}
 		return rval;
 	}
-	
+
 	@Descriptor("List resources")
 	public void lr(CommandSession sess,
 			@Parameter(names = {"-l"}, absentValue = "false", presentValue = "true")
@@ -239,7 +245,7 @@ public class ResourcePathCommands implements Application {
 		Resource cr = (Resource) sess.get(CURRENT_RESOURCE);
 
 		Map<String, Resource> reslist = new LinkedHashMap<>();
-		
+
 		List<String> pexp = expand(sess, path, "lr");
 		if (pexp.isEmpty() && path.length > 0) {
 			return;
@@ -253,7 +259,7 @@ public class ResourcePathCommands implements Application {
 				reslist.put(respath, res);
 			}
 		}
-		
+
 		if (reslist.isEmpty() && path.length > 0) {
 			return;
 		}
@@ -368,7 +374,7 @@ public class ResourcePathCommands implements Application {
 			System.err.println("import: file not found: " + file);
 			return null;
 		}
-		try ( BufferedReader r = Files.newBufferedReader(p)) {
+		try (BufferedReader r = Files.newBufferedReader(p)) {
 			Resource res = appman.getSerializationManager().createFromJson(r);
 			return res;
 		}
@@ -460,13 +466,123 @@ public class ResourcePathCommands implements Application {
 		res.delete();
 	}
 
+	/**
+	 * Depth first pre-order traversal of a resource graph containing all paths
+	 * excluding loops (re-start of loop will not be returned). Note that the usual
+	 * resource traversal (e.g. {@link Resource#getSubResources(boolean) })
+	 * returns a set in which all locations are unique, whereas this traversal
+	 * may return a location multiple times depending on references.
+	 * 
+	 */
+	public static class ResourceSpliterator implements Spliterator<Resource> {
+
+		Deque<IterationState> stack = new ArrayDeque<>();
+		Set<Resource> visitedOnPath = new HashSet<>();
+		int maxDepth;
+
+		class IterationState {
+
+			Resource res;
+			List<Resource> children;
+			int childIndex;
+
+			public IterationState(Resource res, List<Resource> children, int childIndex) {
+				this.res = res;
+				this.children = children;
+				this.childIndex = childIndex;
+			}
+
+		}
+		
+		public ResourceSpliterator(Resource start) {
+			this(start, Integer.MAX_VALUE);
+		}
+
+		public ResourceSpliterator(Resource start, int maxDepth) {
+			if (maxDepth < 0) {
+				throw new IllegalArgumentException("maxDepth must be >= 0");
+			}
+			stack.push(new IterationState(start, start.getSubResources(false), 0));
+			this.maxDepth = maxDepth;
+		}
+
+		// false => post order
+		final boolean preorder = true;
+		
+		@Override
+		public boolean tryAdvance(Consumer<? super Resource> action) {
+			while (!stack.isEmpty()) {
+				IterationState it = stack.peek();
+				if (preorder && it.childIndex == 0) { //preorder
+					action.accept(it.res);
+				}
+				//System.out.printf("current: %d/%d, %s%n", it.childIndex, it.children.size(), it.res.getPath());
+				if (it.children.isEmpty()) {
+					// only used when the starting resource is empty, otherwise
+					// leaf resources are returned directly
+					if (!preorder) {
+						action.accept(it.res);
+					}
+					stack.pop();
+					//System.out.println("pop (empty children)");
+					visitedOnPath.remove(it.res.getLocationResource());
+					return true;
+				}
+				if (it.childIndex == it.children.size()) {
+					// return intermediate node after all children have been processed
+					if (!preorder) {
+						action.accept(it.res);
+					}
+					stack.pop();
+					//System.out.println("pop");
+					visitedOnPath.remove(it.res.getLocationResource());
+					return true;
+				}
+				Resource next = it.children.get(it.childIndex++);
+				if (stack.size() - 1 < maxDepth && !visitedOnPath.contains(next.getLocationResource())) {
+					//System.out.println("push: " + next.getPath());
+					List<Resource> nextChildren = next.getSubResources(false);
+					if (nextChildren.isEmpty()) { // return leaf node directly
+						action.accept(next);
+						return true;
+					}
+					else {
+						visitedOnPath.add(next.getLocationResource());
+						stack.push(new IterationState(next, nextChildren, 0));
+					}
+				} // else: looping path, do not descend further or max depth reached
+			}
+			return false;
+		}
+
+		@Override
+		public Spliterator<Resource> trySplit() {
+			return null;
+		}
+
+		@Override
+		public long estimateSize() {
+			return Long.MAX_VALUE;
+		}
+
+		@Override
+		public int characteristics() {
+			return Spliterator.ORDERED | Spliterator.CONCURRENT;
+		}
+
+	}
+	
+	Stream<Resource> dfResourceStream(Resource start, int maxDepth) {
+		ResourceSpliterator rs = new ResourceSpliterator(start, maxDepth);
+		return StreamSupport.stream(rs, false);
+	}
+
 	@Descriptor("Find resources\n"
 			+ "Regular expressions use the Perl-style Java regex syntax, matches "
 			+ "can be inverted by prefixing the expression with '!', case insensitive "
 			+ "matching can be enabled with '(?i)'. The command will return the "
 			+ "matched resources as list, except when using -print or -exec. "
-			+ "Matching is always done in the order listed here, parameter order "
-			+ "on the command line does not matter.")
+			+ "Matching is always performed in the order name, path, location, type.")
 	public List<Resource> find(CommandSession sess,
 			@Parameter(names = {"-name"}, absentValue = "")
 			@Descriptor("Match name with regular expression.") String namerx,
@@ -484,23 +600,33 @@ public class ResourcePathCommands implements Application {
 			@Parameter(names = {"-print"}, absentValue = "", presentValue = "print")
 			@Descriptor("Print found resources with path, return empty list (does not work with -exec).") String print,
 			@Parameter(names = {"-exec"}, absentValue = "")
-			@Descriptor("Execute console command for each matched resource, e.g.: \"-exec '$it delete'\", return empty list (does not work with -print).") String exec,
+			@Descriptor("Execute console command for each matched resource, e.g.: \"-exec {$it delete}\", return empty list (does not work with -print).") String exec,
+			@Parameter(names = {"-maxdepth"}, absentValue = "32000")
+			@Descriptor("Stop traversal at 'maxdepth' levels below starting point.") int maxdepth,
 			Resource res) throws ClassNotFoundException {
 		if (!exec.isEmpty() && !print.isEmpty()) {
 			sess.getConsole().println("find: -exec and -print are mutually exclusive.");
 			return null;
 		}
 		Stream<Resource> s;
+		/*
 		if (res == null) {
 			s = appman.getResourceAccess().getToplevelResources(null).stream()
 					.flatMap(tr -> Stream.concat(Stream.of(tr), tr.getSubResources(true).stream()));
 		} else {
 			s = res.getSubResources(true).stream();
 		}
+		*/
+		if (res == null) {
+			s = appman.getResourceAccess().getToplevelResources(null).stream()
+					.flatMap(tr -> dfResourceStream(tr, maxdepth));
+		} else {
+			s = dfResourceStream(res, maxdepth);
+		}
 
 		Resource cwr = (Resource) sess.get(CURRENT_RESOURCE);
 		String pathrel = cwr != null && !cwr.getPath().isEmpty() ? "/" + cwr.getPath() : "";
-		
+
 		if (!namerx.isEmpty()) {
 			if (namerx.startsWith("!")) {
 				s = s.filter(r -> !r.getName().matches(namerx.substring(1)));
@@ -552,17 +678,17 @@ public class ResourcePathCommands implements Application {
 			return Collections.emptyList();
 		}
 		if (!exec.isEmpty()) {
+			Object outerIt = sess.get("it");
 			s.forEach(r -> {
-				Object outerIt = sess.get("it");
 				try {
 					sess.put("it", r);
 					sess.execute(exec);
 				} catch (Exception ex) {
-					throw new RuntimeException(ex);
-				} finally {
 					sess.put("it", outerIt);
+					throw new RuntimeException(ex);
 				}
 			});
+			sess.put("it", outerIt);
 			return Collections.emptyList();
 		}
 		return s.collect(Collectors.toList());
@@ -573,8 +699,7 @@ public class ResourcePathCommands implements Application {
 			+ "can be inverted by prefixing the expression with '!', case insensitive "
 			+ "matching can be enabled with '(?i)'. The command will return the "
 			+ "matched resources as list, except when using -print or -exec. "
-			+ "Matching is always done in the order listed here, parameter order "
-			+ "on the command line does not matter.")
+			+ "Matching is always performed in the order name, path, location, type.")
 	public List<Resource> find(CommandSession sess,
 			@Parameter(names = {"-name"}, absentValue = "")
 			@Descriptor("Match name with regular expression.") String namerx,
@@ -592,8 +717,10 @@ public class ResourcePathCommands implements Application {
 			@Parameter(names = {"-print"}, absentValue = "", presentValue = "print")
 			@Descriptor("Print found resources with path, return empty list (does not work with -exec).") String print,
 			@Parameter(names = {"-exec"}, absentValue = "")
-			@Descriptor("Execute console command for each matched resource, e.g.: \"-exec '$it delete'\", return empty list (does not work with -print).") String exec,
-			String ... path) throws Exception {
+			@Descriptor("Execute console command for each matched resource, e.g.: \"-exec {$it delete}\", return empty list (does not work with -print).") String exec,
+			@Parameter(names = {"-maxdepth"}, absentValue = "32000")
+			@Descriptor("Stop traversal at 'maxdepth' levels below starting point.") int maxdepth,
+			String... path) throws Exception {
 		/*
 		Resource r = (Resource) sess.get(CURRENT_RESOURCE);
 		r = getResource(sess, r, path);
@@ -601,14 +728,14 @@ public class ResourcePathCommands implements Application {
 			sess.getConsole().printf("find: %s: resource not found.", path);
 			return null;
 		}
-		*/
+		 */
 
 		Map<String, Resource> res = expandAndResolve(sess, path, "find");
 		List<Resource> rval = new ArrayList<>();
-		res.forEach((p,r) -> {
+		res.forEach((p, r) -> {
 			sess.put(REQUEST_PATH, p);
 			try {
-				rval.addAll(find(sess, namerx, pathrx, locrx, type, time, value, print, exec, r));
+				rval.addAll(find(sess, namerx, pathrx, locrx, type, time, value, print, exec, maxdepth, r));
 			} catch (ClassNotFoundException cnfe) {
 				sess.getConsole().printf("find: unloadable resource: %s%n", cnfe.getMessage());
 			}
