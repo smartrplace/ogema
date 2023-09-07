@@ -88,7 +88,8 @@ public class ResourceTransactionImpl implements ResourceTransaction {
 		lock(structureWriteLock, writeLock);
 		try {
 			while ((action = pending.poll()) != null) {
-				appMan.getLogger().trace("Executing action {} for resource {}",action.getType(),action.getSource());
+				if(Boolean.getBoolean("org.ogema.resourcemanager.impl.transaction.debug"))
+					appMan.getLogger().trace("Executing action {} for resource {}",action.getType(),action.getSource());
 				done.add(action); // add this immediately, so we can try to rollback this action even if it fails
 				try {
 					action.execute();
