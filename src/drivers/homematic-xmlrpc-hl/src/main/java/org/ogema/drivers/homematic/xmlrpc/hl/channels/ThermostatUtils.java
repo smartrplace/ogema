@@ -9,11 +9,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -226,7 +229,9 @@ public abstract class ThermostatUtils {
 			logger.debug("no parameters set on for {}/{}", address, set);
 		}
 	}
-
+	
+	static Map<Long, CompletableFuture<Void>> updateTasks = new ConcurrentSkipListMap<>();
+	
 	static void setupParameterResources(HmDevice parent, DeviceDescription desc,
 			Map<String, Map<String, ParameterDescription<?>>> paramSets,
 			HomeMaticConnection conn, Resource model, Logger logger) {
@@ -272,7 +277,25 @@ public abstract class ThermostatUtils {
 			if (!b.getValue()) {
 				return;
 			}
-			CompletableFuture.runAsync(updateValues);
+			//exec.execute(updateValues);
+			long now = System.currentTimeMillis();
+			Iterator<Entry<Long,CompletableFuture<Void>>> it = updateTasks.entrySet().iterator();
+			while (it.hasNext()) {
+				Entry<Long,CompletableFuture<Void>> e = it.next();
+				if (e.getValue().isDone()) {
+					it.remove();
+				}
+				else if (now - e.getKey() > 60_000) {
+					logger.warn("cancelling stalled update task for {}", model.getPath());
+					e.getValue().cancel(true);
+					it.remove();
+				} else if (now - e.getKey() < 10_000) {
+					break;
+				}
+			}
+			CompletableFuture<Void> f = CompletableFuture.runAsync(updateValues);
+			updateTasks.put(now, f);
+			logger.trace("number of pending parameter updates (all thermostat types): {}", updateTasks.size());
 		};
 		PARAMETERS.forEach((p, t) -> {
 			if (allParams.containsKey(p)) {
