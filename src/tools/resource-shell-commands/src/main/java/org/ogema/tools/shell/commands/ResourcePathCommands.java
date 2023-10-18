@@ -7,11 +7,13 @@ package org.ogema.tools.shell.commands;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.Writer;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -42,6 +44,7 @@ import org.jline.utils.InfoCmp;
 import org.ogema.core.application.Application;
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.core.model.Resource;
+import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.ValueResource;
 import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.FloatResource;
@@ -71,6 +74,7 @@ complete -c ogr:find -a '__resources'
 			"osgi.command.function=cr",
 			"osgi.command.function=deactivate",
 			"osgi.command.function=delete",
+			"osgi.command.function=exportJson",
 			"osgi.command.function=find",
 			"osgi.command.function=importJson",
 			"osgi.command.function=lr",
@@ -161,6 +165,11 @@ public class ResourcePathCommands implements Application {
 	private void printLong(PrintStream out, Resource r) {
 		out.print(ResourceToString.printLine(r));
 		out.println();
+	}
+	
+	private Resource getResource(CommandSession sess, String path) {
+		Resource current = (Resource) sess.get(CURRENT_RESOURCE);
+		return getResource(sess, current, path);
 	}
 
 	private Resource getResource(CommandSession sess, Resource current, String path) {
@@ -368,16 +377,67 @@ public class ResourcePathCommands implements Application {
 		return rval;
 	}
 
-	public Resource importJson(CommandSession sess, String file) throws IOException {
+	public Resource importJson(CommandSession sess,
+			@Descriptor("import collection")
+			@Parameter(names = {"-c"}, presentValue = "true", absentValue = "false")
+			boolean isCollection,
+			@Descriptor("import to resource")
+			@Parameter(names = {"-r"}, absentValue = "")
+			String resource,
+			String file) throws IOException {
 		Path p = Paths.get(file);
 		if (!Files.exists(p)) {
 			System.err.println("import: file not found: " + file);
 			return null;
 		}
 		try (BufferedReader r = Files.newBufferedReader(p)) {
-			Resource res = appman.getSerializationManager().createFromJson(r);
-			return res;
+			if (resource.isEmpty()) {
+				if (isCollection) {
+					return appman.getSerializationManager().createResourcesFromJson(r).iterator().next();
+				} else {
+					return appman.getSerializationManager().createFromJson(r);
+				}
+			} else {
+				Resource res = getResource(sess, resource);
+				if (isCollection) {
+					return appman.getSerializationManager().createResourcesFromJson(r, res).iterator().next();
+				} else {
+					return appman.getSerializationManager().createFromJson(r, res);
+				}
+			}
 		}
+	}
+	
+	public void exportJson(CommandSession sess,
+			@Descriptor("output file (required)")
+			@Parameter(names = {"-o"}, absentValue = "")
+			String file,
+			@Descriptor("resources to export")
+			String ... paths) throws IOException {
+		if ("".equals(file)) {
+			sess.getConsole().println("export: must specify output file (-o)");
+			return;
+		}
+		Map<String, Resource> res = expandAndResolve(sess, paths, "find");
+		Path p = Paths.get(file);
+		if (res.isEmpty()) {
+			sess.getConsole().println("export: no resources found");
+			return;
+		}
+		if (Files.exists(p) && !Files.isWritable(p)) {
+			sess.getConsole().println("export: cannot write to " + p);
+			return;
+		}
+		try (Writer w = Files.newBufferedWriter(p, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE)) {
+			if (res.size() > 1) {
+				appman.getSerializationManager(Integer.MAX_VALUE, true, true)
+					.writeJson(w, res.values());
+			} else {
+				appman.getSerializationManager(Integer.MAX_VALUE, true, true)
+					.writeJson(w, res.values().iterator().next());
+			}
+		}
+		sess.getConsole().printf("%s: %d resources, %d bytes%n", p, res.size(), Files.size(p));
 	}
 
 	public Object printTermCap(CommandSession session, String cap) {
@@ -487,6 +547,9 @@ public class ResourcePathCommands implements Application {
 			int childIndex;
 
 			public IterationState(Resource res, List<Resource> children, int childIndex) {
+				if (!(res instanceof ResourceList)) {
+					Collections.sort(children, (r1,r2) -> r1.getName().compareTo(r2.getName()));
+				}
 				this.res = res;
 				this.children = children;
 				this.childIndex = childIndex;
