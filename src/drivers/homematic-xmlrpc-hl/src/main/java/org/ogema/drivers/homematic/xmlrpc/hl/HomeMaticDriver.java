@@ -256,7 +256,11 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 		while (it.hasNext()) {
 			final HmConnection conn = it.next();
 			it.remove();
-			conn.close();
+			try {
+				conn.close();
+			} catch (RuntimeException re) {
+				logger.warn("connection close failed for {}", conn.baseResource, re);
+			}
 		}
 		acceptedDevices.clear();
 	}
