@@ -69,7 +69,10 @@ class UserAccountImpl implements UserAccount {
 			res = new UserAccountImpl(name, natural, pm);
 		}
 		else {
-			throw new RuntimeException("No UserAccount could be created!");
+			String text = "No UserAccount could be created!";
+			if(name != null)
+				text += " Username:"+name;
+			throw new RuntimeException(text);
 		}
 		return res;
 	}
