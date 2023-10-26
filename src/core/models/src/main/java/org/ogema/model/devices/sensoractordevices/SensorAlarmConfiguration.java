@@ -19,11 +19,13 @@ public interface SensorAlarmConfiguration extends Data {
 	FloatResource upperLimit();
 	
 	/** If the values are outside the limits specified not more than the interval time given here
-	 * then no alarm will be generated (minutes)
+	 * then no alarm will be generated (minutes)<br>
+	 * Default value is 5 minutes.
 	 */
 	FloatResource maxViolationTimeWithoutAlarm();
 	
-	/** Maximum time between new values (minutes). A negative value indicates that no alarm shall be generated if no more values are received.*/
+	/** Maximum time between new values (minutes). A negative value indicates that no alarm shall be generated if no more values are received.<br>
+	 * Default value is -1.*/
 	FloatResource maxIntervalBetweenNewValues();
 	
 	/** If active and false the alarm will not send messages, only the alarm configuration will be created. If not active it is
