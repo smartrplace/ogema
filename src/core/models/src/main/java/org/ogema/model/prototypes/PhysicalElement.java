@@ -17,6 +17,7 @@ package org.ogema.model.prototypes;
 
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
+import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.model.units.ThermalEnergyCapacityResource;
 import org.ogema.model.devices.profiles.ProgramInformation;
@@ -69,4 +70,13 @@ public interface PhysicalElement extends Resource {
 	 * Human-readable name.
 	 */
 	StringResource name();
+	
+	/** 0: Device shall be in normal operation/connection (usually the Decorator is not set)<br>
+	 *  1: Device in TrahsBin, but an attempt should still be made to reach it (usually, Decorator is not set as it is not relevant for drivers)<br>
+	 *  2: Device no longer exists in terms of hardware, no connection should be established; device should not be activated by the driver anymore<br>
+	 *  3: as 2, device should also be deleted from CCU or similar adapters; device should not be activated by the driver anymore<br>
+	 *  4: Device should also be deleted from ResourceDB, should be done by the driver as soon as it has cleaned up everything; may otherwise be done later by
+	 *     the application (not used in most cases as existing data should generally not be deleted from the database so that old data can still be accessed)
+	 */
+	IntegerResource disableStatus();
 }
