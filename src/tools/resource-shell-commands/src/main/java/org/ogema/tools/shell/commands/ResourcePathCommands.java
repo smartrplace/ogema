@@ -713,7 +713,7 @@ public class ResourcePathCommands implements Application {
 			}
 		}
 		if (!type.isEmpty()) {
-			Class c = ResourceCommands.loadResourceClass(ctx, type);//Class.forName(type);
+			Class<?> c = ResourceCommands.loadResourceClass(ctx, type);//Class.forName(type);
 			if (c == null) {
 				sess.getConsole().println("find: type not found: " + type);
 				return null;
@@ -732,8 +732,12 @@ public class ResourcePathCommands implements Application {
 					.filter(r -> inv ^ (((ValueResource) r).getLastUpdateTime() >= test));
 		}
 		if (!value.isEmpty()) {
-			s = s.filter(r -> r instanceof ValueResource)
-					.filter(r -> ResourceToString.getResourceValueAsString((ValueResource) r).matches(value));
+			s = s.filter(r -> r instanceof ValueResource);
+			if (value.startsWith("!")) {
+				s = s.filter(r -> !ResourceToString.getResourceValueAsString((ValueResource) r).matches(value.substring(1)));
+			} else {
+				s = s.filter(r -> ResourceToString.getResourceValueAsString((ValueResource) r).matches(value));
+			}
 		}
 		if (!print.isEmpty()) {
 			Process p = Process.Utils.current();
