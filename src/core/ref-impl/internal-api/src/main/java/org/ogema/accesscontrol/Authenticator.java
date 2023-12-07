@@ -17,8 +17,6 @@ package org.ogema.accesscontrol;
 
 import javax.servlet.http.HttpServletRequest;
 
-import org.ogema.accesscontrol.RestAccess.LoginViaNaturalUserChecker;
-
 /**
  * Register as OSGi service with property {@link #AUTHENTICATOR_ID} set.
  */
@@ -35,6 +33,25 @@ public interface Authenticator {
 	 * Id of the built-in basic authentication provider
 	 */
 	public static final String DEFAULT_BASIC_AUTH = "basicauth";
+	
+	/**
+	 * User attribute listing the 2FA types (see {@link #TWOFA_TYPE}) configured
+	 * for the user (comma separated).
+	 */
+	public static final String USER_TWOFA_TYPES = "authentication.2fa_types";
+	
+	/**
+	 * Service property marking an authenticator as a second factor authenticator
+	 * for the 2FA method given as value.
+	 */
+	public static final String TWOFA_TYPE = "2fa";
+	
+	/**
+	 * HTTP request parameter signaling the presence of second factor authentication
+	 * data for the given type (matched against the {@link #TWOFA_TYPE} property
+	 * of registered Authenticators).
+	 */
+	public static final String TWOFA_PARAM = "2fa";
 
 	/**
 	 * Validate the login credentials associated to a servlet request, and

@@ -32,9 +32,12 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
@@ -110,7 +113,7 @@ import org.slf4j.Logger;
 class AccessManagerImpl implements AccessManager, BundleListener {
 
 	private final Logger logger = org.slf4j.LoggerFactory.getLogger(getClass());
-	final Map<String, Authenticator> authenticators;
+	final Map<String, Map.Entry<Authenticator, Map<String,Object>>> authenticators;
 	private volatile Collection<String> globallyAdmissibleAuthenticatorIds = null;
 	
 	// static final String ADMIN_NAME = "master";
@@ -704,6 +707,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 		}
 		else {
 			result = cStore.login(usrName, pwd);
+			logger.debug("CredentialStore login result for {}: {}", usrName, result);
 		}
 		time = System.currentTimeMillis() - time;
 		int toWait = meanLoginTime + meanLoginTime >> 4 - (int) time;
@@ -715,7 +719,9 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 				Thread.currentThread().interrupt();
 			}
 		// wait until meanLoginTime is over
-		logger.debug("failed login attempt with user name '{}'", usrName);
+		if (!result) {
+			logger.debug("failed login attempt with user name '{}'", usrName);
+		}
 		return result;
 	}
 
@@ -936,12 +942,29 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 			final String pw = req.getParameter(Constants.OTPNAME);
 			if (user != null && pw != null	&& isAuthenticatorAdmitted(user, Authenticator.DEFAULT_USER_PW_ID)) {
 				if (authenticate(user, pw, isNatural != null ? isNatural : isNatural(user))) {
-					return user;
+					List<String> twofaMethods = configured2faMethods(user);
+					if (!twofaMethods.isEmpty()) {
+						logger.debug("2 factor authentication methods configured for user {}: {}", user, twofaMethods);
+						String twofaAuthUser = check2fa(req, twofaMethods);
+						if (twofaAuthUser == null) {
+							logger.debug("2FA authentication failed for user {}", user);
+							return null;
+						} else {
+							if (!user.equals(twofaAuthUser)) {
+								logger.debug("2FA authentication for {} returned a different user ({})!", user, twofaAuthUser);
+								return null;
+							} else {
+								return user;
+							}
+						}
+					} else {
+						return user;
+					}
 				}
 				//else: allow pluggable authenticators...
 			}
 		}
-		for (Map.Entry<String, Authenticator> entry : authenticators.entrySet()) {
+		for (Map.Entry<String, Map.Entry<Authenticator, Map<String,Object>>> entry : authenticators.entrySet()) {
 			logger.debug("trying pluggable authenticator: {}", entry.getKey());
 			if (isNatural != null && 
 					!isAuthenticatorAdmitted(isNatural ? OGEMA_NATURAL_USER : OGEMA_MACHINE_USER, entry.getKey())) {
@@ -950,7 +973,7 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 			}
 			Authenticator auth = null;
 			try {
-				auth = entry.getValue();//osgi.getService(entry.getValue());
+				auth = entry.getValue().getKey();//osgi.getService(entry.getValue());
 				final String usr;
 				if(Boolean.getBoolean("org.ogema.impl.security.enablerestusernamecompletion") &&
 						isNatural != null && (!isNatural)) {
@@ -1006,6 +1029,43 @@ class AccessManagerImpl implements AccessManager, BundleListener {
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 			}
+		return null;
+	}
+	
+	private List<String> configured2faMethods(String user) {
+		Role r = findRole(user);
+		if (r != null) {
+			Object o = r.getProperties().get(Authenticator.USER_TWOFA_TYPES);
+			if (o != null) {
+				String typeList = o.toString();
+				return Stream.of(typeList.split(",")).map(String::trim).collect(Collectors.toList());
+			}
+		}
+		return Collections.emptyList();
+	}
+	
+	private String check2fa(HttpServletRequest req, List<String> methods) {
+		String request2faType = String.valueOf(req.getParameter(Authenticator.TWOFA_PARAM));
+		if (request2faType.equals("null")) {
+			logger.debug("2FA missing from request, accepted 2FA methods: {}", methods);
+			return null;
+		}
+		if (!methods.contains(request2faType)) {
+			logger.debug("request 2FA type ({}) not in list of accepted 2FA methods: {}", request2faType, methods);
+			return null;
+		}
+		Optional<Authenticator> auth = authenticators.values().stream()
+				.filter(e -> request2faType.equalsIgnoreCase(e.getValue().getOrDefault(Authenticator.TWOFA_TYPE, "").toString()))
+				.map(e -> e.getKey()).findFirst();
+		if (!auth.isPresent()) {
+			logger.warn("no Authenticator available for request 2FA type {}", request2faType);
+			return null;
+		}
+		String user = auth.get().authenticate(req);
+		if (user != null) {
+			logger.debug("2FA success with {}", auth.get());
+			return user;
+		}
 		return null;
 	}
 	
