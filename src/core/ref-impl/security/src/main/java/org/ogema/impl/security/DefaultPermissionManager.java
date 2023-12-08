@@ -21,6 +21,7 @@ import java.security.AccessController;
 import java.security.Permission;
 import java.security.PrivilegedAction;
 import java.security.ProtectionDomain;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Dictionary;
 import java.util.HashMap;
@@ -168,7 +169,7 @@ public class DefaultPermissionManager implements PermissionManager {
 	private ShellCommands sc;
 
 	private final HashMap<Application, AccessControlContext> accs = new HashMap<>();
-	final Map<String, Authenticator> authenticators = new ConcurrentHashMap<>(4);
+	final Map<String, Map.Entry<Authenticator, Map<String,Object>>> authenticators = new ConcurrentHashMap<>(4);
 
 	@Override
 	public WebAccessManager getWebAccess() {
@@ -310,9 +311,9 @@ public class DefaultPermissionManager implements PermissionManager {
 		if (Authenticator.DEFAULT_USER_PW_ID.equals(id)) {
 			throw new IllegalArgumentException("Illegal authenticator id " + id);
 		}
-		final Authenticator old = authenticators.put((String) id, service);
+		final Map.Entry<?,?> old = authenticators.put((String) id, new AbstractMap.SimpleEntry<>(service, props));
 		if (old != null) {
-			logger.warn("Duplicate authenticator id: {}: {}, {}",id, old, service);
+			logger.warn("Duplicate authenticator id: {}: {}, {}",id, service, props);
 		}
 	}
 	

@@ -35,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 
 import org.apache.xmlrpc.XmlRpcException;
 import org.ogema.core.application.Application;
@@ -59,6 +60,7 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.ogema.model.devices.buildingtechnology.ThermostatProgram;
+import org.ogema.model.prototypes.PhysicalElement;
 import org.osgi.framework.Constants;
 import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.ComponentContext;
@@ -349,10 +351,38 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 					}
 					HmDevice toplevelDevice = channelDesc.isDevice()
 							? dev : (HmDevice) dev.getParent().getParent();
-					h.setup(toplevelDevice, channelDesc, paramSets);
-					acceptedDevices.put(address, new ConnectedDevice(toplevelDevice, dev, conn, h));
-					logger.info("{} completed setup of {}", h.getClass().getSimpleName(), address);
-					break;
+					Optional<PhysicalElement> peDisabled = toplevelDevice.getDirectSubResources(true).stream().filter(s -> s instanceof PhysicalElement)
+							.map(s -> (PhysicalElement) s).filter(pe -> pe.disableStatus().getValue() > 1)
+							.findAny();
+					if (!peDisabled.isPresent()) {
+						h.setup(toplevelDevice, channelDesc, paramSets);
+						acceptedDevices.put(address, new ConnectedDevice(toplevelDevice, dev, conn, h));
+						logger.info("{} completed setup of {}", h.getClass().getSimpleName(), address);
+						break;
+					} else {
+						int disableStatus = peDisabled.get().disableStatus().getValue();
+						switch (disableStatus) {
+							case 2: {
+								logger.info("ignoring disabled device {}", toplevelDevice.getPath());
+								//??? deactivate it?
+								break;
+							}
+							case 3:
+							case 4: {
+								logger.info("deleting device with disableStatus {} from CCU: {}", disableStatus, toplevelDevice.getPath());
+								try {
+									conn.deleteDevice(toplevelDevice.address().getValue(), 0x05);
+									if (disableStatus == 4) {
+										logger.info("deleting device with disableStatus {} from resources: {}", disableStatus, toplevelDevice.getPath());
+										toplevelDevice.delete();
+									}
+								} catch (IOException ex) {
+									logger.error("cloud not delete device {}: {}", toplevelDevice.getPath(), ex.getMessage());
+									logger.trace("cloud not delete device {}", toplevelDevice.getPath(), ex);
+								}
+							}
+						}
+					}
 				}
 			}
 			failedSetup.remove(dev);

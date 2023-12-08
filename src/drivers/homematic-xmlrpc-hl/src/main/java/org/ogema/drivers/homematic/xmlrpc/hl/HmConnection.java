@@ -92,8 +92,6 @@ public class HmConnection implements HomeMaticConnection {
 	private final HomeMaticDriver hmDriver;
     private boolean dynamicCcuDiscovery = false;
 
-	final int MAX_RETRIES = 5;
-
 	// private final Runnable initTask;
 	protected long reInitTryTime = 2 * 60_000;
 	public static final long MAX_REINITTRYTIME = 15 * 60_000;
@@ -269,7 +267,7 @@ public class HmConnection implements HomeMaticConnection {
                 baseResource.interfaceInfo().address().activate(false);
             }
             if (interfaceInfo.containsKey("CONNECTED")) {
-                boolean conn = Boolean.valueOf(interfaceInfo.get("CONNECTED").toString());
+                boolean conn = Boolean.parseBoolean(interfaceInfo.get("CONNECTED").toString());
                 baseResource.interfaceInfo().connected().reading().create();
                 baseResource.interfaceInfo().connected().reading().setValue(conn);
                 baseResource.interfaceInfo().connected().reading().activate(false);
@@ -282,7 +280,7 @@ public class HmConnection implements HomeMaticConnection {
                 baseResource.interfaceInfo().description().activate(false);
             }
             if (interfaceInfo.containsKey("DUTY_CYCLE")) {
-                float dc = Float.valueOf(interfaceInfo.get("DUTY_CYCLE").toString());
+                float dc = Float.parseFloat(interfaceInfo.get("DUTY_CYCLE").toString());
                 baseResource.interfaceInfo().dutyCycle().reading().create();
                 baseResource.interfaceInfo().dutyCycle().reading().setValue(dc / 100);
                 baseResource.interfaceInfo().dutyCycle().reading().activate(false);
@@ -610,6 +608,11 @@ public class HmConnection implements HomeMaticConnection {
 		StringResource urlRes = baseResource.interfaceInfo().getSubResource("clientUrl", StringResource.class).create();
 		urlRes.setValue(clientUrl);
 		urlRes.activate(false);
+	}
+	
+	private String readClientUrl() {
+		StringResource urlRes = baseResource.interfaceInfo().getSubResource("clientUrl", StringResource.class).create();
+		return urlRes.isActive() ? urlRes.getValue() : null;
 	}
 	
 	private static String getServletAlias(final HmLogicInterface config) {
@@ -983,7 +986,7 @@ public class HmConnection implements HomeMaticConnection {
 
 	@Override
 	public String getConnectionUrl() {
-		return clientUrl;
+		return clientUrl != null ? clientUrl : readClientUrl();
 	}
 
 	@Override

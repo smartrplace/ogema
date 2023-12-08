@@ -287,6 +287,24 @@ public class OgemaHttpContext implements HttpContext {
 				logger.debug("Known Session detected.");
             }
 		}
+		
+		if (sesAuth == null) {
+			logger.warn("sesAuth still null?!?");
+		} else {
+			//System.out.println("authenticated session for user: " + sesAuth.getName());
+			String user = accessMngr.getLoggedInUser(request);
+			if (user != null) {
+				boolean userExists = accessMngr.getAllUsers().contains(user);
+				//System.out.printf("session for user: %s, user exists: %b%n", user, userExists);
+				if (!userExists) {
+					logger.debug("invalidating session of deleted user '{}'", user);
+					httpses.invalidate();
+					response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+					return false;
+				}
+			}
+		}
+		
 		final HttpConfigManagement httpConfigs = httpConfigRef.get();
 		final HttpConfig httpConfig = httpConfigs == null ? null : httpConfigs.getConfig(owner.getBundle());
 		if (httpConfig != null) {
@@ -419,9 +437,9 @@ public class OgemaHttpContext implements HttpContext {
     
 	private void tryPluggableAuthenticators(HttpServletRequest request) {
 		//XXX
-		Map<String, Authenticator> authenticators = ((DefaultPermissionManager) permMan).authenticators;
-		for (Map.Entry<String, Authenticator> e : authenticators.entrySet()) {
-			Authenticator auth = e.getValue();
+		final Map<String, Map.Entry<Authenticator, Map<String,Object>>> authenticators = ((DefaultPermissionManager) permMan).authenticators;
+		for (Map.Entry<String, Map.Entry<Authenticator, Map<String,Object>>> e : authenticators.entrySet()) {
+			Authenticator auth = e.getValue().getKey();
 			String authId = e.getKey();
 			logger.trace("trying pluggable authenticator {}", authId);
 			String username = auth.authenticate(request);
