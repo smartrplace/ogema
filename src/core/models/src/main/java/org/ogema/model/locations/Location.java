@@ -15,6 +15,8 @@
  */
 package org.ogema.model.locations;
 
+import org.ogema.core.model.array.StringArrayResource;
+import org.ogema.core.model.array.TimeArrayResource;
 import org.ogema.model.prototypes.Data;
 import org.ogema.model.prototypes.PhysicalElement;
 
@@ -36,7 +38,17 @@ public interface Location extends Data {
 	 */
 	Room room();
 
+	/** The length of roomLocationHistory and roomLocationStart shall be equal. The resources contain information
+	 * to which rooms the device was assigned in the past and currently. This may also be used to provide information
+	 * on real rooms without adding the room information for applications if the device shall just be used for
+	 * monitoring. So this information shall not be obtained automatically from the location()#room() field.<br>
+	 * The last entry in the list is the current room to which the device is assigned. If the room is not assigned
+	 * to any room at a certain interval or currently then for the respective interval the entry in roomLocationHistory
+	 * shall be an empty String. Otherwise it shall contain the room location as String.*/
+	StringArrayResource roomHistory();
+	/** See roomHistory */
+	TimeArrayResource roomStart();
+	
 	/** Geographical position */
 	GeographicLocation geographicLocation();
-
 }
