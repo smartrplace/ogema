@@ -129,6 +129,10 @@ public abstract class ResourceBase implements ConnectedResource {
 				timestamp, valueChanged);
 	}
 
+	protected long getFrameworkTime() {
+		return resMan.getApplicationManager().getFrameworkTime();
+	}
+	
 	@Override
 	@JsonIgnore
 	//FIXME! annotation does not belong here

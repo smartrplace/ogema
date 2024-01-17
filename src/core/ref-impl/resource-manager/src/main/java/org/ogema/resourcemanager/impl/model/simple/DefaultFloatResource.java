@@ -22,10 +22,13 @@ import org.ogema.core.resourcemanager.AccessMode;
 import org.ogema.core.resourcemanager.ResourceAccessException;
 import org.ogema.core.resourcemanager.ResourceNotFoundException;
 import org.ogema.core.resourcemanager.VirtualResourceException;
+import org.ogema.persistence.impl.faketree.ScheduleTreeElement;
 import org.ogema.resourcemanager.impl.ApplicationResourceManager;
 import org.ogema.resourcemanager.impl.model.schedule.HistoricalSchedule;
 import org.ogema.resourcemanager.virtual.VirtualTreeElement;
 import org.ogema.resourcetree.SimpleResourceData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 
@@ -47,18 +50,39 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 		}
 	}
 
-	private static long lastMinInterval = -1;
+	//private static long lastMinInterval = -1;
 	
 	@Override
 	public boolean setValue(float value) {
 		return setValue(value, -1);
 	}
 	
+	private static final Logger LOG = LoggerFactory.getLogger(ScheduleTreeElement.class);
+	private static final String RES_TO_TEST = System.getProperty("org.ogema.resourcemanager.impl.model.simple.testForNaN");
+	private static final String RES_TO_TEST2 = System.getProperty("org.ogema.resourcemanager.impl.model.simple.writeToConsole");
+	private static final Long MIN_INTERVAL = Long.getLong("org.ogema.resourcemanager.impl.model.simple.minWriteInterval");
+	
 	@Override
 	public boolean setValue(float value, long timestamp) {
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
+			// /*
+			if(RES_TO_TEST != null && Float.isNaN(value) && el.getLocation().contains(RES_TO_TEST))
+				LOG.warn("Writing NaN to "+el.getLocation());
+			if(RES_TO_TEST2 != null && el.getLocation().contains(RES_TO_TEST2)) {
+				LOG.info("Writing "+value+" to "+el.getLocation(), 
+						new IllegalStateException("Writing "+value+" to "+el.getLocation()));
+			}
+			if(MIN_INTERVAL != null && RES_TO_TEST != null && el.getLocation().contains(RES_TO_TEST)) {
+				long now = getFrameworkTime();
+				long last = getLastUpdateTime();
+				if((now - last) < MIN_INTERVAL) {
+					String text = "Written too quickly:"+RES_TO_TEST+":"+value+" after "+(now - last)+" msec";
+					LOG.warn(text, new IllegalStateException(text));
+				}
+			}
+			//*/
 			if (el.isVirtual() || getAccessModeInternal() == AccessMode.READ_ONLY) {
 				return false;
 			}
