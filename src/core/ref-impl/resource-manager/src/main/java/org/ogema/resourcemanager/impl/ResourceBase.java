@@ -42,6 +42,7 @@ import static org.ogema.core.resourcemanager.AccessMode.READ_ONLY;
 
 import org.ogema.core.resourcemanager.AccessModeListener;
 import org.ogema.core.resourcemanager.NoSuchResourceException;
+import org.ogema.core.resourcemanager.ResourceAccess;
 import org.ogema.core.resourcemanager.ResourceAccessException;
 import org.ogema.core.resourcemanager.AccessPriority;
 import org.ogema.core.resourcemanager.InvalidResourceTypeException;
@@ -131,6 +132,15 @@ public abstract class ResourceBase implements ConnectedResource {
 
 	protected long getFrameworkTime() {
 		return resMan.getApplicationManager().getFrameworkTime();
+	}
+	
+	protected void logErrorCode(int errorCode) {
+		ResourceAccess rAcc = resMan.getApplicationManager().getResourceAccess();
+		if(rAcc == null)
+			return;
+		Resource logRes = rAcc.getResource("Gateway_Device/logFileCheckNotification");
+		if(logRes != null && (logRes instanceof FloatResource))
+			((FloatResource)logRes).setValue(errorCode);
 	}
 	
 	@Override

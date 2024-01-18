@@ -61,6 +61,7 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 	private static final String RES_TO_TEST = System.getProperty("org.ogema.resourcemanager.impl.model.simple.testForNaN");
 	private static final String RES_TO_TEST2 = System.getProperty("org.ogema.resourcemanager.impl.model.simple.writeToConsole");
 	private static final Long MIN_INTERVAL = Long.getLong("org.ogema.resourcemanager.impl.model.simple.minWriteInterval");
+	private static final Integer LOG_ERROR_CODE = Integer.getInteger("org.ogema.resourcemanager.impl.model.simple.logErrorCode");
 	
 	@Override
 	public boolean setValue(float value, long timestamp) {
@@ -80,6 +81,8 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 				if((now - last) < MIN_INTERVAL) {
 					String text = "Written too quickly:"+RES_TO_TEST+":"+value+" after "+(now - last)+" msec";
 					LOG.warn(text, new IllegalStateException(text));
+					if(LOG_ERROR_CODE != null)
+						logErrorCode(LOG_ERROR_CODE);
 				}
 			}
 			//*/
