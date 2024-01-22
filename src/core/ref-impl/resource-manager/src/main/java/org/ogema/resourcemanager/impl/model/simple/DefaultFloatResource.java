@@ -15,6 +15,9 @@
  */
 package org.ogema.resourcemanager.impl.model.simple;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.ogema.core.model.schedule.AbsoluteSchedule;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.recordeddata.RecordedData;
@@ -62,6 +65,8 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 	private static final String RES_TO_TEST2 = System.getProperty("org.ogema.resourcemanager.impl.model.simple.writeToConsole");
 	private static final Long MIN_INTERVAL = Long.getLong("org.ogema.resourcemanager.impl.model.simple.minWriteInterval");
 	private static final Integer LOG_ERROR_CODE = Integer.getInteger("org.ogema.resourcemanager.impl.model.simple.logErrorCode");
+	private static final Integer SKIP_BEFORELOG_ERROR_CODE = Integer.getInteger("org.ogema.resourcemanager.impl.model.simple.skipErrorsBeforeLogCode");
+	private static final Map<String, Integer> COUNT_ERROR = new HashMap<>();
 	
 	@Override
 	public boolean setValue(float value, long timestamp) {
@@ -81,8 +86,17 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 				if((now - last) < MIN_INTERVAL) {
 					String text = "Written too quickly:"+RES_TO_TEST+":"+value+" after "+(now - last)+" msec";
 					LOG.warn(text, new IllegalStateException(text));
-					if(LOG_ERROR_CODE != null)
-						logErrorCode(LOG_ERROR_CODE);
+					if(LOG_ERROR_CODE != null) {
+						Integer count = null;
+						if(SKIP_BEFORELOG_ERROR_CODE != null) {
+							count = COUNT_ERROR.get(el.getLocation());
+							if(count == null)
+								count = 0;
+							COUNT_ERROR.put(el.getLocation(), count+1);
+						}
+						if(count == null || (count >= SKIP_BEFORELOG_ERROR_CODE))
+							logErrorCode(LOG_ERROR_CODE);
+					}
 				}
 			}
 			//*/
