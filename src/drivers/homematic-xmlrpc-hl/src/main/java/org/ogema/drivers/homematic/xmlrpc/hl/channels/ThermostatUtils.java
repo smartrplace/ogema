@@ -126,6 +126,8 @@ public abstract class ThermostatUtils {
 		model.valve().create().activate(false);
 		StringResource setting = model.valve().getSubResource("DECALCIFICATION", StringResource.class);
 		StringResource feedback = model.valve().getSubResource("DECALCIFICATION_FEEDBACK", StringResource.class);
+		setting.create().activate(false);
+		feedback.create().activate(false);
 		Function<Map<String, Object>, String> decalcStringFromParams = masterValueReadings -> {
 			//note: HM weekday enum is Sunday(0) ... Saturday(6)
 			Integer weekday = (Integer) masterValueReadings.get("DECALCIFICATION_WEEKDAY");
