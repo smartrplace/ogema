@@ -1,11 +1,16 @@
 package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
+import org.ogema.core.model.Resource;
 import org.ogema.core.model.simple.FloatResource;
-import org.ogema.core.model.simple.SingleValueResource;
+
+import org.ogema.core.model.units.ElectricCurrentResource;
+import org.ogema.core.model.units.EnergyResource;
+import org.ogema.core.model.units.FrequencyResource;
+import org.ogema.core.model.units.PhysicalUnit;
+import org.ogema.core.model.units.PowerResource;
+import org.ogema.core.model.units.VoltageResource;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandler;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandlerFactory;
@@ -15,148 +20,136 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEventListener;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
-import org.ogema.model.actors.MultiSwitch;
+import org.ogema.model.connections.ElectricityConnection;
+import org.ogema.model.devices.sensoractordevices.SensorDeviceLabelled;
+import org.ogema.model.sensors.ElectricCurrentSensor;
+import org.ogema.model.sensors.ElectricFrequencySensor;
+import org.ogema.model.sensors.ElectricVoltageSensor;
+import org.ogema.model.sensors.EnergyAccumulatedSensor;
+import org.ogema.model.sensors.PowerSensor;
 import org.ogema.tools.resource.util.ResourceUtils;
-import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.osgi.framework.Constants;
 import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * Handler for the HmIP-ESI energy meter reader.
  *
  * @author jlapp
  */
-@Component(service = {DeviceHandlerFactory.class}, property = {Constants.SERVICE_RANKING + ":Integer=1"})
-public class IpBslDimmerChannels extends AbstractDeviceHandler implements DeviceHandlerFactory {
-    
-    public static enum Colors {
-		
-		BLACK(0),
-		BLUE(1),
-		GREEN(2),
-		TURQUOISE(3),
-		RED(4),
-		PURPLE(5),
-		YELLOW(6),
-		WHITE(7);
-		
-		public final int code;
+// increased ranking because there are more generic handlers that will pick up ENERGIE_METER_TRANSMITTER
+@Component(service = {DeviceHandlerFactory.class}, property = {Constants.SERVICE_RANKING + ":Integer=100"})
+public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandlerFactory {
 
-		private Colors(int code) {
-			this.code = code;
-		}
-		
-		public int getCode() {
-			return code;
-		}
-		
+	Logger logger = LoggerFactory.getLogger(getClass());
+
+	@Override
+	public DeviceHandler createHandler(HomeMaticConnection connection) {
+		return new IpEsiChannels(connection);
 	}
 
-    Logger logger = LoggerFactory.getLogger(getClass());
-    
-    @Override
-    public DeviceHandler createHandler(HomeMaticConnection connection) {
-        return new IpBslDimmerChannels(connection);
-    }
+	public IpEsiChannels() {
+		super(null);
+	}
 
-    public IpBslDimmerChannels() {
-        super(null);
-    }
+	public IpEsiChannels(HomeMaticConnection conn) {
+		super(conn);
+	}
 
-    public IpBslDimmerChannels(HomeMaticConnection conn) {
-        super(conn);
-    }
-    
-    class BslEventListener implements HmEventListener {
+	class EnergyMeterEventListener implements HmEventListener {
 
-        final Map<String, SingleValueResource> resources;
-        final String baseAddress;
+		final SensorDeviceLabelled sdl;
+		final String address;
 
-        public BslEventListener(Map<String, SingleValueResource> resources, String baseAddress) {
-            this.resources = resources;
-            this.baseAddress = baseAddress;
-        }
+		public EnergyMeterEventListener(SensorDeviceLabelled sdl, String address) {
+			this.sdl = sdl;
+			this.address = address;
+		}
 
-        @Override
-        public void event(List<HmEvent> events) {
-            for (HmEvent e : events) {
-				//logger.trace("event: {}", e);
-                if (!e.getAddress().startsWith(baseAddress)) {
-                    continue;
-                }
-				if (!"COLOR".equals(e.getValueKey())) {
+		@Override
+		public void event(List<HmEvent> events) {
+			for (HmEvent e : events) {
+				if (!address.equals(e.getAddress())) {
 					continue;
 				}
-				logger.debug("got COLOR feedback for {}", e.getAddress());
-				logger.debug("resource map: {}", resources);
-                SingleValueResource res = resources.get(e.getAddress());
-                if (res == null) {
-                    continue;
-                }
-                try {
-					ValueResourceUtils.setValue(res, e.getValueInt());
-                    logger.debug("resource updated: {} = {}", res.getPath(), e.getValue());
-                } catch (RuntimeException ex) {
-					logger.warn("set value failed: {}", ex.getMessage());
-                }
-            }
-        }
+				switch (e.getValueKey()) {
+					case "POWER":
+						PowerResource pwr = sdl.sensors()
+								.getSubResource(ResourceUtils.getValidResourceName("Power_" + address), PowerSensor.class).reading();
+						setValueAndActivate(pwr, e.getValueFloat(), sdl);
+						logger.debug("power reading updated: {} = {}", pwr.getPath(), e.getValueFloat());
+						break;
+					case "CURRENT": {
+						ElectricCurrentResource reading = sdl.sensors()
+								.getSubResource(ResourceUtils.getValidResourceName("Current_" + address), ElectricCurrentSensor.class).reading();
+						float a = e.getValueFloat() / 1000.0f;
+						setValueAndActivate(reading, a, sdl);
+						logger.debug("current reading updated: {} = {}", reading.getPath(), a);
+						break;
+					}
+					case "VOLTAGE": {
+						VoltageResource reading = sdl.sensors()
+								.getSubResource(ResourceUtils.getValidResourceName("Voltage_" + address), ElectricVoltageSensor.class).reading();
+						setValueAndActivate(reading, e.getValueFloat(), sdl);
+						logger.debug("voltage reading updated: {} = {}", reading.getPath(), e.getValueFloat());
+						break;
+					}
+					case "FREQUENCY": {
+						FrequencyResource reading = sdl.sensors()
+								.getSubResource(ResourceUtils.getValidResourceName("Frequency_" + address), ElectricFrequencySensor.class).reading();
+						setValueAndActivate(reading, e.getValueFloat(), sdl);
+						logger.debug("frequency reading updated: {} = {}", reading.getPath(), e.getValueFloat());
+						break;
+					}
+					case "ENERGY_COUNTER": {
+						EnergyResource reading = sdl.sensors()
+								.getSubResource(ResourceUtils.getValidResourceName("Energy_" + address), EnergyAccumulatedSensor.class).reading();
+						//XXX conversion?
+						if (reading.getUnit() != PhysicalUnit.KILOWATT_HOURS) {
+							reading.setUnit(PhysicalUnit.KILOWATT_HOURS);
+						}
+						setValueAndActivate(reading, e.getValueFloat(), sdl);
+						logger.debug("energy reading updated: {} = {}", reading.getPath(), e.getValueFloat());
+						break;
+					}
+				}
+			}
+		}
 
-    }
+	}
+	
+	void setValueAndActivate(FloatResource r, float v, Resource top) {
+		if (!r.exists()) {
+			r.create();
+		}
+		r.setValue(v);
+		if (!r.isActive()) {
+			Resource a = r;
+			do {
+				a.activate(false);
+				a = a.getParent();
+			} while (a != null && !a.equals(top));
+		}
+	}
 
-    @Override
-    public boolean accept(DeviceDescription desc) {
-        //not actually interested in DIMMER_WEEK_PROFILE, but there is only one such channel per device
-        return ("HmIP-BSL".equalsIgnoreCase(desc.getParentType()) && "DIMMER_WEEK_PROFILE".equalsIgnoreCase(desc.getType()));
-    }
+	@Override
+	/**
+	 * Note: There are other handlers for ENERGIE_METER_TRANSMITTER but the
+	 * driver will use this one for HmIP-ESI because of its higher service ranking.
+	 */
+	public boolean accept(DeviceDescription desc) {
+		return "HmIP-ESI".equalsIgnoreCase(desc.getParentType())
+				|| "ENERGIE_METER_TRANSMITTER".equalsIgnoreCase(desc.getType());
+	}
 
-    @Override
-    public void setup(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
-        final String deviceAddress = desc.getAddress();
-		final String baseAddress = deviceAddress.substring(0, deviceAddress.indexOf(":"));
-        logger.debug("setup HmIP-BSL handler for address {}", baseAddress);
-		// there are 2 DIMMER_TRANSMITTER channels with 3 DIMMER_VIRTUAL_RECEIVER channels each.
-		// COLOR is writable on the DIMMER_VIRTUAL_RECEIVER channels. The final
-		// COLOR value seems to be determined by an 'or' operation (default, configurable)
-		// over the 3 channel, and gets reported on the DIMMER_TRANSMITTER channel if it actually changes.
-		// There is no separate on/off setting, off is COLOR=BLACK.
-		final String addressTr1 = baseAddress + ":7";
-		final String addressRec1 = baseAddress + ":8";
-		final String addressTr2 = baseAddress + ":11";
-		final String addressRec2 = baseAddress + ":12";
-		
-        String sw1Name = ResourceUtils.getValidResourceName("DIMMER_LEDS_1_" + addressTr1);
-		String sw2Name = ResourceUtils.getValidResourceName("DIMMER_LEDS_2_" + addressTr2);
+	@Override
+	public void setup(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
+		LoggerFactory.getLogger(getClass()).debug("setup HmIP-ESI handler for address {}", desc.getAddress());
+		String sdName = ResourceUtils.getValidResourceName("SENSORS_" + desc.getAddress());
+		SensorDeviceLabelled sdl = parent.getSubResource(sdName, SensorDeviceLabelled.class).create();
+		conn.addEventListener(new EnergyMeterEventListener(sdl, desc.getAddress()));
+		sdl.activate(true);
+	}
 
-        MultiSwitch sw1 = parent.addDecorator(sw1Name, MultiSwitch.class);
-		MultiSwitch sw2 = parent.addDecorator(sw2Name, MultiSwitch.class);
-		
-        conn.registerControlledResource(conn.getChannel(parent, addressRec1), sw1);
-		conn.registerControlledResource(conn.getChannel(parent, addressRec2), sw2);
-		
-        Map<String, SingleValueResource> resources = new HashMap<>();
-		sw1.stateControl().create().activate(false);
-		sw1.stateFeedback().create().activate(false);
-		sw1.activate(false);
-		sw2.stateControl().create().activate(false);
-		sw2.stateFeedback().create().activate(false);
-		sw2.activate(false);
-		resources.put(addressTr1, sw1.stateFeedback());
-		resources.put(addressTr2, sw2.stateFeedback());
-        
-		sw1.stateControl().addValueListener((FloatResource f) -> {
-			int val = (int) f.getValue();
-			logger.debug("setting COLOR value for {}: {}", addressRec1, val);
-			conn.performSetValue(addressRec1, "COLOR", val);
-		}, true);
-		sw2.stateControl().addValueListener((FloatResource f) -> {
-			int val = (int) f.getValue();
-			logger.debug("setting COLOR value for {}: {}", addressRec2, val);
-			conn.performSetValue(addressRec2, "COLOR", val);
-		}, true);
-		
-        conn.addEventListener(new BslEventListener(resources, baseAddress));
-    }
-    
 }
