@@ -84,7 +84,7 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 				long now = getFrameworkTime();
 				long last = getLastUpdateTime();
 				if((now - last) < MIN_INTERVAL) {
-					String text = "Written too quickly:"+RES_TO_TEST+":"+value+" after "+(now - last)+" msec";
+					String text = "Written too quickly:"+el.getLocation()+":"+value+" after "+(now - last)+" msec";
 					LOG.warn(text, new IllegalStateException(text));
 					if(LOG_ERROR_CODE != null) {
 						Integer count = null;
