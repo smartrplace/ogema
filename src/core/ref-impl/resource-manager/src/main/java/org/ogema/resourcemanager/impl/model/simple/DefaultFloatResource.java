@@ -97,7 +97,8 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 						if(count == null || (count >= SKIP_BEFORELOG_ERROR_CODE))
 							logErrorCode(LOG_ERROR_CODE);
 					}
-				}
+				} else
+					COUNT_ERROR.remove(el.getLocation());
 			}
 			//*/
 			if (el.isVirtual() || getAccessModeInternal() == AccessMode.READ_ONLY) {
