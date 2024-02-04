@@ -74,33 +74,50 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 		try {
 			final VirtualTreeElement el = getElInternal();
 			// /*
-			if(RES_TO_TEST != null && Float.isNaN(value) && el.getLocation().contains(RES_TO_TEST))
-				LOG.warn("Writing NaN to "+el.getLocation());
-			if(RES_TO_TEST2 != null && el.getLocation().contains(RES_TO_TEST2)) {
-				LOG.info("Writing "+value+" to "+el.getLocation(), 
-						new IllegalStateException("Writing "+value+" to "+el.getLocation()));
+			final String location;
+			if(el.getLocation() == null)
+				location = el.getPath();
+			else
+				location = el.getLocation();
+			if(location == null) {
+				final String ID;
+				if(el.getName() != null)
+					ID = el.getName();
+				else 
+					ID = "ResID::"+el.getResID();
+				String text = "el.getLocation() is null for "+ID;
+				LOG.warn(text, new IllegalStateException(text));
+				logErrorCode(-18);				
 			}
-			if(MIN_INTERVAL != null && RES_TO_TEST != null && el.getLocation().contains(RES_TO_TEST)) {
-				long now = getFrameworkTime();
-				long last = getLastUpdateTime();
-				if((now - last) < MIN_INTERVAL) {
-					String text = "Written too quickly:"+el.getLocation()+":"+value+" after "+(now - last)+" msec";
-					LOG.warn(text, new IllegalStateException(text));
-					if(LOG_ERROR_CODE != null) {
-						Integer count = null;
-						if(SKIP_BEFORELOG_ERROR_CODE != null) {
-							count = COUNT_ERROR.get(el.getLocation());
-							if(count == null)
-								count = 0;
-							COUNT_ERROR.put(el.getLocation(), count+1);
+			else {
+				if(RES_TO_TEST != null && Float.isNaN(value) && location.contains(RES_TO_TEST))
+					LOG.warn("Writing NaN to "+location);
+				if(RES_TO_TEST2 != null && location.contains(RES_TO_TEST2)) {
+					LOG.info("Writing "+value+" to "+location, 
+							new IllegalStateException("Writing "+value+" to "+location));
+				}
+				if((MIN_INTERVAL) != null && (RES_TO_TEST != null) && location.contains(RES_TO_TEST)) {
+					long now = getFrameworkTime();
+					long last = getLastUpdateTime();
+					if((now - last) < MIN_INTERVAL) {
+						String text = "Written too quickly:"+location+":"+value+" after "+(now - last)+" msec";
+						LOG.warn(text, new IllegalStateException(text));
+						if(LOG_ERROR_CODE != null) {
+							Integer count = null;
+							if(SKIP_BEFORELOG_ERROR_CODE != null) {
+								count = COUNT_ERROR.get(location);
+								if(count == null)
+									count = 0;
+								COUNT_ERROR.put(location, count+1);
+							}
+							if(count == null || (count >= SKIP_BEFORELOG_ERROR_CODE)) {
+								logErrorCode(LOG_ERROR_CODE);
+								LOG.warn("Wrote ERROR_CODE "+LOG_ERROR_CODE+" to logFileCheck!");
+							}
 						}
-						if(count == null || (count >= SKIP_BEFORELOG_ERROR_CODE)) {
-							logErrorCode(LOG_ERROR_CODE);
-							LOG.warn("Wrote ERROR_CODE "+LOG_ERROR_CODE+" to logFileCheck!");
-						}
-					}
-				} else
-					COUNT_ERROR.remove(el.getLocation());
+					} else
+						COUNT_ERROR.remove(location);
+				}
 			}
 			//*/
 			if (el.isVirtual() || getAccessModeInternal() == AccessMode.READ_ONLY) {
