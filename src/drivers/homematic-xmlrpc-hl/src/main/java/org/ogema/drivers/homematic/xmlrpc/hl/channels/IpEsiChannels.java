@@ -115,6 +115,9 @@ public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandle
 					}
 				}
 			}
+			if (sdl.exists()) {
+				sdl.activate(false);
+			}
 		}
 
 	}
@@ -147,9 +150,9 @@ public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandle
 	public void setup(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
 		LoggerFactory.getLogger(getClass()).debug("setup HmIP-ESI handler for address {}", desc.getAddress());
 		String sdName = ResourceUtils.getValidResourceName("SENSORS_" + desc.getAddress());
-		SensorDeviceLabelled sdl = parent.getSubResource(sdName, SensorDeviceLabelled.class).create();
+		SensorDeviceLabelled sdl = parent.getSubResource(sdName, SensorDeviceLabelled.class);
 		conn.addEventListener(new EnergyMeterEventListener(sdl, desc.getAddress()));
-		sdl.activate(true);
+		//sdl.activate(true);
 	}
 
 }
