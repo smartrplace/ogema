@@ -375,6 +375,9 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 									if (disableStatus == 4) {
 										logger.info("deleting device with disableStatus {} from resources: {}", disableStatus, toplevelDevice.getPath());
 										toplevelDevice.delete();
+									} else if (disableStatus == 3) { // 3: disable resource
+										logger.info("deactivating device with disableStatus {}: {}", disableStatus, toplevelDevice.getPath());
+										toplevelDevice.deactivate(true);
 									}
 								} catch (IOException ex) {
 									logger.error("cloud not delete device {}: {}", toplevelDevice.getPath(), ex.getMessage());
