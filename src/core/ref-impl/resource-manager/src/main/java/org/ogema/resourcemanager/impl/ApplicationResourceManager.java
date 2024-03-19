@@ -85,6 +85,7 @@ public class ApplicationResourceManager implements ResourceManagement, ResourceA
 	// resource demands registered by this app
 	private final Collection<ResourceDemandListenerRegistration> resourceDemands;
 	private final Cache<String, ResourceAccessRights> accessRights;
+	private final ResourceAccessRights noSecurityRights;
 	
 	public ApplicationResourceManager(ApplicationManager appMan, Application app, ResourceDBManager dbMan,	PermissionManager pManager) {
 		Objects.requireNonNull(appMan);
@@ -101,7 +102,13 @@ public class ApplicationResourceManager implements ResourceManagement, ResourceA
 		this.accessedResources = new HashSet<>();
 		this.structureListeners = new HashSet<>();
 		this.resourceDemands = new HashSet<>();
-        this.accessRights = CacheBuilder.newBuilder().softValues().build();//new ConcurrentHashMap<>();
+		// ResourceAccessRights are only expensive with activated security
+		if (permissionManager.isSecure()) {
+			this.accessRights = CacheBuilder.newBuilder().softValues().build();
+		} else {
+			this.accessRights = null;
+		}
+		noSecurityRights = new ResourceAccessRights(null, null, pManager);
 		logger = org.slf4j.LoggerFactory.getLogger("org.ogema.core.resourcemanager-" + app.getClass().getName());
 	}
 
@@ -124,8 +131,10 @@ public class ApplicationResourceManager implements ResourceManagement, ResourceA
 		} finally {
 			dbMan.unlockRead();
 		}
-		synchronized (accessRights) {
-			accessRights.invalidateAll();
+		if (accessRights != null) {
+			synchronized (accessRights) {
+				accessRights.invalidateAll();
+			}
 		}
 	}
 	
@@ -265,6 +274,10 @@ public class ApplicationResourceManager implements ResourceManagement, ResourceA
 	}
 
 	protected ResourceAccessRights getAccessRights(TreeElement el) {
+		if (!permissionManager.isSecure()) {
+			//return permissionManager.getAccessRights(app, location, user);
+			return noSecurityRights;
+		}
 		TreeElement location = getLocationElement(el);
 		// here "no user" is treated as a special system user
 		final String user = permissionManager.getAccessManager().getCurrentUser();
