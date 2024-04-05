@@ -301,7 +301,7 @@ public class ValueResourceUtils {
 			return String.valueOf(((TimeResource) resource).getValue());
 		}
 		else
-			throw new RuntimeException();
+			throw new RuntimeException("Unknown SingleValueResource: "+resource==null?"null":(resource.getLocation()+" :: "+resource.getResourceType().getName()));
 	}
 	
 	/**
