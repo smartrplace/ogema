@@ -98,7 +98,7 @@ public class UdpDiscovery implements AutoCloseable {
 	}
 	
     private Collection<Ccu> sendBroadcast(InetAddress address, final NetworkInterface nif, String serialNumber) throws IOException {
-    	HmConnection.logger.trace("Starting Homematic CCU discovery scan for {}", address);
+    	HmConnection.logger.trace("Starting Homematic CCU discovery scan for {}/{}", nif.getDisplayName(), address);
         final MulticastSocket socket = new MulticastSocket();
         socket.setBroadcast(true);
         socket.setTimeToLive(5);

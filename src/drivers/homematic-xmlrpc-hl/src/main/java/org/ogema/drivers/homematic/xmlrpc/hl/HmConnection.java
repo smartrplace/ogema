@@ -756,6 +756,9 @@ public class HmConnection implements HomeMaticConnection {
 		Collection<Ccu> results = null;
 		try (final UdpDiscovery udp = new UdpDiscovery()) {
 			outer: for (NetworkInterface nif : ifs) {
+				if (!nif.isUp()) {
+					continue;
+				}
 				for (InterfaceAddress ia : nif.getInterfaceAddresses()) {
 					final InetAddress brdc = ia.getBroadcast();
 					if (brdc == null) {
