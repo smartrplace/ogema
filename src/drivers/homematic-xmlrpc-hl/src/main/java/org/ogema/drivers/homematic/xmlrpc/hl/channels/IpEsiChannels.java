@@ -20,13 +20,16 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEventListener;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
-import org.ogema.model.connections.ElectricityConnection;
 import org.ogema.model.devices.sensoractordevices.SensorDeviceLabelled;
 import org.ogema.model.sensors.ElectricCurrentSensor;
 import org.ogema.model.sensors.ElectricFrequencySensor;
 import org.ogema.model.sensors.ElectricVoltageSensor;
 import org.ogema.model.sensors.EnergyAccumulatedSensor;
+import org.ogema.model.sensors.FlowSensor;
+import org.ogema.model.sensors.GenericFloatSensor;
 import org.ogema.model.sensors.PowerSensor;
+import org.ogema.model.sensors.Sensor;
+import org.ogema.model.sensors.VolumeAccumulatedSensor;
 import org.ogema.tools.resource.util.ResourceUtils;
 import org.osgi.framework.Constants;
 import org.osgi.service.component.annotations.Component;
@@ -69,6 +72,8 @@ public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandle
 
 		@Override
 		public void event(List<HmEvent> events) {
+			GenericFloatSensor mainSensor = null;
+			String mainSensorLabel = null;
 			for (HmEvent e : events) {
 				if (!address.equals(e.getAddress())) {
 					continue;
@@ -79,6 +84,9 @@ public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandle
 								.getSubResource(ResourceUtils.getValidResourceName("Power_" + address), PowerSensor.class).reading();
 						setValueAndActivate(pwr, e.getValueFloat(), sdl);
 						logger.debug("power reading updated: {} = {}", pwr.getPath(), e.getValueFloat());
+						mainSensor = sdl.sensors()
+								.getSubResource(ResourceUtils.getValidResourceName("Power_" + address), PowerSensor.class);
+						mainSensorLabel = "Power";
 						break;
 					case "CURRENT": {
 						ElectricCurrentResource reading = sdl.sensors()
@@ -86,6 +94,9 @@ public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandle
 						float a = e.getValueFloat() / 1000.0f;
 						setValueAndActivate(reading, a, sdl);
 						logger.debug("current reading updated: {} = {}", reading.getPath(), a);
+						mainSensor = sdl.sensors()
+								.getSubResource(ResourceUtils.getValidResourceName("Current_" + address), ElectricCurrentSensor.class);
+						mainSensorLabel = "Current";
 						break;
 					}
 					case "VOLTAGE": {
@@ -93,6 +104,9 @@ public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandle
 								.getSubResource(ResourceUtils.getValidResourceName("Voltage_" + address), ElectricVoltageSensor.class).reading();
 						setValueAndActivate(reading, e.getValueFloat(), sdl);
 						logger.debug("voltage reading updated: {} = {}", reading.getPath(), e.getValueFloat());
+						mainSensor = sdl.sensors()
+								.getSubResource(ResourceUtils.getValidResourceName("Voltage_" + address), ElectricVoltageSensor.class);
+						mainSensorLabel = "Voltage";
 						break;
 					}
 					case "FREQUENCY": {
@@ -100,6 +114,9 @@ public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandle
 								.getSubResource(ResourceUtils.getValidResourceName("Frequency_" + address), ElectricFrequencySensor.class).reading();
 						setValueAndActivate(reading, e.getValueFloat(), sdl);
 						logger.debug("frequency reading updated: {} = {}", reading.getPath(), e.getValueFloat());
+						mainSensor = sdl.sensors()
+								.getSubResource(ResourceUtils.getValidResourceName("Frequency_" + address), ElectricFrequencySensor.class);
+						mainSensorLabel = "Frequency";
 						break;
 					}
 					case "ENERGY_COUNTER": {
@@ -111,12 +128,49 @@ public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandle
 						}
 						setValueAndActivate(reading, e.getValueFloat(), sdl);
 						logger.debug("energy reading updated: {} = {}", reading.getPath(), e.getValueFloat());
+						mainSensor = sdl.sensors()
+								.getSubResource(ResourceUtils.getValidResourceName("Energy_" + address), EnergyAccumulatedSensor.class);
+						mainSensorLabel = "Energy";
+						break;
+					}
+					case "GAS_FLOW": {
+						Sensor sens = sdl.sensors()
+							.getSubResource(ResourceUtils.getValidResourceName("GasFlow_" + address), FlowSensor.class);
+						//XXX conversion?
+						setValueAndActivate((FloatResource) sens.reading(), e.getValueFloat(), sdl);
+						sdl.mainSensor().setAsReference(sens);
+						if (!sdl.mainSensorTitle().isActive()) {
+							sdl.mainSensorTitle().create();
+							sdl.mainSensorTitle().setValue("Gas Flow");
+							sdl.mainSensorTitle().activate(false);
+						}
+						logger.debug("gas flow reading updated: {} = {}", sens.reading().getPath(), e.getValueFloat());
+						break;
+					}
+					case "GAS_VOLUME": {
+						Sensor sens = sdl.sensors()
+							.getSubResource(ResourceUtils.getValidResourceName("GasVolume_" + address), VolumeAccumulatedSensor.class);
+						//XXX conversion?
+						setValueAndActivate((FloatResource) sens.reading(), e.getValueFloat(), sdl);
+						sdl.mainSensor().setAsReference(sens);
+						if (!sdl.mainSensorTitle().isActive()) {
+							sdl.mainSensorTitle().create();
+							sdl.mainSensorTitle().setValue("Gas Volume");
+							sdl.mainSensorTitle().activate(false);
+						}
+						logger.debug("gas volume reading updated: {} = {}", sens.reading().getPath(), e.getValueFloat());
 						break;
 					}
 				}
 			}
 			if (sdl.exists()) {
 				sdl.activate(false);
+			}
+			if (!sdl.mainSensorTitle().isActive() && mainSensorLabel != null) {
+				sdl.mainSensorTitle().create();
+				sdl.mainSensorTitle().setValue(mainSensorLabel);
+				sdl.mainSensorTitle().activate(false);
+				sdl.mainSensor().setAsReference(mainSensor);
 			}
 		}
 
