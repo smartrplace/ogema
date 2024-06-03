@@ -115,6 +115,9 @@ public class HmEsTxWmPowerMeterChannel extends AbstractDeviceHandler {
         @Override
         public void event(List<HmEvent> events) {
             for (HmEvent e : events) {
+				if (!e.getAddress().startsWith(desc.getAddress())) {
+					continue;
+				}
                 switch (e.getValueKey()) {
 					case "POWER":
                     case "IEC_POWER": {
