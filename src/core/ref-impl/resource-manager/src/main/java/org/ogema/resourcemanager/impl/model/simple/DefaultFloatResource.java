@@ -67,6 +67,19 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 	private static final Integer LOG_ERROR_CODE = Integer.getInteger("org.ogema.resourcemanager.impl.model.simple.logErrorCode");
 	private static final Integer SKIP_BEFORELOG_ERROR_CODE = Integer.getInteger("org.ogema.resourcemanager.impl.model.simple.skipErrorsBeforeLogCode");
 	private static final Map<String, Integer> COUNT_ERROR = new HashMap<>();
+
+	private static final String RESSTART_TO_TEST = System.getProperty("org.ogema.resourcemanager.impl.model.simple.testResStart");
+	private static final Float VAL_TO_TEST = getFloatProperty("org.ogema.resourcemanager.impl.model.simple.testForValue");
+	private static Float getFloatProperty(String propertyName) {
+		String prop = System.getProperty(propertyName);
+		if(prop == null)
+			return null;
+		try {
+			return Float.parseFloat(prop);
+		} catch(NumberFormatException e) {
+			return null;
+		}
+	}
 	
 	@Override
 	public boolean setValue(float value, long timestamp) {
@@ -96,7 +109,14 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 					LOG.info("Writing "+value+" to "+location, 
 							new IllegalStateException("Writing "+value+" to "+location));
 				}
-				if((MIN_INTERVAL) != null && (RES_TO_TEST != null) && location.contains(RES_TO_TEST)) {
+				if((VAL_TO_TEST != null) && (VAL_TO_TEST == value)
+						&& (RES_TO_TEST != null) && location.contains(RES_TO_TEST) 
+						&& ((RESSTART_TO_TEST == null) || location.contains(RESSTART_TO_TEST))) {
+					String text = "Wrote critical value:"+location+":"+value;
+					LOG.warn(text, new IllegalStateException(text));					
+					logErrorCode(LOG_ERROR_CODE+1);
+				}
+				if((MIN_INTERVAL != null) && (RES_TO_TEST != null) && location.contains(RES_TO_TEST)) {
 					long now = getFrameworkTime();
 					long last = getLastUpdateTime();
 					if((now - last) < MIN_INTERVAL) {
