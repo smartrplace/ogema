@@ -58,6 +58,7 @@ class Persistence implements HmBackend, DeviceListener {
         List<DeviceDescription> rval = new ArrayList<>();
         for (HmDevice dev : hm.devices().getAllElements()) {
             DeviceDescriptionXmlRpc dd = new DeviceDescriptionXmlRpc(dev.address().getValue(), dev.version().getValue());
+			dd.setString(DeviceDescription.KEYS.TYPE.name(), dev.type().getValue());
             rval.add(dd);
             for (HmDevice c: dev.channels().getAllElements()) {
                 rval.add(new DeviceDescriptionXmlRpc(c.address().getValue(), c.version().getValue()));
@@ -70,7 +71,7 @@ class Persistence implements HmBackend, DeviceListener {
     private static String createResourceName(String type, String address) {
         return ("HM_" + type + "_" + address).replaceAll("[^\\p{javaJavaIdentifierPart}]", "_");
     }
-    
+	
     private void storeCommonData(HmDevice dev, DeviceDescription desc) {
         dev.type().<StringResource>create().setValue(desc.getType());
         dev.address().<StringResource>create().setValue(desc.getAddress());

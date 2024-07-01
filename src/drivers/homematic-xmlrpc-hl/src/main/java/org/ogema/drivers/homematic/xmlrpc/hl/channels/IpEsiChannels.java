@@ -122,11 +122,11 @@ public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandle
 					case "ENERGY_COUNTER": {
 						EnergyResource reading = sdl.sensors()
 								.getSubResource(ResourceUtils.getValidResourceName("Energy_" + address), EnergyAccumulatedSensor.class).reading();
-						//XXX conversion?
+						//ESI returns energy as Wh
 						if (reading.getUnit() != PhysicalUnit.KILOWATT_HOURS) {
 							reading.setUnit(PhysicalUnit.KILOWATT_HOURS);
 						}
-						setValueAndActivate(reading, e.getValueFloat(), sdl);
+						setValueAndActivate(reading, e.getValueFloat() / 1000f, sdl);
 						logger.debug("energy reading updated: {} = {}", reading.getPath(), e.getValueFloat());
 						mainSensor = sdl.sensors()
 								.getSubResource(ResourceUtils.getValidResourceName("Energy_" + address), EnergyAccumulatedSensor.class);

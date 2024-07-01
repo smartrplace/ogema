@@ -35,7 +35,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 
 import org.apache.xmlrpc.XmlRpcException;
 import org.ogema.core.application.Application;
@@ -82,6 +81,7 @@ import org.slf4j.LoggerFactory;
 		property = {"osgi.command.scope=hmhl",
 			"osgi.command.function=checkPrograms",
 			"osgi.command.function=listDevices",
+			"osgi.command.function=listCcuDevices",
 			"osgi.command.function=writeCounts"})
 public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 
@@ -451,6 +451,18 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 		if (setupInProgress) {
 			System.out.println("Setup in progress...");
 		}
+	}
+	
+	public void listCcuDevices() {
+		getConnections().forEach((iface,conn) -> {
+			System.out.printf("%s (%s, %s):%n", iface.getPath(),
+					iface.interfaceInfo().address().getValue(),
+					iface.interfaceInfo().getSubResource("clientUrl", StringResource.class).getValue());
+			List<DeviceDescription> ldd = ((HmConnection) conn).persistence.getKnownDevices(null);
+			ldd.forEach(dd -> {
+				System.out.printf("%s: %s (%s)%n", dd.getAddress(), dd.getType(), dd.getVersion());
+			});
+		});
 	}
 	
 	public void checkPrograms() {
