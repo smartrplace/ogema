@@ -187,6 +187,7 @@ public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandle
 				a.activate(false);
 				a = a.getParent();
 			} while (a != null && !a.equals(top));
+			top.activate(false);
 		}
 	}
 
@@ -206,6 +207,7 @@ public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandle
 		String sdName = ResourceUtils.getValidResourceName("SENSORS_" + desc.getAddress());
 		SensorDeviceLabelled sdl = parent.getSubResource(sdName, SensorDeviceLabelled.class);
 		conn.addEventListener(new EnergyMeterEventListener(sdl, desc.getAddress()));
+		ChannelUtils.linkMaintenanceWhenAvailable(parent, sdl.electricityStorage());
 		//sdl.activate(true);
 	}
 

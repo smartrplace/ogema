@@ -2,6 +2,7 @@ package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
@@ -10,12 +11,17 @@ import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.SingleValueResource;
+import org.ogema.core.resourcemanager.ResourceStructureEvent;
+import org.ogema.core.resourcemanager.ResourceStructureListener;
 import org.ogema.core.resourcemanager.ResourceValueListener;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
+import org.ogema.drivers.homematic.xmlrpc.hl.types.HmMaintenance;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription.SET_TYPES;
+import org.ogema.model.devices.buildingtechnology.Thermostat;
+import org.ogema.model.devices.storage.ElectricityStorage;
 import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.slf4j.Logger;
 
@@ -109,6 +115,36 @@ public class ChannelUtils {
 		update.activate(false);
 		CompletableFuture.runAsync(updateValues);
 	}
+	
+	public static void linkMaintenanceWhenAvailable(final HmDevice device, final ElectricityStorage battery) {
+        List<HmMaintenance> l = device.getSubResources(HmMaintenance.class, false);
+        if (l.isEmpty()) {
+            device.addStructureListener(new ResourceStructureListener() {
+                @Override
+                public void resourceStructureChanged(ResourceStructureEvent event) {
+                    if (event.getType() != ResourceStructureEvent.EventType.SUBRESOURCE_ADDED) {
+                        return;
+                    }
+                    if (HmMaintenance.class.isAssignableFrom(event.getChangedResource().getResourceType())) {
+                        linkMaintencanceBattery((HmMaintenance) event.getChangedResource(), battery);
+                        device.removeStructureListener(this);
+                    }
+                }
+            });
+            // race condition during creation not resolveable here
+            l = device.getSubResources(HmMaintenance.class, false);
+            if (!l.isEmpty()) {
+                linkMaintencanceBattery(l.get(0), battery);
+            }
+        } else {
+            linkMaintencanceBattery(l.get(0), battery);
+        }
+    }
+    
+    private static void linkMaintencanceBattery(HmMaintenance mntn, ElectricityStorage battery) {
+        battery.create().activate(false);
+        mntn.battery().setAsReference(battery);
+    }
 
 	
 }

@@ -54,9 +54,12 @@ import org.ogema.tools.resource.util.ResourceUtils;
  *
  * @author jlapp
  */
-public class MaintenanceChannel extends AbstractDeviceHandler {
+public final class MaintenanceChannel extends AbstractDeviceHandler {
 
     static final long RSSI_MAX_AGE = 15 * 60 * 1000L;
+	
+	public static final float BATTERY_CHARGE_LOW = 0.1f;
+	public static final float BATTERY_CHARGE_OK = 1.0f;
 
     public static enum PARAMS {
 
@@ -91,13 +94,13 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
 
         final HmMaintenance resource;
         final DeviceDescription desc;
-        final Map<String, ParameterDescription<?>> values;
+        //final Map<String, ParameterDescription<?>> values;
         volatile long lastRead;
 
         public KnownDevice(HmMaintenance resource, DeviceDescription desc, Map<String, ParameterDescription<?>> values) {
             this.resource = resource;
             this.desc = desc;
-            this.values = values;
+            //this.values = values;
         }
 
         void checkRssiUpdate(long maxAge) {
@@ -143,7 +146,7 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
         final String address;
         final HmDevice parent;
 
-        public MaintenanceEventListener(HmDevice parent, HmMaintenance mnt, String address) {
+		public MaintenanceEventListener(HmDevice parent, HmMaintenance mnt, String address) {
             this.mnt = mnt;
             this.address = address;
             this.parent = parent;
@@ -187,6 +190,10 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                         mnt.batteryLow().create().activate(false);
                     }
                     mnt.batteryLow().setValue(e.getValueBoolean());
+					// battery resources created in setup
+					mnt.battery().chargeSensor().reading()
+							.setValue(e.getValueBoolean() ? BATTERY_CHARGE_LOW : BATTERY_CHARGE_OK);
+					mnt.battery().chargeSensor().reading().activate(false);
                 } else if (PARAMS.RSSI_DEVICE.name().equals(e.getValueKey())) {
                     if (e.getValueInt() == 0) {
                         logger.debug("cowardly refusing to store RSSI_DEVICE=0 for {}", e.getAddress());
@@ -206,12 +213,9 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
                         mnt.rssiPeer().setValue(e.getValueInt());
                     }
                 } else if (PARAMS.OPERATING_VOLTAGE.name().equals(e.getValueKey())) {
-                    if (!mnt.battery().internalVoltage().reading().isActive()) {
-                        mnt.battery().internalVoltage().reading().create().activate(false);
-                        mnt.battery().internalVoltage().activate(false);
-                        mnt.battery().activate(false);
-                    }
+					// battery resources created in setup
                     mnt.battery().internalVoltage().reading().setValue(e.getValueFloat());
+					mnt.battery().internalVoltage().reading().activate(false);
                 } else if (PARAMS.UNREACH.name().equals(e.getValueKey())) {
                     mnt.communicationStatus().communicationDisturbed().setValue(e.getValueBoolean());
                 }
@@ -279,6 +283,16 @@ public class MaintenanceChannel extends AbstractDeviceHandler {
         if (values.containsKey(PARAMS.RSSI_PEER.name())) {
             mnt.rssiPeer().create();
         }
+		if (values.containsKey(PARAMS.OPERATING_VOLTAGE.name())) {
+			mnt.battery().internalVoltage().reading().create();
+			mnt.battery().internalVoltage().activate(false);
+			mnt.battery().activate(false);
+		}
+		if (values.containsKey(PARAMS.LOWBAT.name())) {
+			mnt.battery().chargeSensor().reading().create();
+			mnt.battery().chargeSensor().activate(false);
+			mnt.battery().activate(false);
+		}
         
         Map<String, ParameterDescription<?>> master =
                 paramSets.get(ParameterDescription.SET_TYPES.MASTER.name());

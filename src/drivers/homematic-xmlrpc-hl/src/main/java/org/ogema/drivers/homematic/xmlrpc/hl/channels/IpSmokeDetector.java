@@ -181,7 +181,7 @@ public class IpSmokeDetector extends AbstractDeviceHandler implements DeviceHand
 					}
 				});
 		conn.addEventListener(new SmokeDetectorListener(sens, desc.getAddress()));
-
+		ChannelUtils.linkMaintenanceWhenAvailable(parent, sens.battery());
 		sens.activate(true);
 	}
 
