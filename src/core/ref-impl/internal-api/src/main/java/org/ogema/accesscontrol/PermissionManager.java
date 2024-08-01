@@ -18,6 +18,8 @@ package org.ogema.accesscontrol;
 import java.io.PrintStream;
 import java.security.AccessControlContext;
 import java.security.Permission;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 import org.ogema.applicationregistry.ApplicationRegistry;
@@ -32,6 +34,7 @@ import org.ogema.resourcetree.TreeElement;
 import org.osgi.framework.Bundle;
 import org.osgi.service.condpermadmin.ConditionalPermissionInfo;
 import org.osgi.service.condpermadmin.ConditionalPermissionUpdate;
+import org.osgi.service.permissionadmin.PermissionInfo;
 
 /**
  * This class is the entry point to the functionality related to permission handling. It encapsulates the Java/OSGi
@@ -323,6 +326,10 @@ public interface PermissionManager {
 	public boolean isSecure();
 
 	/**
+	 * @deprecated ConditionalPermissionUpdate does not work that way!
+	 *             ConditionalPermissionUpdate#getConditionalPermissionInfos returns
+	 *             the list of CPIs as it was when the CPU was created.
+	 * 
 	 * Removes a permission that was granted to the specified bundle before. The permission to be removed is specified
 	 * by the name of the permission class and the optional parameter filterString and actions. In case of removing
 	 * multiple permissions this method is more performance than
@@ -343,8 +350,22 @@ public interface PermissionManager {
 	 * @return true, if the reduction of the policy could be achieved by removing of a permission from the policy table
 	 *         or false, if the reduction was achievable by adding of negative policy only.
 	 */
+	@Deprecated
 	public boolean removePermissionManual(ConditionalPermissionUpdate cpu, Bundle bundle, String permissionClassName,
 			String filterString, String actions);
+	
+	/**
+	 * Bulk removal method.
+	 * @param bundle
+	 *            The reference of the bundle, that owns the permission to be removed.
+	 * @param permissions
+	 *            Permissions to remove.
+	 * @return List of permissions for which the remove call actually changed the
+	 *         active permission set.
+	 */
+	default public List<PermissionInfo> removePermissions(final Bundle bundle, Collection<PermissionInfo> permissions) {
+		throw new UnsupportedOperationException();
+	}
 
 	public boolean checkWebAccess(AppID accessor, AppID access);
 }

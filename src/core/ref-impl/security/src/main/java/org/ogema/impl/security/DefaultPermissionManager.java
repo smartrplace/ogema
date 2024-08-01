@@ -23,6 +23,7 @@ import java.security.PrivilegedAction;
 import java.security.ProtectionDomain;
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -758,7 +759,144 @@ public class DefaultPermissionManager implements PermissionManager {
 		});
 		return acc;
 	}
+	
+	private static final int PERMISSION_REMOVED = 1;
+	private static final int PERMISSION_UPDATED = 2;
+	
+	private static int removePermission(Bundle b, ConditionalPermissionAdmin cpa, final List<ConditionalPermissionInfo> cpuPiList, PermissionInfo pi, Logger logger) {
+		final String permissionName = pi.getType();
+		final String filterString = pi.getName();
+		final String actions = pi.getActions();
+		ArrayList<ConditionalPermissionInfo> changedPInfos = null;
+		int rval = 0;
+		boolean match;
+		boolean isDefaultPol = false;
+		String appLoc = "";
+		if (b == null) {
+			isDefaultPol = true;
+		}
 
+		if (b != null) {
+			appLoc = b.getLocation();
+		}
+		for (Iterator<ConditionalPermissionInfo> it = cpuPiList.iterator(); it.hasNext();) {
+			ConditionalPermissionInfo cpInfo = it.next();
+			// for (ConditionalPermissionInfo cpInfo : piList) {
+			// Get the condition infos to check which of them match the
+			// given app location ...
+			ConditionInfo cia[] = cpInfo.getConditionInfos();
+			if (cia.length == 0 && !isDefaultPol) // if no conditions
+			// are set, its a
+			// default permission
+			{
+				// in this case the permission couldn't be removed
+				// rather a negative permission is to be added.
+				continue;
+			} else {
+				match = true;
+			}
+			if (!isDefaultPol) {
+				for (ConditionInfo tmpci : cia) {
+					match = false;
+					// ... and check for BundleLocationCondition
+					if (tmpci.getType().equals(BUNDLE_LOCATION_CONDITION_NAME)) {
+						String args[] = tmpci.getArgs();
+						int length = args.length;
+						if (length == 0) {
+							continue; // should never happen
+						}
+						match = checkBCMatch(args, appLoc);
+						break;
+					}
+				}
+			}
+			if (match) {
+				// Check if the permission match
+				PermissionInfo[] pinfos = cpInfo.getPermissionInfos();
+				int length = pinfos.length;
+				int index = -1;
+
+				for (PermissionInfo pinfo : pinfos) {
+					index++;
+					String permType = pinfo.getType();
+					if (!permType.equals(permissionName)) {
+						continue;
+					}
+					if (compareStr(filterString, pinfo.getName()) == 0
+							&& compareStr(actions, pinfo.getActions()) == 0) {
+						logger.debug("Remove policy " + cpInfo.getEncoded());
+						it.remove();
+						if (length > 1) {
+							PermissionInfo[] tmpPinfos = new PermissionInfo[length - 1];
+							int index2 = 0, addidx = 0;
+							for (PermissionInfo tmppinfo : pinfos) {
+								if (index != index2) {
+									tmpPinfos[addidx++] = tmppinfo;
+								}
+								index2++;
+							}
+							ConditionalPermissionInfo tmpCpi = cpa.newConditionalPermissionInfo(
+									cpInfo.getName(), cia, tmpPinfos, cpInfo.getAccessDecision());
+							if (changedPInfos == null) {
+								changedPInfos = new ArrayList<>();
+							}
+							changedPInfos.add(tmpCpi);
+						}
+						rval |= PERMISSION_REMOVED;
+					} else if (compareStr(filterString, pinfo.getName()) == 0 // only actions are to be reduced
+							&& compareStr(actions, pinfo.getActions()) != 0) {
+						PermissionInfo[] tmpPinfos = new PermissionInfo[1];
+						tmpPinfos[0] = new PermissionInfo(permissionName, filterString, actions);
+						ConditionalPermissionInfo tmpCpi = cpa.newConditionalPermissionInfo(
+								"deny_" + System.currentTimeMillis(), cia, tmpPinfos, ConditionalPermissionInfo.DENY);
+						if (changedPInfos == null) {
+							changedPInfos = new ArrayList<>();
+						}
+						changedPInfos.add(tmpCpi);
+					}
+				}
+			}
+		}
+		if (changedPInfos != null && !changedPInfos.isEmpty()) {
+			cpuPiList.addAll(changedPInfos);
+			rval |= PERMISSION_UPDATED;
+		}
+		return rval;
+	}
+	
+	public List<PermissionInfo> removePermissions(final Bundle b, Collection<PermissionInfo> permissions) {
+		if (!handleSecurity(new AdminPermission(AdminPermission.APP))) {
+			throw new SecurityException("Access denied! org.ogema.accesscontrol.AdminPermission(APP) is required.");
+		}
+		ConditionalPermissionUpdate cpu = cpa.newConditionalPermissionUpdate();
+		final List<ConditionalPermissionInfo> updateList = cpu.getConditionalPermissionInfos();
+		// = new ArrayList<>();
+		List<PermissionInfo> removedPermissions = AccessController.doPrivileged(new PrivilegedAction<List<PermissionInfo>>() {
+			@Override
+			public List<PermissionInfo> run() {
+				List<PermissionInfo> removedList = new ArrayList<>();
+				for (PermissionInfo pi : permissions) {
+					int rval = removePermission(b, cpa, updateList, pi, logger);
+					if (rval != 0) {
+						removedList.add(pi);
+					}
+				}
+				return removedList;
+			}
+		});
+		if (!removedPermissions.isEmpty()) {
+			boolean commitSuccess = cpu.commit();
+			if (commitSuccess) {
+				return removedPermissions;
+			} else {
+				logger.debug("permission update commit failed, retrying");
+				return removePermissions(b, permissions);
+			}
+		} else {
+			return removedPermissions;
+		}
+	}
+	
 	@Override
 	public boolean removePermission(final Bundle b, final String permissionName, final String filterString,
 			final String actions) {
@@ -770,114 +908,22 @@ public class DefaultPermissionManager implements PermissionManager {
 		 */
 		Boolean ap = AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
 			public Boolean run() {
-				ArrayList<ConditionalPermissionInfo> changedPInfos = null;
-				boolean result = false;
-				boolean match = false;
-				boolean isDefaultPol = false;
-				String appLoc = "";
-				if (b == null) {
-					isDefaultPol = true;
-				}
-
-				if (b != null) {
-					appLoc = b.getLocation();
-				}
-				// First get the permissions table
+				PermissionInfo pi = new PermissionInfo(permissionName, filterString, actions);
 				ConditionalPermissionUpdate cpu = cpa.newConditionalPermissionUpdate();
-				List<ConditionalPermissionInfo> piList = cpu.getConditionalPermissionInfos();
-				for (Iterator<ConditionalPermissionInfo> it = piList.iterator(); it.hasNext();) {
-					ConditionalPermissionInfo cpInfo = it.next();
-					// for (ConditionalPermissionInfo cpInfo : piList) {
-					// Get the condition infos to check which of them match the
-					// given app location ...
-					ConditionInfo cia[] = cpInfo.getConditionInfos();
-					if (cia.length == 0 && !isDefaultPol) // if no conditions
-															// are set, its a
-					// default permission
-					{
-						// in this case the permission couldn't be removed
-						// rather a negative permission is to be added.
-						match = false;
-						continue;
-					}
-					else {
-						match = true;
-					}
-					if (!isDefaultPol) {
-						for (ConditionInfo tmpci : cia) {
-							match = false;
-							// ... and check for BundleLocationCondition
-							if (tmpci.getType().equals(BUNDLE_LOCATION_CONDITION_NAME)) {
-								String args[] = tmpci.getArgs();
-								int length = args.length;
-								if (length == 0)
-									continue; // should never happen
-								match = checkBCMatch(args, appLoc);
-								break;
-							}
-						}
-					}
-					if (match) {
-						// Check if the permission match
-						PermissionInfo[] pinfos = cpInfo.getPermissionInfos();
-						int length = pinfos.length;
-						int index = -1;
-
-						for (PermissionInfo pinfo : pinfos) {
-							index++;
-							String permType = pinfo.getType();
-							if (!permType.equals(permissionName))
-								continue;
-							if (compareStr(filterString, pinfo.getName()) == 0
-									&& compareStr(actions, pinfo.getActions()) == 0) {
-								logger.debug("Remove policy " + cpInfo.getEncoded());
-								it.remove();
-
-								if (length > 1) {
-									PermissionInfo[] tmpPinfos = new PermissionInfo[length - 1];
-									int index2 = 0, addidx = 0;
-									for (PermissionInfo tmppinfo : pinfos) {
-										if (index != index2) {
-											tmpPinfos[addidx++] = tmppinfo;
-										}
-										index2++;
-									}
-									ConditionalPermissionInfo tmpCpi = cpa.newConditionalPermissionInfo(
-											cpInfo.getName(), cia, tmpPinfos, cpInfo.getAccessDecision());
-									if (changedPInfos == null)
-										changedPInfos = new ArrayList<>();
-									changedPInfos.add(tmpCpi);
-								}
-								result = true;
-							}
-							else if (compareStr(filterString, pinfo.getName()) == 0 // only actions are to be reduced
-									&& compareStr(actions, pinfo.getActions()) != 0) {
-								PermissionInfo[] tmpPinfos = new PermissionInfo[1];
-								tmpPinfos[0] = new PermissionInfo(permissionName, filterString, actions);
-								ConditionalPermissionInfo tmpCpi = cpa.newConditionalPermissionInfo(
-										"deny_" + System.currentTimeMillis(), cia, tmpPinfos, ConditionalPermissionInfo.DENY);
-								if (changedPInfos == null)
-									changedPInfos = new ArrayList<>();
-								changedPInfos.add(tmpCpi);
-							}
-						}
-						match = false;
-					}
+				int rval = removePermission(b, cpa, cpu.getConditionalPermissionInfos(), pi, logger);
+				if (rval != 0) {
+					cpu.commit();
+				} else {
+					logger.debug("no change for remove permission {}", pi);
 				}
-
-				if (changedPInfos != null && !changedPInfos.isEmpty()) {
-					piList.addAll(changedPInfos);
-				}
-				cpu.commit();
-				return result;
+				return (rval & PERMISSION_REMOVED) > 0;
 			}
-
 		});
 		return ap;
 
 	}
 
-	private boolean checkBCMatch(String[] args, String appLoc) {
+	private static boolean checkBCMatch(String[] args, String appLoc) {
 		boolean match = false;
 		boolean conditionNegated = false;
 		String loc = args[0];
@@ -902,7 +948,7 @@ public class DefaultPermissionManager implements PermissionManager {
 		return match;
 	}
 
-	protected int compareStr(String str1, String str2) {
+	protected static int compareStr(String str1, String str2) {
 		if (str1 == null && str2 == null) // both null ->match
 			return 0;
 		if (str1 == null || str2 == null) // not both null but one of them ->
@@ -1012,108 +1058,10 @@ public class DefaultPermissionManager implements PermissionManager {
 		 */
 		Boolean ap = AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
 			public Boolean run() {
-				ArrayList<ConditionalPermissionInfo> changedPInfos = null;
-				boolean result = false;
-				boolean match = false;
-				boolean isDefaultPol = false;
-				String appLoc = "";
-				if (b == null) {
-					isDefaultPol = true;
-				}
-
-				if (b != null) {
-					appLoc = b.getLocation();
-				}
-				// First get the permissions table
-
-				List<ConditionalPermissionInfo> piList = cpu.getConditionalPermissionInfos();
-
-				for (Iterator<ConditionalPermissionInfo> it = piList.iterator(); it.hasNext();) {
-					ConditionalPermissionInfo cpInfo = it.next();
-					// for (ConditionalPermissionInfo cpInfo : piList) {
-					// Get the condition infos to check which of them match the
-					// given app location ...
-					ConditionInfo cia[] = cpInfo.getConditionInfos();
-					if (cia.length == 0 && !isDefaultPol) // if no conditions
-															// are set, its a
-					// default permission
-					{
-						// in this case the permission couldn't be removed
-						// rather a negative permission is to be added.
-						match = false;
-						continue;
-					}
-					else {
-						match = true;
-					}
-					if (!isDefaultPol) {
-						for (ConditionInfo tmpci : cia) {
-							match = false;
-							// ... and check for BundleLocationCondition
-							if (tmpci.getType().equals(BUNDLE_LOCATION_CONDITION_NAME)) {
-								String args[] = tmpci.getArgs();
-								int length = args.length;
-								if (length == 0)
-									continue; // should never happen
-								match = checkBCMatch(args, appLoc);
-								break;
-							}
-						}
-					}
-					if (match) {
-						// Check if the permission match
-						PermissionInfo[] pinfos = cpInfo.getPermissionInfos();
-						int length = pinfos.length;
-						int index = -1;
-
-						for (PermissionInfo pinfo : pinfos) {
-							index++;
-							String permType = pinfo.getType();
-							if (!permType.equals(permissionName))
-								continue;
-							if (compareStr(filterString, pinfo.getName()) == 0
-									&& compareStr(actions, pinfo.getActions()) == 0) {
-								logger.debug("Remove policy " + cpInfo.getEncoded());
-								it.remove();
-
-								if (length > 1) {
-									PermissionInfo[] tmpPinfos = new PermissionInfo[length - 1];
-									int index2 = 0, addidx = 0;
-									for (PermissionInfo tmppinfo : pinfos) {
-										if (index != index2) {
-											tmpPinfos[addidx++] = tmppinfo;
-										}
-										index2++;
-									}
-									ConditionalPermissionInfo tmpCpi = cpa.newConditionalPermissionInfo(
-											cpInfo.getName(), cia, tmpPinfos, cpInfo.getAccessDecision());
-									if (changedPInfos == null)
-										changedPInfos = new ArrayList<>();
-									changedPInfos.add(tmpCpi);
-								}
-								result = true;
-							}
-							else if (compareStr(filterString, pinfo.getName()) == 0 // only actions are to be reduced
-									&& compareStr(actions, pinfo.getActions()) != 0) {
-								PermissionInfo[] tmpPinfos = new PermissionInfo[1];
-								tmpPinfos[0] = new PermissionInfo(permissionName, filterString, actions);
-								ConditionalPermissionInfo tmpCpi = cpa.newConditionalPermissionInfo(
-										"deny_" + System.currentTimeMillis(), cia, tmpPinfos, ConditionalPermissionInfo.DENY);
-								if (changedPInfos == null)
-									changedPInfos = new ArrayList<>();
-								changedPInfos.add(tmpCpi);
-							}
-
-						}
-						match = false;
-					}
-				}
-
-				if (changedPInfos != null && !changedPInfos.isEmpty()) {
-					piList.addAll(changedPInfos);
-				}
-
-				return result;
+				PermissionInfo pi = new PermissionInfo(permissionName, filterString, actions);
+				ConditionalPermissionUpdate cpu = cpa.newConditionalPermissionUpdate();
+				int rval = removePermission(b, cpa, cpu.getConditionalPermissionInfos(), pi, logger);
+				return (rval & PERMISSION_REMOVED) > 0;
 			}
 
 		});
