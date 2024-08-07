@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.simple.BooleanResource;
+import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
 
@@ -84,6 +85,12 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
 		PARAMETERS.put("CYCLIC_INFO_MSG", IntegerResource.class);
 		PARAMETERS.put("CYCLIC_INFO_MSG_DIS_UNCHANGED", IntegerResource.class);
 		PARAMETERS.put("CYCLIC_INFO_MSG_DIS", IntegerResource.class);
+		
+		// for FALMOT and FAL230
+		PARAMETERS.put("HEATING_EMERGENCY_PWM_SIGNAL", FloatResource.class);
+		// FALMOT only
+		PARAMETERS.put("DECALCIFICATION_TIME", IntegerResource.class);
+		PARAMETERS.put("DECALCIFICATION_WEEKDAY", IntegerResource.class);
 	}
 
     Logger logger = LoggerFactory.getLogger(getClass());
@@ -318,7 +325,7 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
         knownDevices.add(new KnownDevice(mnt, desc, values));
         update(mnt, desc.getAddress());
     }
-
+	
     private Sensor maintenanceSensorReading(HmDevice parent, PARAMS param, HmEvent e) {
         SensorDevice sd = parent.getSubResource("maintenanceChannelReadings", SensorDevice.class);
         if (!sd.isActive()) {
