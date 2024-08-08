@@ -198,7 +198,7 @@ public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandle
 	 */
 	public boolean accept(DeviceDescription desc) {
 		return "HmIP-ESI".equalsIgnoreCase(desc.getParentType())
-				|| "ENERGIE_METER_TRANSMITTER".equalsIgnoreCase(desc.getType());
+				&& "ENERGIE_METER_TRANSMITTER".equalsIgnoreCase(desc.getType());
 	}
 
 	@Override
