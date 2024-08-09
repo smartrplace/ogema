@@ -20,7 +20,6 @@ import org.ogema.drivers.homematic.xmlrpc.hl.types.HmMaintenance;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription.SET_TYPES;
-import org.ogema.model.devices.buildingtechnology.Thermostat;
 import org.ogema.model.devices.storage.ElectricityStorage;
 import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.slf4j.Logger;
@@ -142,8 +141,9 @@ public class ChannelUtils {
     }
     
     private static void linkMaintencanceBattery(HmMaintenance mntn, ElectricityStorage battery) {
-        battery.create().activate(false);
-        mntn.battery().setAsReference(battery);
+		if (mntn.battery().exists() && !mntn.battery().isReference(true)) {
+			battery.setAsReference(mntn.battery());
+		}
     }
 
 	

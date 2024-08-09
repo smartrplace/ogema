@@ -172,6 +172,9 @@ public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandle
 				sdl.mainSensorTitle().activate(false);
 				sdl.mainSensor().setAsReference(mainSensor);
 			}
+			if (!sdl.sensors().getAllElements().isEmpty()) {
+				ChannelUtils.linkMaintenanceWhenAvailable(sdl.getParent(), sdl.electricityStorage());
+			}
 		}
 
 	}
@@ -207,8 +210,11 @@ public class IpEsiChannels extends AbstractDeviceHandler implements DeviceHandle
 		String sdName = ResourceUtils.getValidResourceName("SENSORS_" + desc.getAddress());
 		SensorDeviceLabelled sdl = parent.getSubResource(sdName, SensorDeviceLabelled.class);
 		conn.addEventListener(new EnergyMeterEventListener(sdl, desc.getAddress()));
-		ChannelUtils.linkMaintenanceWhenAvailable(parent, sdl.electricityStorage());
 		//sdl.activate(true);
+		if (sdl.exists() && sdl.getSubResources(false).size() == 1 && sdl.electricityStorage().exists()) {
+			//remove empty (except for linked battery) device created by previous version
+			sdl.delete();
+		}
 	}
 
 }
