@@ -43,6 +43,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.servlet.ServletException;
 import org.apache.xmlrpc.XmlRpcException;
 import org.ogema.core.application.ApplicationManager;
@@ -97,6 +98,10 @@ public class HmConnection implements HomeMaticConnection {
 	public static final long MAX_REINITTRYTIME = 15 * 60_000;
 	private Thread connectionThread;
 	private volatile boolean connected = false;
+	
+	// maximum number of consecutive failed pings before restarting the connection
+	int maxConsecutivePingFailures = 3;
+	AtomicInteger consecutivePingFailures = new AtomicInteger(0);
 
 	// quasi-final: not changed after init() call
 	HomeMaticService hm;
@@ -349,7 +354,7 @@ public class HmConnection implements HomeMaticConnection {
 			}
 		}
 	};
-
+	
 	Future<Boolean> checkPing() {
 		final String callerId = "ogema " + clientUrl + " " + System.currentTimeMillis();
 		final CountDownLatch pongReceived = new CountDownLatch(1);
@@ -366,6 +371,7 @@ public class HmConnection implements HomeMaticConnection {
 						if ("CENTRAL".equals(e.getAddress()) || "CENTRAL:0".equals(e.getAddress())) {
 							if (callerId.equals(e.getValueString())) {
 								pongReceived.countDown();
+								consecutivePingFailures.set(0);
 							}
 						}
 					}
@@ -383,6 +389,10 @@ public class HmConnection implements HomeMaticConnection {
 						logger.debug("ping OK for {}", baseResource.getName());
 						return true;
 					} else {
+						if (consecutivePingFailures.incrementAndGet() <= maxConsecutivePingFailures) {
+							logger.warn("ping failed {} times for {}", consecutivePingFailures.get(), baseResource.getName());
+							return true;
+						}
 						if (executor.isShutdown()) {
 							return false;
 						}

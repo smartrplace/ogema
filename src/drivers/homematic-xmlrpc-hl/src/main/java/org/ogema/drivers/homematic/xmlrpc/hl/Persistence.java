@@ -19,16 +19,20 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.ogema.core.application.ApplicationManager;
+import org.ogema.core.model.ValueResource;
 import org.ogema.core.model.array.StringArrayResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.StringResource;
+import org.ogema.core.resourcemanager.ResourceValueListener;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmLogicInterface;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceListener;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmBackend;
 import org.ogema.drivers.homematic.xmlrpc.ll.xmlrpc.DeviceDescriptionXmlRpc;
+import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.slf4j.Logger;
 
 /**
@@ -72,16 +76,29 @@ class Persistence implements HmBackend, DeviceListener {
         return ("HM_" + type + "_" + address).replaceAll("[^\\p{javaJavaIdentifierPart}]", "_");
     }
 	
+	private void storeIfChanged(ValueResource res, Object val) {
+		if (!res.isActive() || !Objects.deepEquals(val, ValueResourceUtils.getValue(res))) {
+			res.create();
+			ValueResourceUtils.setValue(res, val);
+			res.activate(false);
+		}
+	}
+	
     private void storeCommonData(HmDevice dev, DeviceDescription desc) {
-        dev.type().<StringResource>create().setValue(desc.getType());
-        dev.address().<StringResource>create().setValue(desc.getAddress());
-        dev.version().<IntegerResource>create().setValue(desc.getVersion());
-        dev.paramsets().<StringArrayResource>create().setValues(desc.getParamsets());
+        //dev.type().<StringResource>create().setValue(desc.getType());
+		storeIfChanged(dev.type(), desc.getType());
+        //dev.address().<StringResource>create().setValue(desc.getAddress());
+		storeIfChanged(dev.address(), desc.getAddress());
+        //dev.version().<IntegerResource>create().setValue(desc.getVersion());
+		storeIfChanged(dev.version(), desc.getVersion());
+        //dev.paramsets().<StringArrayResource>create().setValues(desc.getParamsets());
+		storeIfChanged(dev.paramsets(), desc.getParamsets());
     }
     
     private void storeDeviceData(HmDevice dev, DeviceDescription desc) {
         storeCommonData(dev, desc);
-        dev.children().<StringArrayResource>create().setValues(desc.getChildren());
+        //dev.children().<StringArrayResource>create().setValues(desc.getChildren());
+		storeIfChanged(dev.children(), desc.getChildren());
     }
     
     private void storeChannelData(HmDevice dev, DeviceDescription desc) {
