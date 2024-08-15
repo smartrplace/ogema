@@ -158,28 +158,28 @@ public class HomeMaticService {
          */
         @Override
         public Void deleteDevices(String interfaceId, Object[] addresses) {
-            logger.warn("received unsupported deleteDevices calls: iterface={}, addresses={}",
+            logger.warn("received unsupported deleteDevices calls: interface={}, addresses={}",
                     interfaceId, Arrays.asList(addresses));
             return null;
         }
 
         @Override
         public Void readdedDevice(String interfaceId, String[] addresses) {
-        	  logger.warn("received unsupported readdedDevice call: iterface={}, addresses={}",
+        	  logger.warn("received unsupported readdedDevice call: interface={}, addresses={}",
                       interfaceId, Arrays.asList(addresses));
         	  return null;
         }
 
         @Override
         public Void replaceDevice(String interfaceId, String oldDeviceAddress, String newDeviceAddress) {
-        	  logger.warn("received unsupported replaceDevice calls: iterface={}, old address={}, new address={}",
+        	  logger.warn("received unsupported replaceDevice calls: interface={}, old address={}, new address={}",
                       interfaceId, oldDeviceAddress, newDeviceAddress);
         	  return null;
         }
 
         @Override
         public Void updateDevice(String interfaceId, String address, int hint) {
-        	  logger.warn("received unsupported deleteDevices calls: iterface={}, address={}, hint={}",
+        	  logger.warn("received unsupported deleteDevices calls: interface={}, address={}, hint={}",
                       interfaceId, address, hint);
         	  return null;
         }
@@ -249,13 +249,21 @@ public class HomeMaticService {
             if (!events.isEmpty()) {
             	logger.debug("Processing "+events.size()+" for "+eventListeners.size()+" event listeners. First address:"+events.get(0).getAddress());
                 for (HmEventListener l : eventListeners) {
-                    executor.submit(() -> l.event(Collections.unmodifiableList(events)));
+                    executor.submit(() -> callEventListener(l, events));
                 }
             }
             Object[] result = new Object[calls.length];
             
             return result;
         }
+		
+		private void callEventListener(HmEventListener l, List<HmEvent> events) {
+			try {
+				l.event(Collections.unmodifiableList(events));
+			} catch (RuntimeException re) {
+				logger.warn("bugged HmEventListener", re);
+			}
+		}
 
         @Override
         public Object listMethods(String s) {
