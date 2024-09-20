@@ -40,8 +40,8 @@ public abstract class CountDownDelayedExecutionTimer implements TimerListener {
 	}
 
 	@Override
-	public void timerElapsed(Timer timer) {
-		timer.destroy();
+	public void timerElapsed(Timer timer2) {
+		this.timer.destroy();
 		delayedExecution();
 	}
 
