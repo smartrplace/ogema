@@ -28,13 +28,11 @@ import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoField;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.Locale;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
@@ -95,7 +93,7 @@ public class WeatherUtil {
 
 		String result = "{}";
 		try {
-			final SSLContext sslContext = SSLContext.getInstance("SSL");
+			final SSLContext sslContext = SSLContext.getDefault();
 //			sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
 			final SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 			final URLConnection urlCon = new URL(querry).openConnection();

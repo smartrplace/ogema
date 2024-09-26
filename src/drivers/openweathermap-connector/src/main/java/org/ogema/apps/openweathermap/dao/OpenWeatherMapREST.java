@@ -15,7 +15,6 @@
  */
 package org.ogema.apps.openweathermap.dao;
 
-import org.ogema.apps.openweathermap.OpenWeatherMapApplication;
 import org.ogema.apps.openweathermap.WeatherUtil;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,11 +30,17 @@ public class OpenWeatherMapREST {
 
 	private String API_KEY = "";
     public static final String API_KEY_PROPERTY = "org.ogema.drivers.openweathermap.key";
-	private final String BASE_URL = "http://api.openweathermap.org/";
+	public static final String BASE_URL_PROPERTY = "org.ogema.drivers.openweathermap.url";
+	public static final String BASE_URL_DEFAULT = "http://api.openweathermap.org/";
+	private final String BASE_URL;
 	private final WeatherUtil util = WeatherUtil.getInstance();
 	private static OpenWeatherMapREST instance;
     
     private final static Logger LOGGER = LoggerFactory.getLogger(OpenWeatherMapREST.class);
+	
+	private OpenWeatherMapREST(String baseurl) {
+		this.BASE_URL = baseurl;
+	}
 
 	public static void main(String[] args) {
         //System.setProperty(API_KEY_PROPERTY, "");
@@ -58,7 +63,7 @@ public class OpenWeatherMapREST {
 
 	public static OpenWeatherMapREST getInstance() {
 		if (OpenWeatherMapREST.instance == null) {
-			OpenWeatherMapREST.instance = new OpenWeatherMapREST();
+			OpenWeatherMapREST.instance = new OpenWeatherMapREST(System.getProperty(BASE_URL_PROPERTY, BASE_URL_DEFAULT));
 			String key = System.getProperty(API_KEY_PROPERTY, null);
 			if (key == null) {
 				System.out.print("openweathermapKEY is required, Please register: http://openweathermap.org/register");
