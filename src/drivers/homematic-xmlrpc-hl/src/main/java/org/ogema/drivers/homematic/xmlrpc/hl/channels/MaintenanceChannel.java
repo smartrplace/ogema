@@ -271,11 +271,12 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
 				ccu.interfaceInfo().addDecorator("dutyCycleLevelMnt", sens);
 			}
         }
-        HmMaintenance mnt = parent.addDecorator(swName, HmMaintenance.class);
-        // create the battery field as it will be probably be linked into higher level models
-        mnt.batteryLow().create();
-        mnt.activate(true);
-
+        HmMaintenance mnt = parent.addDecorator(swName, HmMaintenance.class).create();
+		mnt.activate(true);
+		if (values.containsKey(PARAMS.LOWBAT.name())) {
+			// create the battery field as it will be probably be linked into higher level models
+		    mnt.batteryLow().create();
+		}
         mnt.communicationStatus().communicationDisturbed().create();
 		Object unreachValue = null;
         try {
@@ -292,17 +293,24 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
         if (values.containsKey(PARAMS.RSSI_PEER.name())) {
             mnt.rssiPeer().create();
         }
+		//boolean hasBattery = false;
 		if (values.containsKey(PARAMS.OPERATING_VOLTAGE.name())) {
 			mnt.battery().internalVoltage().reading().create();
 			mnt.battery().internalVoltage().activate(false);
 			mnt.battery().activate(false);
+			//hasBattery = true;
 		}
 		if (values.containsKey(PARAMS.LOWBAT.name())) {
 			mnt.battery().chargeSensor().reading().create();
 			mnt.battery().chargeSensor().activate(false);
 			mnt.battery().activate(false);
+			//hasBattery = true;
 		}
-        
+		/*
+		if (!hasBattery && mnt.battery().exists() && !mnt.battery().isReference(true)) {
+			mnt.battery().delete();
+		}
+        */
         Map<String, ParameterDescription<?>> master =
                 paramSets.get(ParameterDescription.SET_TYPES.MASTER.name());
         if (master != null) {
