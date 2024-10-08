@@ -19,14 +19,11 @@ import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
 import org.ogema.core.model.units.TemperatureResource;
-import org.ogema.core.resourcemanager.ResourceStructureEvent;
-import org.ogema.core.resourcemanager.ResourceStructureListener;
 import org.ogema.core.resourcemanager.ResourceValueListener;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
@@ -34,7 +31,6 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEventListener;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.ogema.model.devices.buildingtechnology.Thermostat;
-import org.ogema.model.sensors.TemperatureSensor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
@@ -164,12 +160,13 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
     */
     @Override
     public boolean accept(DeviceDescription desc) {
-        //System.out.println("parent type = " + desc.getParentType());
-        return (("HMIP-eTRV".equalsIgnoreCase(desc.getParentType()) || "HmIP-BWTH".equalsIgnoreCase(desc.getParentType()))
-                && "HEATING_CLIMATECONTROL_TRANSCEIVER".equalsIgnoreCase(desc.getType()))
-                || (desc.getParentType() != null
-                && desc.getParentType().toLowerCase().startsWith("hmip-wth-")
-                && "HEATING_CLIMATECONTROL_TRANSCEIVER".equalsIgnoreCase(desc.getType()));
+		String pType = desc.getParentType();
+		boolean parentTypeMatches = pType != null && (
+				/*"HMIP-eTRV".equalsIgnoreCase(pType) //XXX also matched by IpThermostatBChannel
+				||*/ pType.toLowerCase().startsWith("hmip-wth-")
+				|| pType.toLowerCase().startsWith("hmip-bwth")
+		);
+		return parentTypeMatches && "HEATING_CLIMATECONTROL_TRANSCEIVER".equalsIgnoreCase(desc.getType());
     }
 
     @Override
