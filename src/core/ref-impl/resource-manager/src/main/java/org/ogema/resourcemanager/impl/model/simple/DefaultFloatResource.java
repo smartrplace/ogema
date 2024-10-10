@@ -60,7 +60,7 @@ public class DefaultFloatResource extends SingleValueResourceBase implements Flo
 		return setValue(value, -1);
 	}
 	
-	private static final Logger LOG = LoggerFactory.getLogger(ScheduleTreeElement.class);
+	static final Logger LOG = LoggerFactory.getLogger(ScheduleTreeElement.class);
 	private static final String RES_TO_TEST = System.getProperty("org.ogema.resourcemanager.impl.model.simple.testForNaN");
 	private static final String RES_TO_TEST2 = System.getProperty("org.ogema.resourcemanager.impl.model.simple.writeToConsole");
 	private static final Long MIN_INTERVAL = Long.getLong("org.ogema.resourcemanager.impl.model.simple.minWriteInterval");

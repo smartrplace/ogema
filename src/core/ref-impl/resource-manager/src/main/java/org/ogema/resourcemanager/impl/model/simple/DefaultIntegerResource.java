@@ -47,11 +47,39 @@ public class DefaultIntegerResource extends SingleValueResourceBase implements I
 		return setValue(value, -1);
 	}
 
+	private static final String RES_TO_TEST2 = System.getProperty("org.ogema.resourcemanager.impl.model.simple.writeToConsole.int");
+	private static final Integer VAL_TO_TEST2 = Integer.getInteger("org.ogema.resourcemanager.impl.model.simple.writeToConsole.value.int");
+	
 	@Override
 	public boolean setValue(int value, long timestamp) {
 		resMan.lockRead();
 		try {
 			final VirtualTreeElement el = getElInternal();
+			
+			// /*
+			final String location;
+			if(el.getLocation() == null)
+				location = el.getPath();
+			else
+				location = el.getLocation();
+			if(location == null) {
+				final String ID;
+				if(el.getName() != null)
+					ID = el.getName();
+				else 
+					ID = "ResID::"+el.getResID();
+				String text = "el.getLocation() is null for "+ID;
+				DefaultFloatResource.LOG.warn(text, new IllegalStateException(text));
+				logErrorCode(-19);				
+			}
+			else {
+				if(RES_TO_TEST2 != null && location.contains(RES_TO_TEST2)
+						&& (VAL_TO_TEST2 == null || (value == VAL_TO_TEST2))) {
+					DefaultFloatResource.LOG.info("Writing int "+value+" to "+location, 
+							new IllegalStateException("Writing "+value+" to "+location));
+				}
+			}
+			
 			if (el.isVirtual() || getAccessModeInternal() == AccessMode.READ_ONLY) {
 				return false;
 			}
