@@ -31,7 +31,7 @@ public class OpenWeatherMapREST {
 	private String API_KEY = "";
     public static final String API_KEY_PROPERTY = "org.ogema.drivers.openweathermap.key";
 	public static final String BASE_URL_PROPERTY = "org.ogema.drivers.openweathermap.url";
-	public static final String BASE_URL_DEFAULT = "http://api.openweathermap.org/";
+	public static final String BASE_URL_DEFAULT = "https://api.openweathermap.org/";
 	private final String BASE_URL;
 	private final WeatherUtil util = WeatherUtil.getInstance();
 	private static OpenWeatherMapREST instance;
