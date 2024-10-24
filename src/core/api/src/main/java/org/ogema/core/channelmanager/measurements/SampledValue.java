@@ -101,7 +101,7 @@ public final class SampledValue implements Comparable<SampledValue>, Serializabl
 
 	@Override
 	public String toString() {
-		return String.format("%s(%s)", value.getClass().getSimpleName(), value.getObjectValue());
+		return String.format("%tc: %s(%s)", timestamp, value.getClass().getSimpleName(), value.getStringValue());
 	}
 
 	/**
