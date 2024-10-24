@@ -9,6 +9,8 @@ import org.apache.felix.gogo.jline.Shell;
 import org.apache.felix.service.command.CommandSession;
 import org.apache.felix.service.command.Converter;
 import org.jline.utils.InfoCmp;
+import org.ogema.core.channelmanager.measurements.Quality;
+import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ValueResource;
 import org.ogema.core.model.simple.BooleanResource;
@@ -26,7 +28,8 @@ import org.osgi.service.component.annotations.Component;
  * @author jlapp
  */
 @Component(property = {
-	Converter.CONVERTER_CLASSES + "=org.ogema.core.model.Resource"
+	Converter.CONVERTER_CLASSES + "=org.ogema.core.model.Resource",
+	Converter.CONVERTER_CLASSES + "=org.ogema.core.channelmanager.measurements.SampledValue"
 })
 public final class ResourceToString implements Converter {
 
@@ -129,12 +132,8 @@ public final class ResourceToString implements Converter {
 		//System.out.printf("convert: %s, %s%n", type, o);
 		return null;
 	}
-
-	@Override
-	public CharSequence format(Object o, int mode, Converter cnvrtr) throws Exception {
-		if (!(o instanceof Resource)) {
-			return null;
-		}
+	
+	CharSequence formatResource(Object o, int mode, Converter cnvrtr) throws Exception {
 		switch (mode) {
 			case INSPECT:
 				return printInspect((Resource) o);
@@ -146,6 +145,31 @@ public final class ResourceToString implements Converter {
 			default:
 				throw new IllegalArgumentException("illegal mode: " + mode);
 		}
+	}
+	
+	CharSequence formatSampledValue(Object o, int mode, Converter cnvrtr) throws Exception {
+		Map<String, String> m = getMarkup();
+		StringBuilder sb = new StringBuilder();
+		SampledValue sv = (SampledValue) o;
+		sb.append(m.getOrDefault("TIMESTAMP", ""))
+					.append(Instant.ofEpochMilli(sv.getTimestamp()))
+					.append(m.getOrDefault("RESET", "")).append(" = ");
+		sb.append(m.getOrDefault("VALUE", "")).append(sv.getValue().getStringValue()).append(m.getOrDefault("RESET", ""));
+		if (sv.getQuality() == Quality.BAD) {
+			sb.append(m.getOrDefault("PROP", "")).append(" (").append(sv.getQuality()).append(")").append(m.getOrDefault("RESET", ""));
+		}
+		return sb.toString();
+	}
+
+	@Override
+	public CharSequence format(Object o, int mode, Converter cnvrtr) throws Exception {
+		if ((o instanceof Resource)) {
+			return formatResource(o, mode, cnvrtr);
+		}
+		if ((o instanceof SampledValue)) {
+			return formatSampledValue(o, mode, cnvrtr);
+		}
+		return null;
 	}
 
 	protected static String printPart(Resource r) {

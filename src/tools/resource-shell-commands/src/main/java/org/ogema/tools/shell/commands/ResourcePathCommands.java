@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package org.ogema.tools.shell.commands;
 
 import java.io.BufferedReader;
@@ -63,9 +59,9 @@ import org.osgi.service.component.annotations.Component;
  */
 /*
 argument completion:
-complete -c ogr:cr -a '__resources'
-complete -c ogr:lr -a '__resources'
-complete -c ogr:find -a '__resources'
+complete -c resource:cr -a '__resources'
+complete -c resource:lr -a '__resources'
+complete -c resource:find -a '__resources'
  */
 @Component(
 		property = {
@@ -245,7 +241,9 @@ public class ResourcePathCommands implements Application {
 			@Parameter(names = {"-l"}, absentValue = "false", presentValue = "true")
 			@Descriptor("long format") boolean l,
 			@Parameter(names = {"-s"}, absentValue = "false", presentValue = "true")
-			@Descriptor("show number of subresources") boolean s,
+			@Descriptor("show number of direct subresources") boolean s,
+			@Parameter(names = {"-S"}, absentValue = "false", presentValue = "true")
+			@Descriptor("show number of all subresources") boolean S,
 			String... path
 	) {
 		Objects.requireNonNull(appman, "application manager is null");
@@ -274,9 +272,9 @@ public class ResourcePathCommands implements Application {
 		}
 
 		//Map<String, Resource> reslist = expandAndResolve(sess, path, "lr");
-		Consumer<Resource> print = s
+		Consumer<Resource> print = ( s | S )
 				? res -> {
-					p.out().format("%8d ", res.getSubResources(true).size());
+					p.out().format("%8d ", S ? res.getSubResources(true).size() : res.getDirectSubResources(true).size());
 					printResource(p.out(), res, l);
 				}
 				: res -> printResource(p.out(), res, l);
@@ -308,9 +306,11 @@ public class ResourcePathCommands implements Application {
 			@Parameter(names = {"-l"}, absentValue = "False", presentValue = "True")
 			@Descriptor("long format") boolean l,
 			@Parameter(names = {"-s"}, absentValue = "False", presentValue = "True")
-			@Descriptor("show number of subresources") boolean s
+			@Descriptor("show number of direct subresources") boolean s,
+			@Parameter(names = {"-S"}, absentValue = "False", presentValue = "True")
+			@Descriptor("show number of all subresources") boolean S
 	) {
-		lr(sess, l, s, ".");
+		lr(sess, l, s, S, ".");
 	}
 
 	private List<Candidate> __resourcesFromRoot(CommandSession session, String word) {
