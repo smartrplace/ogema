@@ -189,12 +189,8 @@ public class ResourcePathCommands implements Application {
 		if (path.startsWith("/")) {
 			return appman.getResourceAccess().getResource(path);
 		}
-		if (current == null) {
-			return appman.getResourceAccess().getResource(path); //"/" + 
-		} else {
-			String newPath = current.getPath() + "/" + path;
-			return appman.getResourceAccess().getResource(newPath);
-		}
+		String newPath = current.getPath() + "/" + path;
+		return appman.getResourceAccess().getResource(newPath);
 	}
 
 	private List<String> expand(CommandSession sess, String[] args, String commandName) {
@@ -539,6 +535,7 @@ public class ResourcePathCommands implements Application {
 		Deque<IterationState> stack = new ArrayDeque<>();
 		Set<Resource> visitedOnPath = new HashSet<>();
 		int maxDepth;
+		boolean followReferences = true;
 
 		class IterationState {
 
@@ -557,20 +554,29 @@ public class ResourcePathCommands implements Application {
 
 		}
 		
+		/*
 		public ResourceSpliterator(Resource start) {
 			this(start, Integer.MAX_VALUE);
 		}
+		*/
 
-		public ResourceSpliterator(Resource start, int maxDepth) {
+		public ResourceSpliterator(Resource start, int maxDepth, boolean followReferences) {
 			if (maxDepth < 0) {
 				throw new IllegalArgumentException("maxDepth must be >= 0");
 			}
-			stack.push(new IterationState(start, start.getSubResources(false), 0));
+			stack.push(new IterationState(start, getNextChildren(start), 0));
 			this.maxDepth = maxDepth;
+			this.followReferences = followReferences;
 		}
 
 		// false => post order
 		final boolean preorder = true;
+		
+		protected List<Resource> getNextChildren(Resource p) {
+			return followReferences
+					? p.getSubResources(false)
+					: p.getDirectSubResources(false);
+		}
 		
 		@Override
 		public boolean tryAdvance(Consumer<? super Resource> action) {
@@ -604,7 +610,7 @@ public class ResourcePathCommands implements Application {
 				Resource next = it.children.get(it.childIndex++);
 				if (stack.size() - 1 < maxDepth && !visitedOnPath.contains(next.getLocationResource())) {
 					//System.out.println("push: " + next.getPath());
-					List<Resource> nextChildren = next.getSubResources(false);
+					List<Resource> nextChildren = getNextChildren(next);
 					if (nextChildren.isEmpty()) { // return leaf node directly
 						action.accept(next);
 						return true;
@@ -635,8 +641,8 @@ public class ResourcePathCommands implements Application {
 
 	}
 	
-	Stream<Resource> dfResourceStream(Resource start, int maxDepth) {
-		ResourceSpliterator rs = new ResourceSpliterator(start, maxDepth);
+	Stream<Resource> dfResourceStream(Resource start, int maxDepth, boolean followReferences) {
+		ResourceSpliterator rs = new ResourceSpliterator(start, maxDepth, followReferences);
 		return StreamSupport.stream(rs, false);
 	}
 
@@ -666,6 +672,8 @@ public class ResourcePathCommands implements Application {
 			@Descriptor("Execute console command for each matched resource, e.g.: \"-exec {$it delete}\", return empty list (does not work with -print).") String exec,
 			@Parameter(names = {"-maxdepth"}, absentValue = "32000")
 			@Descriptor("Stop traversal at 'maxdepth' levels below starting point.") int maxdepth,
+			@Parameter(names = {"-H"}, absentValue = "false", presentValue = "true")
+			@Descriptor("Do not follow references.") boolean noFollowReferences,
 			Resource res) throws ClassNotFoundException {
 		if (!exec.isEmpty() && !print.isEmpty()) {
 			sess.getConsole().println("find: -exec and -print are mutually exclusive.");
@@ -682,9 +690,9 @@ public class ResourcePathCommands implements Application {
 		*/
 		if (res == null) {
 			s = appman.getResourceAccess().getToplevelResources(null).stream()
-					.flatMap(tr -> dfResourceStream(tr, maxdepth));
+					.flatMap(tr -> dfResourceStream(tr, maxdepth, !noFollowReferences));
 		} else {
-			s = dfResourceStream(res, maxdepth);
+			s = dfResourceStream(res, maxdepth, !noFollowReferences);
 		}
 
 		Resource cwr = (Resource) sess.get(CURRENT_RESOURCE);
@@ -787,6 +795,8 @@ public class ResourcePathCommands implements Application {
 			@Descriptor("Execute console command for each matched resource, e.g.: \"-exec {$it delete}\", return empty list (does not work with -print).") String exec,
 			@Parameter(names = {"-maxdepth"}, absentValue = "32000")
 			@Descriptor("Stop traversal at 'maxdepth' levels below starting point.") int maxdepth,
+			@Parameter(names = {"-H"}, absentValue = "false", presentValue = "true")
+			@Descriptor("Do not follow references.") boolean noFollowReferences,
 			String... path) throws Exception {
 		/*
 		Resource r = (Resource) sess.get(CURRENT_RESOURCE);
@@ -802,7 +812,7 @@ public class ResourcePathCommands implements Application {
 		res.forEach((p, r) -> {
 			sess.put(REQUEST_PATH, p);
 			try {
-				rval.addAll(find(sess, namerx, pathrx, locrx, type, time, value, print, exec, maxdepth, r));
+				rval.addAll(find(sess, namerx, pathrx, locrx, type, time, value, print, exec, maxdepth, noFollowReferences, r));
 			} catch (ClassNotFoundException cnfe) {
 				sess.getConsole().printf("find: unloadable resource: %s%n", cnfe.getMessage());
 			}
@@ -847,6 +857,9 @@ public class ResourcePathCommands implements Application {
 			@Parameter(names = {"-p"}, presentValue = "true", absentValue = "false") boolean printSettings,
 			@Descriptor("Resource") Resource res
 	) {
+		if (res == null) {
+			throw new IllegalArgumentException("resource must not be null");
+		}
 		if (onChange && interval > -1) {
 			sess.getConsole().printf("record: -i and -c are mutually exclusive%n");
 			return;
