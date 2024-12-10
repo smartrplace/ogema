@@ -137,6 +137,7 @@ ngOGFrAdminApp.controller('ResourcesCtrl', ['$scope', 'ogemaGateway', '$interval
             } else if (resType.indexOf("IntegerResource") !== -1) {
                 msg["@type"] = "IntegerResource";
             }
+			msg["lastUpdateTime"] = Date.now();
             console.log(JSON.stringify(msg));
             console.log(path);
             let url = $scope.restPath + path + "?user=" + encodeURIComponent($scope.restUser) + "&pw=" + encodeURIComponent($scope.restPwd);
