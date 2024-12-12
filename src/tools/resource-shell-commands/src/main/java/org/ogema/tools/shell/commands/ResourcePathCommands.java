@@ -71,8 +71,10 @@ complete -c resource:find -a '__resources'
 			"osgi.command.function=deactivate",
 			"osgi.command.function=delete",
 			"osgi.command.function=exportJson",
+			"osgi.command.function=exportXml",
 			"osgi.command.function=find",
 			"osgi.command.function=importJson",
+			"osgi.command.function=importXml",
 			"osgi.command.function=lr",
 			"osgi.command.function=pcr",
 			"osgi.command.function=record",
@@ -372,7 +374,7 @@ public class ResourcePathCommands implements Application {
 		}
 		return rval;
 	}
-
+	
 	public Resource importJson(CommandSession sess,
 			@Descriptor("import collection")
 			@Parameter(names = {"-c"}, presentValue = "true", absentValue = "false")
@@ -404,12 +406,38 @@ public class ResourcePathCommands implements Application {
 		}
 	}
 	
-	public void exportJson(CommandSession sess,
-			@Descriptor("output file (required)")
-			@Parameter(names = {"-o"}, absentValue = "")
-			String file,
-			@Descriptor("resources to export")
-			String ... paths) throws IOException {
+	public Resource importXml(CommandSession sess,
+			@Descriptor("import collection")
+			@Parameter(names = {"-c"}, presentValue = "true", absentValue = "false")
+			boolean isCollection,
+			@Descriptor("import to resource")
+			@Parameter(names = {"-r"}, absentValue = "")
+			String resource,
+			String file) throws IOException {
+		Path p = Paths.get(file);
+		if (!Files.exists(p)) {
+			System.err.println("import: file not found: " + file);
+			return null;
+		}
+		try (BufferedReader r = Files.newBufferedReader(p)) {
+			if (resource.isEmpty()) {
+				if (isCollection) {
+					return appman.getSerializationManager().createResourcesFromXml(r).iterator().next();
+				} else {
+					return appman.getSerializationManager().createFromXml(r);
+				}
+			} else {
+				Resource res = getResource(sess, resource);
+				if (isCollection) {
+					return appman.getSerializationManager().createResourcesFromXml(r, res).iterator().next();
+				} else {
+					return appman.getSerializationManager().createFromXml(r, res);
+				}
+			}
+		}
+	}
+	
+	private void export(CommandSession sess, String file, boolean xml, String ... paths) throws IOException {
 		if ("".equals(file)) {
 			sess.getConsole().println("export: must specify output file (-o)");
 			return;
@@ -426,14 +454,42 @@ public class ResourcePathCommands implements Application {
 		}
 		try (Writer w = Files.newBufferedWriter(p, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE)) {
 			if (res.size() > 1) {
-				appman.getSerializationManager(Integer.MAX_VALUE, true, true)
-					.writeJson(w, res.values());
+				if (xml) {
+					appman.getSerializationManager(Integer.MAX_VALUE, true, true)
+						.writeXml(w, res.values());
+				} else {
+					appman.getSerializationManager(Integer.MAX_VALUE, true, true)
+						.writeJson(w, res.values());
+				}
 			} else {
-				appman.getSerializationManager(Integer.MAX_VALUE, true, true)
-					.writeJson(w, res.values().iterator().next());
+				if (xml) {
+					appman.getSerializationManager(Integer.MAX_VALUE, true, true)
+						.writeXml(w, res.values().iterator().next());
+				} else {
+					appman.getSerializationManager(Integer.MAX_VALUE, true, true)
+						.writeJson(w, res.values().iterator().next());
+				}
 			}
 		}
 		sess.getConsole().printf("%s: %d resources, %d bytes%n", p, res.size(), Files.size(p));
+	}
+	
+	public void exportJson(CommandSession sess,
+			@Descriptor("output file (required)")
+			@Parameter(names = {"-o"}, absentValue = "")
+			String file,
+			@Descriptor("resources to export")
+			String ... paths) throws IOException {
+		export(sess, file, false, paths);
+	}
+	
+	public void exportXml(CommandSession sess,
+			@Descriptor("output file (required)")
+			@Parameter(names = {"-o"}, absentValue = "")
+			String file,
+			@Descriptor("resources to export")
+			String ... paths) throws IOException {
+		export(sess, file, true, paths);
 	}
 
 	public Object printTermCap(CommandSession session, String cap) {
