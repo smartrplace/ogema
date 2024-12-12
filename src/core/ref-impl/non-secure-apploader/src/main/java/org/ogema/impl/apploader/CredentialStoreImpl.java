@@ -75,20 +75,39 @@ public class CredentialStoreImpl implements CredentialStore, UserAdminListener {
         }
     }
     
-    static String encodePassword(String password, int iterations) throws NoSuchAlgorithmException, InvalidKeySpecException {
-        byte[] salt = new byte[PW_SALT_LEN];
+    static String encodePassword(String password, int saltLen, int keyLen, int iterations) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        byte[] salt = new byte[saltLen];
         saltPrng.nextBytes(salt);
         String store = PW_STORED_PREFIX + iterations + ":"
                 + Base64.getEncoder().encodeToString(salt) + ":"
-                + hashPassword(password, salt, iterations);
+                + hashPassword(password, keyLen, salt, iterations);
         return store;
     }
+	
+	static String encodePassword(String password, byte[] salt, int keyLen, int iterations) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        String store = PW_STORED_PREFIX + iterations + ":"
+                + Base64.getEncoder().encodeToString(salt) + ":"
+                + hashPassword(password, keyLen, salt, iterations);
+        return store;
+    }
+	
+	static byte[] storedSalt(String storedPw) {
+		return Base64.getDecoder().decode(storedPw.split(":")[2]);
+	}
+	
+	static String encodePassword(String password, int iterations) throws NoSuchAlgorithmException, InvalidKeySpecException {
+		return encodePassword(password, PW_SALT_LEN, PW_KEY_LEN, iterations);
+    }
+	
+	static String hashPassword(String password, byte[] salt, int iterations) throws NoSuchAlgorithmException, InvalidKeySpecException {
+		return hashPassword(password, PW_KEY_LEN, salt, iterations);
+	}
     
-    static String hashPassword(String password, byte[] salt, int iterations) throws NoSuchAlgorithmException, InvalidKeySpecException {
+    static String hashPassword(String password, int keyLen, byte[] salt, int iterations) throws NoSuchAlgorithmException, InvalidKeySpecException {
         SecretKeyFactory f = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
         long start = System.currentTimeMillis();
         SecretKey key = f.generateSecret(new PBEKeySpec(
-            password.toCharArray(), salt, iterations, PW_KEY_LEN));
+            password.toCharArray(), salt, iterations, keyLen));
         long time = System.currentTimeMillis() - start;
         logger.debug("password hashed in {}ms, {} iterations", time, iterations);
         return Base64.getEncoder().encodeToString(key.getEncoded());
@@ -102,7 +121,7 @@ public class CredentialStoreImpl implements CredentialStore, UserAdminListener {
         }
         String[] a = stored.split(":");
         if (a.length != 4) {
-            logger.error("stored password has incorrect format: {}", stored);
+            logger.error("stored password has incorrect format (got {} fields separated by ':')", a.length);
             return false;
         }
         String storedHash = a[3];
@@ -110,12 +129,11 @@ public class CredentialStoreImpl implements CredentialStore, UserAdminListener {
             int iterations = Integer.parseInt(a[1]);
             byte[] salt = Base64.getDecoder().decode(a[2]);
             String givenPasswordHash = hashPassword(password, salt, iterations);
-            //logger.debug("checking password hash {} against stored hash: {}", givenPasswordHash, storedHash);
             return givenPasswordHash.length() == storedHash.length()
                     ? equalsConstantTime(givenPasswordHash, storedHash)
                     : equalsConstantTimeBase64(givenPasswordHash, storedHash, PW_SALT_LEN);
         } catch (NumberFormatException nfe) {
-            logger.error("stored password has incorrect format: {}", stored);
+            logger.error("stored password has incorrect format");
             return false;
         }
     }
