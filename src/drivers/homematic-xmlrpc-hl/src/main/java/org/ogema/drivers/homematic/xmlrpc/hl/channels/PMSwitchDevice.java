@@ -51,7 +51,7 @@ public class PMSwitchDevice extends AbstractDeviceHandler {
     public boolean accept(DeviceDescription desc) {
     	String type = desc.getType();
     	return "HM-ES-PMSw1-Pl".equals(type) || "HM-ES-PMSw1-Pl-DN-R1".equals(type)
-    			|| "HMIP-PSM".equals(type) || "HMIP-PS".equals(type);
+    			|| "HMIP-PSM".equals(type) || "HMIP-PS".equals(type) || "HmIP-PS-2".equalsIgnoreCase(type);
     }
 
     protected ResourceStructureListener subChannelListener(final HmDevice dev) {
