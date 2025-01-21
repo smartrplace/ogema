@@ -69,7 +69,8 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
         DUTY_CYCLE, // boolean (HAP)
         DUTY_CYCLE_LEVEL, // 0..100% (HAP)
         ERROR_CODE,
-        LOWBAT,
+        LOWBAT, //XXX typo, or is this actually used anywhere?
+		LOW_BAT,
         OPERATING_VOLTAGE,
         RSSI_DEVICE,
         RSSI_PEER,
@@ -192,7 +193,7 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
                         mnt.errorCode().create().activate(false);
                     }
                     mnt.errorCode().setValue(e.getValueInt());
-                } else if (PARAMS.LOWBAT.name().equals(e.getValueKey())) {
+                } else if (PARAMS.LOWBAT.name().equals(e.getValueKey()) || PARAMS.LOW_BAT.name().equals(e.getValueKey())) {
                     if (!mnt.batteryLow().isActive()) {
                         mnt.batteryLow().create().activate(false);
                     }
@@ -273,7 +274,7 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
         }
         HmMaintenance mnt = parent.addDecorator(swName, HmMaintenance.class).create();
 		mnt.activate(true);
-		if (values.containsKey(PARAMS.LOWBAT.name())) {
+		if (values.containsKey(PARAMS.LOWBAT.name()) || values.containsKey(PARAMS.LOW_BAT.name())) {
 			// create the battery field as it will be probably be linked into higher level models
 		    mnt.batteryLow().create();
 		}
@@ -300,7 +301,7 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
 			mnt.battery().activate(false);
 			//hasBattery = true;
 		}
-		if (values.containsKey(PARAMS.LOWBAT.name())) {
+		if (values.containsKey(PARAMS.LOWBAT.name()) || values.containsKey(PARAMS.LOW_BAT.name())) {
 			mnt.battery().chargeSensor().reading().create();
 			mnt.battery().chargeSensor().activate(false);
 			mnt.battery().activate(false);
