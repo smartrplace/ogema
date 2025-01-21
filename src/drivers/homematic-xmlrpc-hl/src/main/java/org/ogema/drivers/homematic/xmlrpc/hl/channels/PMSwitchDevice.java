@@ -97,7 +97,7 @@ public class PMSwitchDevice extends AbstractDeviceHandler {
 
             ssb.activate(false);
             return true;
-        } else if (switches.size() == 1 && "HMIP-PS".equals(dev.type().getValue())) {
+        } else if (switches.size() == 1 && ("HMIP-PS".equals(dev.type().getValue()) || "HMIP-PS-2".equalsIgnoreCase(dev.type().getValue()))) {
             String ssbName = ResourceUtils.getValidResourceName("HM-SingleSwitchBox-" + dev.address().getValue());
             logger.debug("set up SingleSwitchBox for HomeMatic device {}", dev.address().getValue());
             OnOffSwitch sw = switches.get(0);
