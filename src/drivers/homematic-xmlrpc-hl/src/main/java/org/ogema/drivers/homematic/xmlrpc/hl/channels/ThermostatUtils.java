@@ -56,7 +56,7 @@ public abstract class ThermostatUtils {
 	//public final static String SHUTTER_CONTACT_LIST_DECORATOR = "linkedShutterContacts";
 	
 	static final int THREADS_PER_CONNECTION = 16;
-	static final Map<HomeMaticConnection, ScheduledExecutorService> PARAMETER_UPDATES_EXECUTORS = new ConcurrentHashMap<>();
+	static final Map<String, ScheduledExecutorService> PARAMETER_UPDATES_EXECUTORS = new ConcurrentHashMap<>();
 
 	private final static Map<String, Class<? extends SingleValueResource>> PARAMETERS;
 
@@ -280,6 +280,7 @@ public abstract class ThermostatUtils {
 			} catch (IOException | RuntimeException ex) {
 				logger.debug("updating parameter values failed for {}: {}", address, ex.getMessage());
 			}
+			Thread.currentThread().setName("HomeMatic Thermostats Parameter Update (done)");
 		};
 		ResourceValueListener<BooleanResource> updateListener = (BooleanResource b) -> {
 			if (!b.getValue()) {
@@ -302,7 +303,7 @@ public abstract class ThermostatUtils {
 				}
 			}
 			Future<?> f = PARAMETER_UPDATES_EXECUTORS
-					.computeIfAbsent(conn, _c -> Executors.newScheduledThreadPool(THREADS_PER_CONNECTION))
+					.computeIfAbsent(conn.getConnectionUrl(), _c -> Executors.newScheduledThreadPool(THREADS_PER_CONNECTION))
 					.submit(updateValues);
 			updateTasks.put(now, f);
 			logger.trace("number of pending parameter updates (all thermostat types): {}", updateTasks.size());
@@ -322,7 +323,7 @@ public abstract class ThermostatUtils {
 				r.addValueListener(l, true);
 				r.addValueListener(_r -> {
 					PARAMETER_UPDATES_EXECUTORS
-					.computeIfAbsent(conn, _c -> Executors.newScheduledThreadPool(THREADS_PER_CONNECTION))
+					.computeIfAbsent(conn.getConnectionUrl(), _c -> Executors.newScheduledThreadPool(THREADS_PER_CONNECTION))
 					.schedule(updateValues, 3, TimeUnit.SECONDS);
 				}, true);
 				params.put(p, r);
@@ -334,7 +335,7 @@ public abstract class ThermostatUtils {
 		update.addValueListener(updateListener, true);
 		update.activate(false);
 		PARAMETER_UPDATES_EXECUTORS
-				.computeIfAbsent(conn, _c -> Executors.newScheduledThreadPool(THREADS_PER_CONNECTION))
+				.computeIfAbsent(conn.getConnectionUrl(), _c -> Executors.newScheduledThreadPool(THREADS_PER_CONNECTION))
 				.submit(updateValues);
 		//CompletableFuture.runAsync(updateValues);
 	}
