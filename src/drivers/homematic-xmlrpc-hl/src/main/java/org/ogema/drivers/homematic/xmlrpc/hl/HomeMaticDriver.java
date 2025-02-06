@@ -220,10 +220,7 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 
 		@Override
 		public void resourceUnavailable(HmLogicInterface t) {
-			HmConnection conn = connections.remove(t);
-			if (conn != null) {
-				conn.close();
-			}
+			connections.remove(t).close();
 		}
 
 	};
@@ -292,12 +289,6 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 			logger.warn("no connection for device {}", dev.getPath());
 			return;
 		}
-		//deviceSetupTask(conn, dev);
-		conn.setupExecutor.submit(() -> deviceSetupTask(conn, dev));
-	}
-	
-	private void deviceSetupTask(HmConnection conn, HmDevice dev) {
-		String address = dev.address().getValue();
 		try {
 			setupInProgress = true;
 			DeviceDescription channelDesc = conn.persistence.getDeviceDescription(address);
@@ -366,7 +357,7 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 					if (!peDisabled.isPresent()) {
 						h.setup(toplevelDevice, channelDesc, paramSets);
 						acceptedDevices.put(address, new ConnectedDevice(toplevelDevice, dev, conn, h));
-						logger.info("{} completed setup of {} on {}", h.getClass().getSimpleName(), address, conn.getConnectionUrl());
+						logger.info("{} completed setup of {}", h.getClass().getSimpleName(), address);
 						break;
 					} else {
 						int disableStatus = peDisabled.get().disableStatus().getValue();
@@ -405,7 +396,7 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 			setupInProgress = false;
 		}
 	}
-	
+
 	public void storeEvent(HmEvent e, SingleValueResource res) {
 		logger.debug("storing event data for {}@{} to {}", e.getValueKey(), e.getAddress(), res.getPath());
 		if (res instanceof FloatResource) {

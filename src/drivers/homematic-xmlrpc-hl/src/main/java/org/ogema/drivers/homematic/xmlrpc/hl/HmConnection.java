@@ -38,7 +38,6 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -101,7 +100,7 @@ public class HmConnection implements HomeMaticConnection {
 	private volatile boolean connected = false;
 	
 	// maximum number of consecutive failed pings before restarting the connection
-	int maxConsecutivePingFailures = 5;
+	int maxConsecutivePingFailures = 3;
 	AtomicInteger consecutivePingFailures = new AtomicInteger(0);
 
 	// quasi-final: not changed after init() call
@@ -116,7 +115,6 @@ public class HmConnection implements HomeMaticConnection {
     HomeMaticClientCli commandLine;
 
 	private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
-	final ExecutorService setupExecutor;
 	ScheduledFuture<?> installModePoller;
 	ScheduledFuture<?> pingCheck;
     ScheduledFuture<?> bidcosInfoUpdate;
@@ -183,12 +181,6 @@ public class HmConnection implements HomeMaticConnection {
         this.handlers.add(new SmokeDetectorChannel(this));
 		this.handlers.add(new KeyChannel(this));
 		writer.start();
-		
-		setupExecutor = Executors.newSingleThreadExecutor(r -> {
-			Thread t = new Thread(r);
-			t.setName("HMSetup " + baseResource.getPath());
-			return t;
-		});
 	}
 
 	private void connect() {
@@ -812,10 +804,6 @@ public class HmConnection implements HomeMaticConnection {
 	}
 
 	protected void retryConnect() {
-		if (isClosed()) {
-			logger.debug("connection is closed, will not retry connect");
-			return;
-		}
 		logger.info("Will retry initial connect for config {} after " + (reInitTryTime / 1000) + " seconds.",
 				baseResource.getPath());
 		executor.schedule(new Runnable() {
@@ -879,10 +867,6 @@ public class HmConnection implements HomeMaticConnection {
 			connectionThread.start();
 		}
 	}
-	
-	private boolean isClosed() {
-		return executor.isShutdown();
-	}
 
 	protected void close() {
 		HmLogicInterface config = baseResource;
@@ -891,7 +875,6 @@ public class HmConnection implements HomeMaticConnection {
 		}
 		try {
 			executor.shutdownNow();
-			setupExecutor.shutdownNow();
 			if (appman != null) {
 				appman.getResourceAccess().removeResourceDemand(HmDevice.class, devResourceListener);
 			}
