@@ -87,12 +87,16 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
             }
 
         }
+		
+		boolean parentTypeMatches(DeviceDescription desc) {
+			return Stream.of("HmIP-BSL", "HmIP-BS2", "HmIP-BSM", "HmIP-FSM", "HmIP-FSM16",
+					"HmIP-SCTH230", "HMIP-PS", "HmIP-PS-2", "HmIP-PS-2 9YM", "HMIP-PSM-2").anyMatch(t -> t.equalsIgnoreCase(desc.getParentType()))
+					|| desc.getParentType().toLowerCase().startsWith("hmip-ps-2");
+		}
 
         @Override
         public boolean accept(DeviceDescription desc) {
-            
-            return Stream.of("HmIP-BSL", "HmIP-BS2", "HmIP-BSM", "HmIP-FSM", "HmIP-FSM16",
-					"HmIP-SCTH230", "HMIP-PS", "HmIP-PS-2", "HMIP-PSM-2").anyMatch(t -> t.equalsIgnoreCase(desc.getParentType()))
+            return parentTypeMatches(desc)
                     && (SWITCH_TRANSMITTER_TYPE.equalsIgnoreCase(desc.getType())
                     || SWITCH_VIRTUAL_RECEIVER_TYPE.equalsIgnoreCase(desc.getType()));
         }
