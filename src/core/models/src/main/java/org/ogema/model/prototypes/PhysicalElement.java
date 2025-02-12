@@ -77,6 +77,7 @@ public interface PhysicalElement extends Resource {
 	 *  3: as 2, device should also be deleted from CCU or similar adapters; device should not be activated by the driver anymore<br>
 	 *  4: Device should also be deleted from ResourceDB, should be done by the driver as soon as it has cleaned up everything; may otherwise be done later by
 	 *     the application (not used in most cases as existing data should generally not be deleted from the database so that old data can still be accessed)
+	 *  5: Device shall be reset and deleted from CCU (only if the device can still be reached and be reset, otherwise no deletion shall take place)
 	 */
 	IntegerResource disableStatus();
 }
