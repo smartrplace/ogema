@@ -380,7 +380,10 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 							case 4: {
 								logger.info("deleting device with disableStatus {} from CCU: {}", disableStatus, toplevelDevice.getPath());
 								try {
-									conn.deleteDevice(toplevelDevice.address().getValue(), 0x05);
+									// 0x01 = reset before delete
+									// 0x02 = delete even if not reachable
+									// 0x04 = delete as soon as reachable
+									conn.deleteDevice(toplevelDevice.address().getValue(), 0x03);
 									if (disableStatus == 4) {
 										logger.info("deleting device with disableStatus {} from resources: {}", disableStatus, toplevelDevice.getPath());
 										toplevelDevice.delete();

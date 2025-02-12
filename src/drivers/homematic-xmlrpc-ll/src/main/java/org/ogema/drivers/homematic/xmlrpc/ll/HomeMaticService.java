@@ -28,6 +28,7 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
@@ -64,7 +65,12 @@ public class HomeMaticService {
     private final ServiceRegistration<Servlet> registration;
     private final HomeMaticXmlRpcServlet servlet;
     private ServletWebServer server;
-    private ExecutorService executor = Executors.newCachedThreadPool();
+    private ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
+		@Override
+		public Thread newThread(Runnable r) {
+			return new Thread(r, "HM events " + interfaceUrl);
+		}
+	});
     
     private HmBackend backend;
     

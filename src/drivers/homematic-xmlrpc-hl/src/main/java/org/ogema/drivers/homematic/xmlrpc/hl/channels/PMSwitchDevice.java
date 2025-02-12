@@ -15,6 +15,7 @@
  */
 package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
+import java.util.Arrays;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import java.util.List;
 import java.util.Map;
@@ -41,18 +42,27 @@ import org.ogema.tools.resource.util.ResourceUtils;
 public class PMSwitchDevice extends AbstractDeviceHandler {
 
     protected Logger logger = LoggerFactory.getLogger(getClass());
+	
+	final List<String> acceptedTypes = Arrays.asList("HM-ES-PMSw1-Pl", "HM-ES-PMSw1-Pl-DN-R1",
+			"HMIP-PSM", "HMIP-PS", "HmIP-PS-2", "HmIP-PS-2 9YM");
+	final List<String> psTypes = Arrays.asList("HMIP-PS", "HmIP-PS-2", "HmIP-PS-2 9YM");
 
     public PMSwitchDevice(HomeMaticConnection conn) {
         super(conn);
     }
-
+	
     /** Enter main device for power meter and/or switching device here*/
     @Override
     public boolean accept(DeviceDescription desc) {
     	String type = desc.getType();
-    	return "HM-ES-PMSw1-Pl".equals(type) || "HM-ES-PMSw1-Pl-DN-R1".equals(type)
-    			|| "HMIP-PSM".equals(type) || "HMIP-PS".equals(type) || "HmIP-PS-2".equalsIgnoreCase(type);
+    	return acceptedTypes.stream().anyMatch(s -> type.equalsIgnoreCase(s))
+				|| type.toLowerCase().startsWith("hmip-ps-2");
     }
+	
+	boolean matchesPsSwitchType(String type) {
+		return psTypes.stream().anyMatch(s -> type.equalsIgnoreCase(s))
+				|| type.toLowerCase().startsWith("hmip-ps-2");
+	}
 
     protected ResourceStructureListener subChannelListener(final HmDevice dev) {
         return new ResourceStructureListener() {
@@ -80,6 +90,8 @@ public class PMSwitchDevice extends AbstractDeviceHandler {
         //logger.debug("perform high level setup for device {}", dev.address().getValue());
         List<ElectricityConnection> elConns = dev.getSubResources(ElectricityConnection.class, false);
         List<OnOffSwitch> switches = dev.getSubResources(OnOffSwitch.class, false);
+		//System.out.printf("%s switches: %s%n", dev.getPath(), switches);
+		//System.out.printf("%s: matchesPsSwitchType(%s) = %b%n", dev.getPath(), dev.type().getValue(), matchesPsSwitchType(dev.type().getValue()));
         if (elConns.size() == 1 && switches.size() == 1) {
             String ssbName = ResourceUtils.getValidResourceName("HM-SingleSwitchBox-" + dev.address().getValue());
             logger.debug("set up SingleSwitchBox for HomeMatic device {}", dev.address().getValue());
@@ -97,7 +109,7 @@ public class PMSwitchDevice extends AbstractDeviceHandler {
 
             ssb.activate(false);
             return true;
-        } else if (switches.size() == 1 && ("HMIP-PS".equals(dev.type().getValue()) || "HMIP-PS-2".equalsIgnoreCase(dev.type().getValue()))) {
+        } else if (switches.size() == 1 && matchesPsSwitchType(dev.type().getValue())) {
             String ssbName = ResourceUtils.getValidResourceName("HM-SingleSwitchBox-" + dev.address().getValue());
             logger.debug("set up SingleSwitchBox for HomeMatic device {}", dev.address().getValue());
             OnOffSwitch sw = switches.get(0);
