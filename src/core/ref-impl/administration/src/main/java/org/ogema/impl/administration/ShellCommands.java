@@ -83,7 +83,7 @@ import org.osgi.service.useradmin.UserAdmin;
  */
 @Component(specVersion = "1.2")
 @Properties({ @Property(name = "osgi.command.scope", value = "ogm"), @Property(name = "osgi.command.function", value = {
-		"apps", "clock", "loggers", "log", "dump_cache", "update", 
+		"apps", "clock", "loggers", "logcachesize", "log", "dump_cache", "update", 
 		"listUsers", "getUserProps", "setUserProp", "removeUserProp", "createUser", "deleteUser", 
 		"listGroups", "createGroup", "addMember", "removeMember",
 		"setNewPassword", "setUserPassword" }) })
@@ -349,6 +349,17 @@ public class ShellCommands {
 	public void dump_cache() {
 		boolean success = admin.getAllLoggers().get(0).saveCache();
 		System.out.println(success ? "ok" : "failed");
+	}
+	
+	@Descriptor("returns the maximum current size of the log messages cache")
+	public long logcachesize() {
+		return admin.getAllLoggers().get(0).getMaximumSize(LogOutput.CACHE);
+	}
+	
+	@Descriptor("tries to set a new maximum size for the log messages cache and return the new actual limit")
+	public long logcachesize(long newsize) {
+		admin.getAllLoggers().get(0).setMaximumSize(LogOutput.CACHE, newsize);
+		return logcachesize();
 	}
 
 	@Descriptor("Create a new user")

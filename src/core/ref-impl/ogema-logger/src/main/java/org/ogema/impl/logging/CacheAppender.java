@@ -151,6 +151,9 @@ public class CacheAppender<E extends ILoggingEvent> extends UnsynchronizedAppend
 	}
 
 	protected int sizeOf(String s) {
-		return 2 * s.length();
+		//just use a simple estimate:
+		// strings are stored as UTF-8 bytes, so 1 char = 1 byte for the most part
+		// also some overhead for the string object itself
+		return s.length() + 20;
 	}
 }
