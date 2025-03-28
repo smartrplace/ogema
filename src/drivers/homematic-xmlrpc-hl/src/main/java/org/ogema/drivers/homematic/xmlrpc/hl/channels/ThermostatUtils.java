@@ -67,6 +67,10 @@ public abstract class ThermostatUtils {
 		PARAMETERS.put("TEMPERATUREFALL_WINDOW_OPEN_TIME_PERIOD", IntegerResource.class);
 		PARAMETERS.put("TEMPERATURE_WINDOW_OPEN", FloatResource.class);
 		PARAMETERS.put("VALVE_MAXIMUM_POSITION", FloatResource.class);
+		PARAMETERS.put("SHOW_HUMIDITY", BooleanResource.class);
+		PARAMETERS.put("SHOW_SET_TEMPERATURE", BooleanResource.class);
+		PARAMETERS.put("TEMPERATURE_MINIMUM", TemperatureResource.class);
+		PARAMETERS.put("TEMPERATURE_OFFSET", TemperatureResource.class);
 	}
 
 	private ThermostatUtils() {
