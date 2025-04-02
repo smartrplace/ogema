@@ -34,6 +34,7 @@ import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.model.units.PowerResource;
 import org.ogema.core.model.units.TemperatureResource;
+import org.ogema.core.model.units.ThermalEnergyCapacityResource;
 import org.ogema.core.resourcemanager.NoSuchResourceException;
 import org.ogema.core.resourcemanager.ResourceAlreadyExistsException;
 import org.ogema.core.resourcemanager.ResourceException;
@@ -403,7 +404,7 @@ public class ResourceTest extends OsgiTestBase {
         elSwitch.ratedValues().lowerLimit().setAsReference(elSwitch2.ratedValues().lowerLimit().create());
         assertEquals(expectedResources, new HashSet<>(elSwitch.getDirectSubResources(true)));
         
-        elSwitch.ratedValues().addDecorator("bar", elSwitch2.heatCapacity().create());        
+        elSwitch.ratedValues().addDecorator("bar", (ThermalEnergyCapacityResource) elSwitch2.heatCapacity().create());
         assertEquals(expectedResources, new HashSet<>(elSwitch.getDirectSubResources(true)));
     }
 

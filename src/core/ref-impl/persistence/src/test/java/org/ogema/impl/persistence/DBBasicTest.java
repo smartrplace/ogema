@@ -93,7 +93,7 @@ public class DBBasicTest {
 						success = false;
 						break;
 					}
-					if (!cls.equals(ResourceList.class.getName()) && !res.type.getName().equals(cls)) {
+					if (!cls.equals(ResourceList.class.getName()) && !res.getType().getName().equals(cls)) {
 						success = false;
 						break;
 					}

@@ -50,6 +50,7 @@ import static org.ogema.exam.ResourceAssertions.assertActive;
 import static org.ogema.exam.ResourceAssertions.assertDeleted;
 import static org.ogema.exam.ResourceAssertions.assertExists;
 import org.ogema.exam.StructureTestListener;
+import org.ogema.model.actors.Actor;
 
 import org.ogema.model.locations.Room;
 import org.ogema.model.actors.MultiSwitch;
@@ -220,7 +221,7 @@ public class ReferenceTest extends OsgiTestBase {
 		OnOffSwitch sw1 = resMan.createResource(RESNAME + counter++, OnOffSwitch.class);
 		sw1.addOptionalElement("stateFeedback");
 		sw1.stateFeedback().addDecorator("fnord", sw1);
-		assertEquals(2, sw1.getSubResources(true).size());
+		assertEquals("expected 2 resources got: " + sw1.getSubResources(true).toString(), 2, sw1.getSubResources(true).size());
 	}
 
 	@Test
@@ -1421,6 +1422,32 @@ public class ReferenceTest extends OsgiTestBase {
     	room.delete();
     	someResource.delete();
     }
+	
+	@Test(expected = ClassCastException.class)
+	public void referencedSubTypes() {
+		//Actor
+		@SuppressWarnings("unchecked")
+		final ResourceList<Actor> actors = resMan.createResource(newResourceName(), ResourceList.class);
+		actors.setElementType(Actor.class);
+		MultiSwitch ms = resMan.createResource(newResourceName(), MultiSwitch.class);
+		actors.add(ms);
+		OnOffSwitch on = resMan.createResource(newResourceName(), OnOffSwitch.class);
+		actors.add(on);
+		assertEquals(2, actors.getAllElements().size());
+		Actor aRef = null;
+		for (Actor a: actors.getAllElements()) {
+			if (a instanceof OnOffSwitch) {
+				aRef = a;
+				break;
+			}
+		}
+		assertNotNull(aRef);
+		OnOffSwitch swRef = (OnOffSwitch) aRef.getLocationResource();
+		assertNotNull(swRef);
+		on.delete();
+		//ClassCastException: location resource is now a virtual resource of type Actor
+		swRef = (OnOffSwitch) aRef.getLocationResource();
+	}
   
 	
 }

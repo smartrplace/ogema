@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -59,7 +60,7 @@ public class TreeElementImpl implements TreeElement {
 	public int resID;
 	public int typeKey;
 	public String name;
-	public Class<?> type;
+	private Class<?> elType;
 	public String typeName;
 	String appID;
 	public int refID;
@@ -209,7 +210,7 @@ public class TreeElementImpl implements TreeElement {
 		TreeElementImpl node = this;
 		if (reference)
 			node = refered;
-		Class<?> cls = node.type;
+		Class<?> cls = node.getElType();
 		if (cls != null)
 			return cls.asSubclass(Resource.class);
 		else
@@ -310,10 +311,10 @@ public class TreeElementImpl implements TreeElement {
 		if (this.reference)
 			return refered.addReference(ref, refName, decorating);
 
-		if (refimpl.type == null && refimpl.typeKey == DBConstants.TYPE_KEY_COMPLEX_ARR)
-			refimpl.type = DBConstants.CLASS_COMPLEX_ARR_TYPE;
+		if (refimpl.getElType() == null && refimpl.typeKey == DBConstants.TYPE_KEY_COMPLEX_ARR)
+			refimpl.setElType(DBConstants.CLASS_COMPLEX_ARR_TYPE);
 		// check if the demanded model member exists and has the right type
-		TreeElementImpl result = initChild(refName, refimpl.type);
+		TreeElementImpl result = initChild(refName, refimpl.getElType());
 
 		@SuppressWarnings("unused")
 		boolean isComplexArr = refimpl.complexArray;// !db.isSimple(refimpl.type);
@@ -329,7 +330,7 @@ public class TreeElementImpl implements TreeElement {
 		// model member already exists.
 		if (decorating) {
 			result.appID = topLevelParent.appID;
-			result.type = refimpl.type;
+			result.setElType(refimpl.getElType());
 			result.typeName = refimpl.typeName;
 			result.name = refName;
 			result.path = this.path + DBConstants.PATH_SEPARATOR + refName;
@@ -348,11 +349,11 @@ public class TreeElementImpl implements TreeElement {
 			// via
 			// ResourceList#setElementType(Class<? extends Resource>)
 			if (result.complexArray)
-				result.type = db.getListType(result.parent, refName);
+				result.setElType(db.getListType(result.parent, refName));
 
 			// If the child is not complexArray the references type has to be an
 			// ancestor of the childs type.
-			else if (!result.type.isAssignableFrom(refimpl.type)) {
+			else if (!result.elType.isAssignableFrom(refimpl.elType)) {
 				throw new InvalidResourceTypeException(refimpl.getName());
 			}
 			// typeChildren.put(refName, refimpl.type);
@@ -422,7 +423,7 @@ public class TreeElementImpl implements TreeElement {
 		Integer flags = flagsChildren.get(chName);
 		boolean isChild = flags != null && (flags & DBConstants.RES_ISCHILD) != 0;
 		boolean typeMatch = isChild
-				&& ((e.complexArray && chType == ResourceList.class) || (e.type.isAssignableFrom(chType)));
+				&& ((e.complexArray && chType == ResourceList.class) || (e.getElType().isAssignableFrom(chType)));
 		/*
 		 * The demanded model member doesn't exist as optional member and it is not a decorating one.
 		 */
@@ -452,7 +453,7 @@ public class TreeElementImpl implements TreeElement {
 			 * type of all children added later.
 			 */
 			if (chType != DBConstants.CLASS_COMPLEX_ARR_TYPE) {
-				result.type = chType;
+				result.setElType(chType);
 				result.typeName = chType.getName();
 			}
 			else {
@@ -478,13 +479,13 @@ public class TreeElementImpl implements TreeElement {
 		result.resID = id;
 		result.parentID = node.resID;
 		// setup the tree for this type only if itsn't a ComplexArrayResourse
-		if ((result != null && !result.complexArray && result.type != null))
+		if ((result != null && !result.complexArray && result.getElType() != null))
 			db.createTree(result);
 
 		// Determine the type of the ResourceList member. In case of decorating the application has to set the type via
 		// ResourceList#setElementType(Class<? extends Resource>)
 		if (result.complexArray && !isDecorating)
-			result.type = db.getListType(result.parent, result.name);
+			result.setElType(db.getListType(result.parent, result.name));
 
 		db.registerRes(result);
 
@@ -509,22 +510,23 @@ public class TreeElementImpl implements TreeElement {
 		 * before.
 		 */
 		if (!isDecorating) {
-			if (this.type == null) {
-				this.type = result.type = chType;
+			if (this.getElType() == null) {
+				result.setElType(chType);
+				this.setElType(chType);
 				this.typeName = result.typeName = chType.getName();
 			}
-			else if (chType != this.type) {
+			else if (chType != this.getElType()) {
 				throw new UnsupportedOperationException(
 						"Adding of a child to a ComplexResourceArray with a wrong type: " + chType.getName());
 			}
 			else {
-				result.type = chType;
+				result.setElType(chType);
 				result.typeName = chType.getName();
 			}
 		}
 		/* If a decorator is to be added, any type is accepted. */
 		else {
-			result.type = chType;
+			result.setElType(chType);
 			result.typeName = chType.getName();
 		}
 		result.appID = this.topLevelParent.appID;
@@ -562,7 +564,7 @@ public class TreeElementImpl implements TreeElement {
 		}
 		TreeElementImpl result = new TreeElementImpl(db);
 		result.appID = topLevelParent.appID;
-		result.type = refimpl.type;
+		result.setElType(refimpl.getElType());
 		result.typeName = refimpl.typeName;
 		result.name = refName;
 		result.path = this.path + DBConstants.PATH_SEPARATOR + refName;
@@ -607,15 +609,15 @@ public class TreeElementImpl implements TreeElement {
 		/*
 		 * If the type of the ResourceList is already set, the type must an ancestor of the reference.
 		 */
-		if (this.type != null) {
-			if (this.type.isAssignableFrom(refimpl.type)) {
+		if (this.getElType() != null) {
+			if (this.getElType().isAssignableFrom(refimpl.getElType())) {
 				return true;
 			}
 			else
 				return false;
 		}
 		else
-			this.type = refimpl.type;
+			this.setElType(refimpl.getElType());
 
 		/*
 		 * If the type of the ResourceList is not set yet, its compatible any new type to be added.
@@ -735,7 +737,7 @@ public class TreeElementImpl implements TreeElement {
 			return false;
 		if (!e.name.equals(name))
 			return false;
-		if (e.type != (type))
+		if (e.getElType() != (getElType()))
 			return false;
 		if (!e.typeName.equals(typeName))
 			return false;
@@ -782,7 +784,7 @@ public class TreeElementImpl implements TreeElement {
 			if (reference) {
 				return refered.getResourceListType();
 			}
-			final Class<?> cls = type;
+			final Class<?> cls = getElType();
 			if (cls != null) {
 				if (cls == DBConstants.CLASS_COMPLEX_ARR_TYPE)
 					return null;
@@ -803,10 +805,10 @@ public class TreeElementImpl implements TreeElement {
 				refered.setResourceListType(cls);
 				return;
 			}
-			if (type != null && type != DBConstants.CLASS_COMPLEX_ARR_TYPE && type != cls)
-				throw new InvalidResourceTypeException("ResourceList type already set to " + type.getName());
+			if (getElType() != null && getElType() != DBConstants.CLASS_COMPLEX_ARR_TYPE && getElType() != cls)
+				throw new InvalidResourceTypeException("ResourceList type already set to " + getElType().getName());
 			else {
-				type = cls;
+				setElType(cls);
 				typeName = cls.getName();
 				if (db.activatePersistence)
 					db.persistence.store(resID, ChangeInfo.STATUS_CHANGED);
@@ -858,7 +860,7 @@ public class TreeElementImpl implements TreeElement {
 			// is inherited by the data model
 			// its an invalid one.
 			if (typekey == DBConstants.TYPE_KEY_INVALID)
-				throw new InvalidResourceTypeException(type.getName());
+				throw new InvalidResourceTypeException(getElType().getName());
 
 			/*
 			 * if its a ComplexResourceType set the type of the elements as the type of the node.
@@ -873,7 +875,7 @@ public class TreeElementImpl implements TreeElement {
 			/*
 			 * e.type = typeChildren.get(chName); if (e.type != null) e.typeName = e.type.getName();
 			 */
-			e.type = clazz;
+			e.setElType(clazz);
 			Class<?> definedType = typeChildren.get(chName);
 			if (definedType != null) {
 				e.typeName = clazz.getName();
@@ -935,6 +937,17 @@ public class TreeElementImpl implements TreeElement {
 		if (map == null)
 			return null;
 		return map.remove(name);
+	}
+	
+	public Class<?> getElType() {
+		return elType;
+	}
+
+	public void setElType(Class<?> elType) {
+		if (!complexArray) {
+			Objects.requireNonNull(elType);
+		}
+		this.elType = elType;
 	}
 	
 }

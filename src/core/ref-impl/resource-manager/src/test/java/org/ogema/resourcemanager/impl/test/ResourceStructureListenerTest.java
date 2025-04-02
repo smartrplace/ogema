@@ -285,12 +285,15 @@ public class ResourceStructureListenerTest extends OsgiTestBase {
 		assertFalse(sw.stateFeedback().exists());
 		sw.stateFeedback().setAsReference(sw2.stateFeedback());
 		//setAsReference WILL cause a SUBRESOURCE_REMOVED cb, followed by SUBRESOURCE_ADDED!
+		assertTrue("no remove callback received for replaced reference", l.awaitEvent(SUBRESOURCE_REMOVED));
+		assertTrue("no add callback received for replaced reference", l.awaitEvent(SUBRESOURCE_ADDED));
+		l.reset();
 		assertTrue(sw.stateFeedback().exists());
 		sw2.stateFeedback().delete();
 		assertFalse(sw.stateFeedback().exists());
 		assertFalse(sw2.stateFeedback().exists());
 
-		assertTrue("no callback received", l.awaitEvent(SUBRESOURCE_REMOVED));
+		assertTrue("no callback received for removed reference", l.awaitEvent(SUBRESOURCE_REMOVED));
 	}
 
 	/* like {@link #referenceChangeEventsWork() } but with reference replace instead addOptional() */

@@ -242,7 +242,15 @@ public class ApplicationResourceManager implements ResourceManagement, ResourceA
 		} 
 		Class<? extends Resource> type = el.getType();
         if (type == null) {
-            throw new IllegalStateException("TreeElement " + el.getPath() + " has type null");
+			if (el.isReference() && el.getReference().getType() != null) {
+				type = el.getReference().getType();
+			} else {
+				logger.error("unable to infer missing type from reference at {}", el.getPath());
+				type = Resource.class;
+			}
+			if (type == null) {
+				throw new IllegalStateException("TreeElement " + el.getPath() + " has type null");
+			}
         }
 		if (type.equals(FloatResource.class)) {
 			type = determineUnitResourceType(el);

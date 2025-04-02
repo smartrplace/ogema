@@ -70,6 +70,8 @@ import java.util.Comparator;
 import java.util.Iterator;
 import org.ogema.core.model.ModelModifiers.NonPersistent;
 import org.ogema.core.model.ValueResource;
+import org.ogema.core.model.array.ArrayResource;
+import org.ogema.core.model.simple.SingleValueResource;
 
 /**
  * Base class of all Resource implementations, used as base class of concrete
@@ -1336,6 +1338,14 @@ public abstract class ResourceBase implements ConnectedResource {
 	public boolean exists() {
 		return !getEl().isVirtual();
 	}
+	
+	private boolean isNonInstantiableType(Class<? extends Resource> type) {
+		// types which exist only to facilitate object modelling but cannot
+		// actually be created
+		return type.equals(ValueResource.class)
+				|| type.equals(SingleValueResource.class)
+				|| type.equals(ArrayResource.class);
+	}
 
 	@Override
 	@SuppressWarnings("unchecked")
@@ -1345,6 +1355,12 @@ public abstract class ResourceBase implements ConnectedResource {
 		}
 		resMan.getDatabaseManager().lockStructureWrite();
 		try {
+			Class<? extends Resource> type = getResourceType();
+			if (type == null) {
+				throw new IllegalStateException("FRAMEWORK BUG! resource has type null at " + getPath());
+			} else if (isNonInstantiableType(type)) {
+				throw new NoSuchResourceException("cannot create resource of type " + type + " at " + getPath());
+			}
             ResourceBase parent = getParent();
 			assert parent != null : "create called on non-existitent resource without parent: " + getPath();
 			if (!parent.exists()) {

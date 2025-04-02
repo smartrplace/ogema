@@ -21,10 +21,15 @@ import static org.junit.Assert.*;
 
 import org.junit.Test;
 import org.ogema.core.model.Resource;
+import org.ogema.core.model.ValueResource;
 import org.ogema.core.model.schedule.Schedule;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.resourcemanager.ResourceManagement;
+import org.ogema.model.devices.buildingtechnology.Thermostat;
 import org.ogema.model.devices.generators.PVPlant;
+import org.ogema.model.locations.Room;
+import org.ogema.model.prototypes.PhysicalElement;
+import org.ogema.model.sensors.OccupancySensor;
 import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
 import org.ops4j.pax.exam.spi.reactors.PerClass;
 
@@ -97,6 +102,7 @@ public class CyclicResourcesTest extends OsgiTestBase {
 		List<Resource> subres;
 		subres = struct.pvPlant.getSubResources(true);
 		assertEquals(subres.size(), 4);
+		assertTrue(subres.contains(struct.referredPlant));
 		subres = struct.azimuth.getSubResources(true);
 		assertEquals(subres.size(), 4);
 		subres = struct.aziforecast.getSubResources(true);
@@ -107,7 +113,7 @@ public class CyclicResourcesTest extends OsgiTestBase {
 		// get only subresources of specific type
 		List<PVPlant> subpv;
 		subpv = struct.pvPlant.getSubResources(PVPlant.class, true);
-		assertEquals(subpv.size(), 1);
+		assertEquals("expected 1 resources but got " + subpv.size() +": " + subpv, 1, subpv.size());
 		subpv = struct.azimuth.getSubResources(PVPlant.class, true);
 		assertEquals(subpv.size(), 1);
 		subpv = struct.aziforecast.getSubResources(PVPlant.class, true);
@@ -115,4 +121,46 @@ public class CyclicResourcesTest extends OsgiTestBase {
 		subpv = struct.referredPlant.getSubResources(PVPlant.class, true);
 		assertEquals(subpv.size(), 1);
 	}
+	
+	
+	@Test
+	public void fnord() {
+		Resource top = resMan.createResource(newResourceName(), Resource.class);
+		Resource base = top.getSubResource(newResourceName(), Resource.class).create();
+		Resource channels = base.getSubResource("channels", Resource.class).create();
+		Resource device = base.getSubResource("device", Resource.class).create();
+		
+		Thermostat tstat = device.getSubResource("thermos", Thermostat.class);
+		tstat.temperatureSensor().settings().setpoint().create();
+
+		Resource chan1 = channels.getSubResource("chan1", Resource.class).create();
+		Resource controlled = chan1.getSubResource("controlled", Resource.class).create();
+		
+		controlled.addDecorator("cr1", tstat);
+		controlled.addDecorator("cr2", tstat.temperatureSensor());
+		base.activate(true);
+		
+		assertEquals(1, top.getSubResources(ValueResource.class, true).size());
+	}
+	
+	@Test
+	public void ref() {
+		Resource top = resMan.createResource(newResourceName(), Resource.class);
+		Room room = resMan.createResource("room_" + newResourceName(), Room.class);
+
+		Thermostat tstat = top.getSubResource("thermos", Thermostat.class);
+		tstat.temperatureSensor().settings().setpoint().create();
+		tstat.location().room().setAsReference(room);
+
+		OccupancySensor occ = top.getSubResource("occupancy", OccupancySensor.class).create();
+		room.occupancySensor().setAsReference(occ);
+		
+		top.activate(true);
+		room.activate(true);
+		
+		for (PhysicalElement pe: top.getSubResources(PhysicalElement.class, true)) {
+			System.out.println(pe.getPath());
+		}
+	}
+	
 }
