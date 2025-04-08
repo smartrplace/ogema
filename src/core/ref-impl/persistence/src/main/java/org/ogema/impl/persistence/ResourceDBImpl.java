@@ -203,7 +203,7 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 	 * @throws InvalidResourceTypeException
 	 */
 	void createTree(TreeElementImpl node) throws InvalidResourceTypeException {
-		Class<?> type = node.type;
+		Class<?> type = node.getElType();
 		if (type == null) {
 			if (node.getPath() == null)
 				throw new IllegalArgumentException("Node type and name were null.");
@@ -256,8 +256,8 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 			ifaces = superModel.getInterfaces();
 			superModel = ifaces[0];
 		}
-		node.flagsChildren = getChildFlags(node.type);
-		node.typeChildren = getChildTypes(node.type);
+		node.flagsChildren = getChildFlags(node.getElType());
+		node.typeChildren = getChildTypes(node.getElType());
 	}
 
 	/*
@@ -334,7 +334,7 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 	 * Parse all direct children of a type each in an instance of TreeElementImpl as optionals of this TreeElement.
 	 */
 	private void parseComplex(final Class<?> type, TreeElementImpl node) {
-		typeClassByName.put(node.typeName, node.type);
+		typeClassByName.put(node.typeName, node.getElType());
 
 		node.typeChildren = getChildTypes(type);
 		node.flagsChildren = getChildFlags(type);
@@ -460,7 +460,7 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 		 * type of all children added later.
 		 */
 		if (type != DBConstants.CLASS_COMPLEX_ARR_TYPE) {
-			e.type = type;
+			e.setElType(type);
 			e.typeName = type.getName();
 		}
 		else {
@@ -514,7 +514,7 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 		if (e.complexArray)
 			type = DBConstants.CLASS_COMPLEX_ARR_TYPE;
 		else
-			type = e.type;
+			type = e.getElType();
 		if (type != null) {
 			String name = type.getName();
 			// register in table of id's by type as key
@@ -552,7 +552,7 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 		if (e.complexArray)
 			type = DBConstants.CLASS_COMPLEX_ARR_TYPE;
 		else
-			type = e.type;
+			type = e.getElType();
 
 		if (type != null) {
 			// register in table of id's by type as key
@@ -1074,7 +1074,7 @@ public class ResourceDBImpl implements ResourceDB, BundleActivator {
 
 	Class<?> getListType(TreeElementImpl parent, final String chName) {
 		Class<?> clazz;
-		final Class<?> type = parent.type;
+		final Class<?> type = parent.getElType();
 		Method m = AccessController.doPrivileged(new PrivilegedAction<Method>() {
 			public Method run() {
 				try {

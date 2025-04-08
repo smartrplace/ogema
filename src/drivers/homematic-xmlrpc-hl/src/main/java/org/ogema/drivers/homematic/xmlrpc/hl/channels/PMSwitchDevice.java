@@ -19,6 +19,7 @@ import java.util.Arrays;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.ogema.core.resourcemanager.ResourceStructureEvent;
 import org.ogema.core.resourcemanager.ResourceStructureListener;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
@@ -45,7 +46,7 @@ public class PMSwitchDevice extends AbstractDeviceHandler {
 	
 	final List<String> acceptedTypes = Arrays.asList("HM-ES-PMSw1-Pl", "HM-ES-PMSw1-Pl-DN-R1",
 			"HMIP-PSM", "HMIP-PS", "HmIP-PS-2", "HmIP-PS-2 9YM");
-	final List<String> psTypes = Arrays.asList("HMIP-PS", "HmIP-PS-2", "HmIP-PS-2 9YM");
+	final List<String> psTypes = Arrays.asList("HMIP-PS", "HmIP-PS-2", "HmIP-PS-2 9YM", "HmIP-PSM-2");
 
     public PMSwitchDevice(HomeMaticConnection conn) {
         super(conn);
@@ -56,12 +57,14 @@ public class PMSwitchDevice extends AbstractDeviceHandler {
     public boolean accept(DeviceDescription desc) {
     	String type = desc.getType();
     	return acceptedTypes.stream().anyMatch(s -> type.equalsIgnoreCase(s))
-				|| type.toLowerCase().startsWith("hmip-ps-2");
+				|| type.toLowerCase().startsWith("hmip-ps-2")
+				|| type.toLowerCase().startsWith("hmip-psm-2");
     }
 	
 	boolean matchesPsSwitchType(String type) {
 		return psTypes.stream().anyMatch(s -> type.equalsIgnoreCase(s))
-				|| type.toLowerCase().startsWith("hmip-ps-2");
+				|| type.toLowerCase().startsWith("hmip-ps-2")
+				|| type.toLowerCase().startsWith("hmip-psm-2");
 	}
 
     protected ResourceStructureListener subChannelListener(final HmDevice dev) {
@@ -89,24 +92,23 @@ public class PMSwitchDevice extends AbstractDeviceHandler {
     protected boolean performSwitchBoxSetup(HmDevice dev) {
         //logger.debug("perform high level setup for device {}", dev.address().getValue());
         List<ElectricityConnection> elConns = dev.getSubResources(ElectricityConnection.class, false);
-        List<OnOffSwitch> switches = dev.getSubResources(OnOffSwitch.class, false);
+        List<OnOffSwitch> switches = dev.getSubResources(OnOffSwitch.class, false)
+				.stream().filter(sw -> !sw.getName().contains("VIRTUAL_RECEIVER")).collect(Collectors.toList());
 		//System.out.printf("%s switches: %s%n", dev.getPath(), switches);
 		//System.out.printf("%s: matchesPsSwitchType(%s) = %b%n", dev.getPath(), dev.type().getValue(), matchesPsSwitchType(dev.type().getValue()));
-        if (elConns.size() == 1 && switches.size() == 1) {
+        if (switches.size() == 1 && elConns.size() == 1) {
             String ssbName = ResourceUtils.getValidResourceName("HM-SingleSwitchBox-" + dev.address().getValue());
             logger.debug("set up SingleSwitchBox for HomeMatic device {}", dev.address().getValue());
             OnOffSwitch sw = switches.get(0);
-            ElectricityConnection elConn = elConns.get(0);
-
             SingleSwitchBox ssb = dev.getSubResource(ssbName, SingleSwitchBox.class);
-
             ssb.onOffSwitch().stateControl().create().activate(false);
             ssb.onOffSwitch().stateFeedback().create().activate(false);
-            ssb.electricityConnection().create().activate(false);
             ssb.onOffSwitch().activate(false);
+			sw.setAsReference(ssb.onOffSwitch());
+			
+			ElectricityConnection elConn = elConns.get(0);
+			ssb.electricityConnection().create().activate(false);
             elConn.setAsReference(ssb.electricityConnection());
-            sw.setAsReference(ssb.onOffSwitch());
-
             ssb.activate(false);
             return true;
         } else if (switches.size() == 1 && matchesPsSwitchType(dev.type().getValue())) {

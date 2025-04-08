@@ -809,9 +809,9 @@ public class DBResourceIO {
 			}
 		}
 
-		if (node.type != null) {
+		if (node.getElType() != null) {
 			clsLoaded = true;
-			String clsName = node.type.getName();
+			String clsName = node.getElType().getName();
 			if (!node.typeName.equals(clsName)) {
 				try {
 					clsLoaded = setTypeFromName(node);
@@ -836,41 +836,41 @@ public class DBResourceIO {
 		switch (typeKey) {
 		// read simple resource
 		case DBConstants.TYPE_KEY_BOOLEAN:
-			node.type = DBConstants.CLASS_BOOL_TYPE;
+			node.setElType(DBConstants.CLASS_BOOL_TYPE);
 			break;
 		case DBConstants.TYPE_KEY_FLOAT:
-			node.type = DBConstants.CLASS_FLOAT_TYPE;
+			node.setElType(DBConstants.CLASS_FLOAT_TYPE);
 			break;
 		case DBConstants.TYPE_KEY_INT:
-			node.type = DBConstants.CLASS_INT_TYPE;
+			node.setElType(DBConstants.CLASS_INT_TYPE);
 			break;
 		case DBConstants.TYPE_KEY_STRING:
-			node.type = DBConstants.CLASS_STRING_TYPE;
+			node.setElType(DBConstants.CLASS_STRING_TYPE);
 			break;
 		case DBConstants.TYPE_KEY_LONG:
-			node.type = DBConstants.CLASS_TIME_TYPE;
+			node.setElType(DBConstants.CLASS_TIME_TYPE);
 			break;
 		// read array resource
 		case DBConstants.TYPE_KEY_OPAQUE:
-			node.type = DBConstants.CLASS_OPAQUE_TYPE;
+			node.setElType(DBConstants.CLASS_OPAQUE_TYPE);
 			break;
 		case DBConstants.TYPE_KEY_INT_ARR:
-			node.type = DBConstants.CLASS_INT_ARR_TYPE;
+			node.setElType(DBConstants.CLASS_INT_ARR_TYPE);
 			break;
 		case DBConstants.TYPE_KEY_LONG_ARR:
-			node.type = DBConstants.CLASS_TIME_ARR_TYPE;
+			node.setElType(DBConstants.CLASS_TIME_ARR_TYPE);
 			break;
 		case DBConstants.TYPE_KEY_FLOAT_ARR:
-			node.type = DBConstants.CLASS_FLOAT_ARR_TYPE;
+			node.setElType(DBConstants.CLASS_FLOAT_ARR_TYPE);
 			break;
 		case DBConstants.TYPE_KEY_COMPLEX_ARR:
-			node.type = DBConstants.CLASS_COMPLEX_ARR_TYPE;
+			node.setElType(DBConstants.CLASS_COMPLEX_ARR_TYPE);
 			break;
 		case DBConstants.TYPE_KEY_BOOLEAN_ARR:
-			node.type = DBConstants.CLASS_BOOL_ARR_TYPE;
+			node.setElType(DBConstants.CLASS_BOOL_ARR_TYPE);
 			break;
 		case DBConstants.TYPE_KEY_STRING_ARR:
-			node.type = DBConstants.CLASS_STRING_ARR_TYPE;
+			node.setElType(DBConstants.CLASS_STRING_ARR_TYPE);
 			break;
 		case DBConstants.TYPE_KEY_COMPLEX:
 			// create complex resource
@@ -899,22 +899,22 @@ public class DBResourceIO {
 		// read simple resource
 		case DBConstants.TYPE_KEY_BOOLEAN:
 			node.initDataContainer();
-			node.type = DBConstants.CLASS_BOOL_TYPE;
+			node.setElType(DBConstants.CLASS_BOOL_TYPE);
 			node.simpleValue.Z = raf.readBoolean();
 			break;
 		case DBConstants.TYPE_KEY_FLOAT:
 			node.initDataContainer();
-			node.type = DBConstants.CLASS_FLOAT_TYPE;
+			node.setElType(DBConstants.CLASS_FLOAT_TYPE);
 			node.simpleValue.F = raf.readFloat();
 			break;
 		case DBConstants.TYPE_KEY_INT:
 			node.initDataContainer();
-			node.type = DBConstants.CLASS_INT_TYPE;
+			node.setElType(DBConstants.CLASS_INT_TYPE);
 			node.simpleValue.I = raf.readInt();
 			break;
 		case DBConstants.TYPE_KEY_STRING:
 			node.initDataContainer();
-			node.type = DBConstants.CLASS_STRING_TYPE;
+			node.setElType(DBConstants.CLASS_STRING_TYPE);
 			if (isNullString(raf))
 				node.simpleValue.S = null;
 			else
@@ -922,41 +922,41 @@ public class DBResourceIO {
 			break;
 		case DBConstants.TYPE_KEY_LONG:
 			node.initDataContainer();
-			node.type = DBConstants.CLASS_TIME_TYPE;
+			node.setElType(DBConstants.CLASS_TIME_TYPE);
 			node.simpleValue.J = raf.readLong();
 			break;
 		// read array resource
 		case DBConstants.TYPE_KEY_OPAQUE:
 			node.initDataContainer();
-			node.type = DBConstants.CLASS_OPAQUE_TYPE;
+			node.setElType(DBConstants.CLASS_OPAQUE_TYPE);
 			readAB(node);
 			break;
 		case DBConstants.TYPE_KEY_INT_ARR:
 			node.initDataContainer();
-			node.type = DBConstants.CLASS_INT_ARR_TYPE;
+			node.setElType(DBConstants.CLASS_INT_ARR_TYPE);
 			readAI(node);
 			break;
 		case DBConstants.TYPE_KEY_LONG_ARR:
 			node.initDataContainer();
-			node.type = DBConstants.CLASS_TIME_ARR_TYPE;
+			node.setElType(DBConstants.CLASS_TIME_ARR_TYPE);
 			readAJ(node);
 			break;
 		case DBConstants.TYPE_KEY_FLOAT_ARR:
 			node.initDataContainer();
-			node.type = DBConstants.CLASS_FLOAT_ARR_TYPE;
+			node.setElType(DBConstants.CLASS_FLOAT_ARR_TYPE);
 			readAF(node);
 			break;
 		case DBConstants.TYPE_KEY_COMPLEX_ARR:
-			node.type = DBConstants.CLASS_COMPLEX_ARR_TYPE;
+			node.setElType(DBConstants.CLASS_COMPLEX_ARR_TYPE);
 			break;
 		case DBConstants.TYPE_KEY_BOOLEAN_ARR:
 			node.initDataContainer();
-			node.type = DBConstants.CLASS_BOOL_ARR_TYPE;
+			node.setElType(DBConstants.CLASS_BOOL_ARR_TYPE);
 			readAZ(node);
 			break;
 		case DBConstants.TYPE_KEY_STRING_ARR:
 			node.initDataContainer();
-			node.type = DBConstants.CLASS_STRING_ARR_TYPE;
+			node.setElType(DBConstants.CLASS_STRING_ARR_TYPE);
 			readAS(node);
 			break;
 		default:
@@ -989,7 +989,7 @@ public class DBResourceIO {
 			}
 			if (type != null) {
 				result = true;
-				node.type = type;
+				node.setElType(type);
 			}
 		}
 		return result;
@@ -1147,7 +1147,7 @@ public class DBResourceIO {
 			e.topLevelParent = parent.topLevelParent;
 			// Check if the parent is a ResourceList. In this case, this is the right moment to set the resource type
 			// info.
-			if (parent.typeKey == DBConstants.TYPE_KEY_COMPLEX_ARR && parent.type == DBConstants.CLASS_COMPLEX_ARR_TYPE
+			if (parent.typeKey == DBConstants.TYPE_KEY_COMPLEX_ARR && parent.getElType() == DBConstants.CLASS_COMPLEX_ARR_TYPE
 					&& !e.name.equals("@elements")) {
 				// parent.type = e.type;
 			}
@@ -1175,7 +1175,7 @@ public class DBResourceIO {
 
 		// setup the tree for this type only if itsn't a ComplexArrayResourse or
 		// a reference
-		if (!e.complexArray && !e.reference && e.type != null)
+		if (!e.complexArray && !e.reference && e.getElType() != null)
 			database.createTree(e);
 
 		// put the generated tree in the table of the top level resources.
@@ -1384,7 +1384,7 @@ public class DBResourceIO {
 				}
 			}
 			else {
-				tei.type = type;
+				tei.setElType(type);
 			}
 			putResource(tei);
 			// and its children too
@@ -1397,9 +1397,9 @@ public class DBResourceIO {
 					TreeElementImpl child = entry1.getValue();
 					TreeElementImpl parent = database.resNodeByID.get(child.parentID);
 					if (parent != null) { // Is the parent resource already part of the tree?
-						if (child.type == null)
+						if (child.getElType() == null)
 							setTypeFromName(child); // Try to load type class
-						if (child.type != null) { // Set parent and hook it on the tree
+						if (child.getElType() != null) { // Set parent and hook it on the tree
 							child.parent = parent;
 							putResource(child);
 							count++;

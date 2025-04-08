@@ -102,11 +102,17 @@ public class DefaultResourceList<T extends Resource> extends ResourceBase implem
 		Class<T> elementType = getElementType();
 		if (elementType == null) {
 			elementType = (Class<T>) findElementTypeOnParent();
-			setElementType(elementType);
+			if (elementType != null) {
+				setElementType(elementType);
+			}
 		}
 		if (elementType == null) {
 			elementType = (Class<T>) getElInternal().getResourceListType();
-			setElementType(elementType);
+			if (elementType != null) {
+				setElementType(elementType);
+			} else {
+				throw new IllegalStateException("unable to determine element type on " + getPath());
+			}
 		}
 		else {
 			if (!elementType.isAssignableFrom(r.getResourceType())) {

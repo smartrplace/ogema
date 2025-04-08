@@ -21,6 +21,7 @@ import java.util.Map;
 import org.ogema.core.model.units.ElectricCurrentResource;
 import org.ogema.core.model.units.EnergyResource;
 import org.ogema.core.model.units.FrequencyResource;
+import org.ogema.core.model.units.PhysicalUnit;
 import org.ogema.core.model.units.PowerResource;
 import org.ogema.core.model.units.VoltageResource;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
@@ -79,8 +80,10 @@ public class PowerMeterChannel extends AbstractDeviceHandler {
                             reading.create();
                             elconn.currentSensor().activate(true);
                         }
+						// mA -> A
                         reading.setValue(e.getValueFloat() / 1000.0f);
-                        logger.debug("current reading updated: {} = {}", reading.getPath(), e.getValueFloat());
+                        logger.debug("current reading updated: {} = {}A ({})",
+								reading.getPath(), reading.getValue(), e.getValueFloat());
                         break;
                     }
                     case "VOLTAGE": {
@@ -109,9 +112,13 @@ public class PowerMeterChannel extends AbstractDeviceHandler {
                             reading.create();
                             elconn.energySensor().activate(true);
                         }
-                        //FIXME: value conversion required!
-                        reading.setValue(e.getValueFloat());
-                        logger.debug("energy reading updated: {} = {}", reading.getPath(), e.getValueFloat());
+                        //value conversion Wh(?) => kWh
+						if (reading.getUnit() != PhysicalUnit.KILOWATT_HOURS) {
+							reading.setUnit(PhysicalUnit.KILOWATT_HOURS);
+						}
+                        reading.setValue(e.getValueFloat() / 1000f);
+                        logger.debug("energy reading updated: {} = {}kWh ({})",
+								reading.getPath(), reading.getValue(), e.getValueFloat());
                         break;
                     }
                 }
@@ -120,10 +127,10 @@ public class PowerMeterChannel extends AbstractDeviceHandler {
 
     }
 
-    @Override
     /** Note: The main detection is performed in {@link PMSwitchDevice}. Here
      * you should only enter the sub channel relevant for the power meter
      */
+	@Override
     public boolean accept(DeviceDescription desc) {
         return "POWERMETER".equalsIgnoreCase(desc.getType())
         		||"ENERGIE_METER_TRANSMITTER".equalsIgnoreCase(desc.getType());
@@ -136,16 +143,6 @@ public class PowerMeterChannel extends AbstractDeviceHandler {
         ElectricityConnection elconn = parent.addDecorator(swName, ElectricityConnection.class);
         conn.addEventListener(new PowerMeterEventListener(elconn, desc.getAddress()));
         elconn.activate(true);
-        
-        //Switch box
-        /*String ssbName = ResourceUtils.getValidResourceName("HM-SingleSwitchBox-" + parent.address().getValue());
-        SingleSwitchBox ssb = parent.getSubResource(ssbName, SingleSwitchBox.class);
-        ssb.onOffSwitch().stateControl().create().activate(false);
-        ssb.onOffSwitch().stateFeedback().create().activate(false);
-        if(elconn.exists()) ssb.electricityConnection().setAsReference(elconn);
-        ssb.onOffSwitch().activate(false);
-        ssb.activate(false);*/
-        
     }
 
 }

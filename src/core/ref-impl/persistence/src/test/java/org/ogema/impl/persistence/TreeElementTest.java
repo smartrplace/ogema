@@ -185,7 +185,7 @@ public class TreeElementTest extends DBBasicTest {
 		System.out.println("Inside deleteTopLevelResource");
 		int id = resource_PhysicalElement_id_0.resID;
 		String name = resource_PhysicalElement_id_0.path;
-		String cls = resource_PhysicalElement_id_0.type.getName();
+		String cls = resource_PhysicalElement_id_0.getType().getName();
 		TestCase.assertTrue(db.hasResource("resource_PhysicalElement_name_0"));
 		// delete resource
 		db.deleteResource(resource_PhysicalElement_id_0);
@@ -861,7 +861,7 @@ public class TreeElementTest extends DBBasicTest {
 		/*
 		 * The added decorator of type ComplexArrayResource hasn't yet a known type
 		 */
-		TestCase.assertTrue(node_complexArray.type == null);
+		TestCase.assertTrue(node_complexArray.getElType() == null);
 
 		/*
 		 * Adding a child as decorator to the ComplexArrayResource has to succeed. From now the type Information of this
@@ -879,7 +879,7 @@ public class TreeElementTest extends DBBasicTest {
 		TestCase.assertTrue(rooms != null);
 		TestCase.assertTrue(db.hasResource0(rooms));
 		TestCase.assertTrue(rooms.decorator);
-		TestCase.assertTrue(rooms.type == Room.class);
+		TestCase.assertTrue(rooms.getType() == Room.class);
 
 		/*
 		 * Adding of a second decorator of another type as known one to the ComplexArrayResource has to succeed.
@@ -1579,12 +1579,12 @@ public class TreeElementTest extends DBBasicTest {
 				&& (((e.parent != null) && (e.active == e.parent.active)) || (e.parent == null)));
 		TestCase.assertTrue(e.appID.equals(testAppID));
 		// TestCase.assertTrue((e.parent.optionals.get(e.name) == e) || (e.parent.getRequired(e.name) == e));
-		TestCase.assertTrue(db.hasResourceType(e.type.getName()));
+		TestCase.assertTrue(db.hasResourceType(e.getType().getName()));
 		TestCase.assertTrue(e == db.resNodeByID.get(db.resIDByName.get(e.path)));
 		TestCase.assertTrue(e.resRef == null);
 		// e.nonpersistent = false;
 		// e.optional = false;
-		TestCase.assertTrue(((e.decorator == false) && (e.parent.typeChildren.get(e.name) == e.type))
+		TestCase.assertTrue(((e.decorator == false) && (e.parent.typeChildren.get(e.name) == e.getType()))
 				|| ((e.decorator == true) && (e.parent.typeChildren.get(e.name) == null)));
 
 		TestCase.assertTrue(db.resNodeByID.get(e.resID) == e);
