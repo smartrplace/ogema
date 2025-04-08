@@ -32,6 +32,7 @@ import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
 import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.model.units.TemperatureResource;
+import org.ogema.core.recordeddata.RecordedDataConfiguration;
 import org.ogema.core.resourcemanager.ResourceStructureEvent;
 import org.ogema.core.resourcemanager.ResourceStructureListener;
 import org.ogema.core.resourcemanager.ResourceValueListener;
@@ -120,6 +121,7 @@ public abstract class ThermostatUtils {
 	private static void setupDecalcDecorators(HmDevice parent, DeviceDescription desc,
 			Map<String, Map<String, ParameterDescription<?>>> paramSets,
 			HomeMaticConnection conn, Thermostat model, Logger logger, Map<String, Object> masterValues) {
+		boolean decalcDebugMode = true;		
 		Map<String, ParameterDescription<?>> masterParams
 				= paramSets.get(ParameterDescription.SET_TYPES.MASTER.name());
 		if (masterParams == null || !masterParams.containsKey("DECALCIFICATION_WEEKDAY")) {
@@ -132,6 +134,30 @@ public abstract class ThermostatUtils {
 		StringResource feedback = model.valve().getSubResource("DECALCIFICATION_FEEDBACK", StringResource.class);
 		setting.create().activate(false);
 		feedback.create().activate(false);
+		
+		IntegerResource debugSetting = decalcDebugMode
+				? model.valve().getSubResource("DECALC_INT_SETTING", IntegerResource.class).create()
+				: null;
+		IntegerResource debugFeedback = decalcDebugMode
+				? model.valve().getSubResource("DECALC_INT_FEEDBACK", IntegerResource.class).create()
+				: null;
+		if (decalcDebugMode) {
+			debugSetting.activate(false);
+			debugFeedback.activate(false);
+			RecordedDataConfiguration rdc = debugSetting.getHistoricalData().getConfiguration();
+			if (rdc == null) {
+				rdc = new RecordedDataConfiguration();
+				rdc.setStorageType(RecordedDataConfiguration.StorageType.ON_VALUE_UPDATE);
+			}
+			debugSetting.getHistoricalData().setConfiguration(rdc);
+			rdc = debugFeedback.getHistoricalData().getConfiguration();
+			if (rdc == null) {
+				rdc = new RecordedDataConfiguration();
+				rdc.setStorageType(RecordedDataConfiguration.StorageType.ON_VALUE_UPDATE);
+			}
+			debugFeedback.getHistoricalData().setConfiguration(rdc);
+		}
+
 		Function<Map<String, Object>, String> decalcStringFromParams = masterValueReadings -> {
 			//note: HM weekday enum is Sunday(0) ... Saturday(6)
 			Integer weekday = (Integer) masterValueReadings.get("DECALCIFICATION_WEEKDAY");
@@ -151,6 +177,14 @@ public abstract class ThermostatUtils {
 				if (fb == null) {
 					return;
 				}
+				if (decalcDebugMode) {
+					Integer weekday = (Integer) masterValueReadings.get("DECALCIFICATION_WEEKDAY");
+					Integer halfhour = (Integer) masterValueReadings.get("DECALCIFICATION_TIME");
+					if (weekday != null && halfhour != null) {
+						debugFeedback.setValue(weekday * 100 + halfhour);
+						debugFeedback.activate(false);
+					}
+				}
 				feedback.create();
 				feedback.setValue(fb);
 				feedback.activate(false);
@@ -167,6 +201,10 @@ public abstract class ThermostatUtils {
 				LocalTime t = LocalTime.parse(a[1]);
 				int hmWeekDay = dow.getValue() % 7; //DayOfWeek is Mon(1)...Sun(7) (ISO-8601)
 				int hmHalfHour = t.toSecondOfDay() / 60 / 30;
+				if (decalcDebugMode) {
+					debugSetting.setValue(hmWeekDay * 100 + hmHalfHour);
+					debugSetting.activate(false);
+				}
 				Map<String, Object> values = new HashMap<>();
 				values.put("DECALCIFICATION_TIME", hmHalfHour);
 				values.put("DECALCIFICATION_WEEKDAY", hmWeekDay);
@@ -177,6 +215,11 @@ public abstract class ThermostatUtils {
 				logger.warn("illegal value (or bug) on {}: {} ({})", setting.getPath(), s, re.getMessage());
 			}
 		}, true);
+		if (decalcDebugMode) {
+			PARAMETER_UPDATES_EXECUTORS
+					.computeIfAbsent(conn.getConnectionUrl(), _c -> Executors.newScheduledThreadPool(THREADS_PER_CONNECTION))
+					.scheduleAtFixedRate(readValue, 5, 60, TimeUnit.MINUTES);
+		}
 	}
 
 	/*
