@@ -28,6 +28,7 @@ import org.ogema.core.resourcemanager.ResourceAccess;
 import org.ogema.core.resourcemanager.ResourceOperationException;
 import org.ogema.core.resourcemanager.pattern.ResourcePattern;
 import org.ogema.core.resourcemanager.transaction.ResourceTransaction;
+import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.model.locations.Room;
 import org.ogema.model.prototypes.PhysicalElement;
 import org.ogema.tools.activation.impl.ActivationVisitor;
@@ -270,6 +271,13 @@ public class ResourceUtils {
 				Room room = ((PhysicalElement) device).location().room();
 				if (room.isActive()) 
 					return room;
+			} else if (device instanceof HmDevice) {
+				List<PhysicalElement> subs = device.getSubResources(PhysicalElement.class, false);
+				for(PhysicalElement sub: subs) {
+					Room room = sub.location().room();
+					if (room.isActive()) 
+						return room;					
+				}
 			}
 			// possibly the caller does not have permission to access the parent resource
 			device = device.getParent();
