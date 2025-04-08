@@ -53,6 +53,7 @@ import org.ogema.core.resourcemanager.ResourceGraphException;
 import org.ogema.core.resourcemanager.ResourceValueListener;
 import org.ogema.core.resourcemanager.VirtualResourceException;
 import org.ogema.resourcemanager.impl.model.DefaultResourceList;
+import org.ogema.resourcemanager.impl.model.simple.DefaultFloatResource;
 import org.ogema.resourcemanager.virtual.DefaultVirtualTreeElement;
 import org.ogema.resourcetree.TreeElement;
 import org.ogema.resourcetree.listeners.InternalStructureListenerRegistration;
@@ -1337,12 +1338,24 @@ public abstract class ResourceBase implements ConnectedResource {
 		return !getEl().isVirtual();
 	}
 
+	private static final String RES_TO_TEST_CREATE = System.getProperty("org.ogema.resourcemanager.impl.model.debug.testForCreate");
+	
 	@Override
 	@SuppressWarnings("unchecked")
 	public <T extends Resource> T create() {
 		if (exists()) {
 			return (T) this;
 		}
+
+if(RES_TO_TEST_CREATE != null && getPath().contains(RES_TO_TEST_CREATE)) {
+	final String location;
+	if(el.getLocation() == null)
+		location = el.getPath();
+	else
+		location = el.getLocation();
+	DefaultFloatResource.LOG.info("Creating "+getPath()+" at "+location, 
+			new IllegalStateException("Creating "+getPath()));
+}
 		resMan.getDatabaseManager().lockStructureWrite();
 		try {
             ResourceBase parent = getParent();
