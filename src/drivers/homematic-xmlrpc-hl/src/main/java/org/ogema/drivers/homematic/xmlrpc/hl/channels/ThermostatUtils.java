@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
@@ -70,6 +71,7 @@ public abstract class ThermostatUtils {
 		PARAMETERS.put("VALVE_MAXIMUM_POSITION", FloatResource.class);
 		PARAMETERS.put("SHOW_HUMIDITY", BooleanResource.class);
 		PARAMETERS.put("SHOW_SET_TEMPERATURE", BooleanResource.class);
+		PARAMETERS.put("TEMPERATURE_MAXIMUM", TemperatureResource.class);
 		PARAMETERS.put("TEMPERATURE_MINIMUM", TemperatureResource.class);
 		PARAMETERS.put("TEMPERATURE_OFFSET", TemperatureResource.class);
 	}
@@ -285,7 +287,7 @@ public abstract class ThermostatUtils {
 		}
 	}
 	
-	static Map<Long, Future<?>> updateTasks = new ConcurrentSkipListMap<>();
+	static Map<String, ScheduledFuture<?>> parameterUpdateTasks = new ConcurrentSkipListMap<>();
 	
 	static void setupParameterResources(HmDevice parent, DeviceDescription desc,
 			Map<String, Map<String, ParameterDescription<?>>> paramSets,
@@ -333,27 +335,8 @@ public abstract class ThermostatUtils {
 			if (!b.getValue()) {
 				return;
 			}
-			//exec.execute(updateValues);
-			long now = System.currentTimeMillis();
-			Iterator<Entry<Long,Future<?>>> it = updateTasks.entrySet().iterator();
-			while (it.hasNext()) {
-				Entry<Long,Future<?>> e = it.next();
-				if (e.getValue().isDone()) {
-					it.remove();
-				}
-				else if (now - e.getKey() > 60_000) {
-					logger.warn("cancelling stalled update task for {}", model.getPath());
-					e.getValue().cancel(true);
-					it.remove();
-				} else if (now - e.getKey() < 10_000) {
-					break;
-				}
-			}
-			Future<?> f = PARAMETER_UPDATES_EXECUTORS
-					.computeIfAbsent(conn.getConnectionUrl(), _c -> Executors.newScheduledThreadPool(THREADS_PER_CONNECTION))
-					.submit(updateValues);
-			updateTasks.put(now, f);
-			logger.trace("number of pending parameter updates (all thermostat types): {}", updateTasks.size());
+			queueParameterUpdate(address, conn, updateValues, 3000, logger);
+			logger.trace("number of pending parameter updates (all thermostat types): {}", parameterUpdateTasks.size());
 		};
 		PARAMETERS.forEach((p, t) -> {
 			if (allParams.containsKey(p)) {
@@ -369,9 +352,7 @@ public abstract class ThermostatUtils {
 				r.activate(false);
 				r.addValueListener(l, true);
 				r.addValueListener(_r -> {
-					PARAMETER_UPDATES_EXECUTORS
-					.computeIfAbsent(conn.getConnectionUrl(), _c -> Executors.newScheduledThreadPool(THREADS_PER_CONNECTION))
-					.schedule(updateValues, 3, TimeUnit.SECONDS);
+					queueParameterUpdate(address, conn, updateValues, 3000, logger);
 				}, true);
 				params.put(p, r);
 				logger.debug("set up parameter {} on {}", p, address);
@@ -381,10 +362,30 @@ public abstract class ThermostatUtils {
 		update.create();
 		update.addValueListener(updateListener, true);
 		update.activate(false);
-		PARAMETER_UPDATES_EXECUTORS
-				.computeIfAbsent(conn.getConnectionUrl(), _c -> Executors.newScheduledThreadPool(THREADS_PER_CONNECTION))
-				.submit(updateValues);
-		//CompletableFuture.runAsync(updateValues);
+		queueParameterUpdate(address, conn, updateValues, 3000, logger);
+	}
+	
+	static void queueParameterUpdate(String address, HomeMaticConnection conn, Runnable updateValues, long delay, Logger logger) {
+		Iterator<Entry<String,ScheduledFuture<?>>> it = parameterUpdateTasks.entrySet().iterator();
+			while (it.hasNext()) {
+				Entry<String,ScheduledFuture<?>> e = it.next();
+				long delayMs = e.getValue().getDelay(TimeUnit.MILLISECONDS);
+				if (e.getValue().isDone()) {
+					it.remove();
+				} else if (delayMs < -60_000) {
+					logger.warn("cancelling stalled update task for {}", address);
+					e.getValue().cancel(true);
+					it.remove();
+				} else if (delayMs > 20 && e.getKey().equals(address)) {
+					logger.debug("replacing pending parameter update task for {}", address);
+					e.getValue().cancel(true);
+					it.remove();
+				}
+			}
+			ScheduledFuture<?> f = PARAMETER_UPDATES_EXECUTORS
+					.computeIfAbsent(conn.getConnectionUrl(), _c -> Executors.newScheduledThreadPool(THREADS_PER_CONNECTION))
+					.schedule(updateValues, delay, TimeUnit.MILLISECONDS);
+			parameterUpdateTasks.put(address, f);
 	}
 
 	static void setupProgramListener(String address, HomeMaticConnection conn,
