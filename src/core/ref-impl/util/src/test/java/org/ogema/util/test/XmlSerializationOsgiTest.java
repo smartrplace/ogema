@@ -206,7 +206,7 @@ public class XmlSerializationOsgiTest extends OsgiAppTestBase {
 	public void simpleIntRountrip() {
 		StringWriter output = new StringWriter();
 		try {
-			sman.writeXml(output, sw.getSubResource("int"));
+			sman.writeXml(output, (Resource) sw.getSubResource("int"));
 			System.out.println("XML:\n" + output.toString());
 			JAXBContext ctx = createUnmarshallingContext();
 			validateOgemaXml(output.toString());
