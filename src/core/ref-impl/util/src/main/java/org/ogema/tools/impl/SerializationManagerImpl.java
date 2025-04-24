@@ -35,9 +35,10 @@ import org.ogema.core.resourcemanager.ResourceAlreadyExistsException;
 import org.ogema.core.resourcemanager.ResourceManagement;
 import org.ogema.core.tools.SerializationManager;
 
-import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Objects;
 import org.ogema.core.tools.SerializationOptions;
 
@@ -458,4 +459,15 @@ public class SerializationManagerImpl implements SerializationManager {
     public Collection<Resource> createResourcesFromJson(String json, Resource parent) {
         return createResourcesFromJson(new StringReader(json), parent);
     }
+
+	@Override
+	public Collection<Resource> createResourcesFromJson(Collection<Reader> readers) {
+		return core.createFromReadersJson(readers, null, null);
+	}
+
+	@Override
+	public Collection<Resource> createResourcesFromJson(Collection<Reader> readers, Resource parent, Resource linkbase) {
+		return core.createFromReadersJson(readers, parent, linkbase);
+	}
+	
 }

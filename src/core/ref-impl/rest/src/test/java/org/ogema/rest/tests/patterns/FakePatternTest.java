@@ -119,7 +119,8 @@ public class FakePatternTest extends OsgiAppTestBase {
 			resources.add(Util.createMatchingPattern(rpa, null, newResourceName()).model);
 		}
 		for (int i=0;i<nrDummyResources;i++) {
-			resources.add(resMan.createResource(newResourceName(), (i % 2 == 0 ? CoolingDevice.class : Room.class)));
+			Class<? extends Resource> type = (i % 2 == 0 ? CoolingDevice.class : Room.class);
+			resources.add(resMan.createResource(newResourceName(), type));
 		}
 		for (int i=0;i<nrTestSubResources;i++) {
 			Resource base = resMan.createResource(newResourceName(), Room.class);

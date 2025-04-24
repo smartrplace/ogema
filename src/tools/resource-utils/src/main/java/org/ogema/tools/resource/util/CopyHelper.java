@@ -134,7 +134,7 @@ class CopyHelper {
 				final String name = source.getName();
 				final Resource old = targetParent.getSubResource(name);
 				final boolean isNew = old == null || !old.equalsLocation(source);
-				final Resource ref = targetParent.addDecorator(source.getName(), source.getLocationResource());
+				final Resource ref = targetParent.addDecorator(source.getName(), source.<Resource>getLocationResource());
 				if (isNew)
 					newlyCreated.add(ref);
 			}

@@ -51,12 +51,8 @@ import org.ogema.core.model.array.IntegerArrayResource;
 import org.ogema.core.model.array.StringArrayResource;
 import org.ogema.core.model.array.TimeArrayResource;
 import org.ogema.core.model.schedule.Schedule;
-import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.FloatResource;
-import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
-import org.ogema.core.model.simple.StringResource;
-import org.ogema.core.model.simple.TimeResource;
 import org.ogema.core.resourcemanager.InvalidResourceTypeException;
 import org.ogema.core.resourcemanager.NoSuchResourceException;
 import org.ogema.core.resourcemanager.ResourceAccess;
@@ -79,6 +75,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.introspect.JacksonAnnotationIntrospector;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -429,6 +427,10 @@ final class SerializationCore {
 			throw new IOException(e.getCause());
 		}
 	}
+	
+	protected <T extends Resource> T create(org.ogema.serialization.jaxb.Resource input, Resource target, Resource linkBase, Set<LinkInfo> unresolvedLinks) {
+		return createInternal(input, target, linkBase, unresolvedLinks);
+	}
     
     protected <T extends Resource> T create(org.ogema.serialization.jaxb.Resource input, Resource target, Resource linkBase) {
         Set<LinkInfo> unresolvedLinks = new HashSet<>();
@@ -567,18 +569,23 @@ final class SerializationCore {
 			// of unresolved links doesn't change any more (-> input broken or
 			// refering to deleted resources)
 		} while (!(unresolvedLinks.isEmpty() || unresolvedLinks.equals(lastUnresolvedLinks)));
+		/*
         @SuppressWarnings("deprecation")
 		org.ogema.core.resourcemanager.Transaction deactivate = resacc.createTransaction();
 		deactivate.addResources(resourcesToDeactivate);
 		// FIXME deactivation, setting of values and activation are not
 		// synchronized
 		deactivate.deactivate();
+		*/
+		resourcesToDeactivate.forEach(r -> trans.deactivate(r));
+		resourcesToActivate.forEach(r -> trans.activate(r));
 		trans.commit();
+		/*
         @SuppressWarnings("deprecation")
 		org.ogema.core.resourcemanager.Transaction activate = resacc.createTransaction();
 		activate.addResources(resourcesToActivate);
 		activate.activate();
-        
+        */
         return unresolvedLinks;
 	}
     
@@ -1011,6 +1018,83 @@ final class SerializationCore {
 		return resources;
 	}
 	
+	protected void resolveLinks(Set<LinkInfo> unresolvedLinksIn) {
+		if (unresolvedLinksIn.isEmpty()) {
+			return;
+		}
+		Set<LinkInfo> unresolvedLinks = new HashSet<>(unresolvedLinksIn);
+		Set<LinkInfo> lastUnresolved;
+
+		do {
+			lastUnresolved = new HashSet<>(unresolvedLinks);
+			Iterator<LinkInfo> it = unresolvedLinks.iterator();
+			while (it.hasNext()) {
+				LinkInfo link = it.next();
+				// create missing links between different top level resources
+				//XXX works outside of activation transactions.
+				Resource linkParent = resacc.getResource(link.parent);
+				if (linkParent == null || !linkParent.exists()) {
+					LOGGER.warn("invalid link: link parent '{}' does not exist", link.parent);
+					continue;
+				}
+				Resource linkTarget = resacc.getResource(link.target);
+				if (linkTarget == null || !linkTarget.exists()) {
+					LOGGER.warn("invalid link: link target '{}' does not exist", link.target);
+					continue;
+				}
+				Class<? extends Resource> linkType;
+				try {
+					linkType = Class.forName(link.type).asSubclass(Resource.class);
+					linkParent.getSubResource(link.name, linkType).setAsReference(linkTarget);
+					it.remove();
+				} catch (ClassNotFoundException ex) {
+					LOGGER.warn("invalid link: unknown type: {}", link.type);
+				} catch (ResourceAlreadyExistsException e) {
+					LOGGER.warn("invalid link: resource exists with invalid type.", e);
+				}
+			}
+		} while (!lastUnresolved.equals(unresolvedLinks));
+		if (!unresolvedLinks.isEmpty()) {
+			LOGGER.warn("{}/{} links remain unresolved", unresolvedLinks.size(), unresolvedLinksIn.size());
+		}
+	}
+	
+	protected Collection<Resource> createFromReadersJson(Collection<Reader> input, Resource target, Resource linkBase) {
+		List<Resource> resources = new ArrayList<>();
+		Set<LinkInfo> unresolvedLinks = new LinkedHashSet<>();
+		for (Reader r: input) {
+			try {
+				org.ogema.serialization.jaxb.Resource res = deserializeJson(r);
+				Resource result = create(res, target, linkBase, unresolvedLinks);
+				if (result != null) {
+					resources.add(result);
+				}
+			} catch (Exception e) {
+				LOGGER.error("Error deserializing a collection of resources for target {}", target,e);
+			}
+		}
+		resolveLinks(unresolvedLinks);
+		return resources;
+	}
+	
+	protected Collection<Resource> create(Collection<org.ogema.serialization.jaxb.Resource> input, Resource target, Resource linkBase) {
+		List<Resource> resources = new ArrayList<>();
+		Set<LinkInfo> unresolvedLinks = new LinkedHashSet<>();
+		for (org.ogema.serialization.jaxb.Resource res: input) {
+			try {
+				Resource result = create(res, target, linkBase, unresolvedLinks);
+				if (result != null) {
+					resources.add(result);
+				}
+			} catch (Exception e) {
+				LOGGER.error("Error deserializing a collection of resources for target {}", target,e);
+			}
+		}
+		resolveLinks(unresolvedLinks);
+		return resources;
+	}
+	
+	/*
 	protected Collection<Resource> create(Collection<org.ogema.serialization.jaxb.Resource> input, Resource target, Resource linkBase) {
 		List<Resource> resources = new ArrayList<>();
 		for (org.ogema.serialization.jaxb.Resource res: input) {
@@ -1024,6 +1108,7 @@ final class SerializationCore {
 		}
 		return resources;
 	}
+	*/
 	
 	void writeJson(Writer output, Collection<Resource> resources, SerializationManager manager) throws IOException {
 		if (useFastJsonGenerator) {

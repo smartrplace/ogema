@@ -18,11 +18,13 @@ package org.ogema.application.manager.impl;
 import java.io.File;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.Callable;
@@ -72,7 +74,7 @@ public class ApplicationManagerImpl implements ApplicationManager, TimerRemovedL
 	private final FrameworkClock clock;
 
 	protected final ExecutorService executor;
-	private final Queue<Future<?>> workQueue;
+	private final Queue<Map.Entry<Future<?>, Callable<?>>> workQueue;
 	private static final int WORKQUEUE_FORCE_DRAIN_SIZE = 50;
 	final Callable<Void> drainWorkQueueTask;
 	private final ApplicationThreadFactory tfac;
@@ -89,6 +91,10 @@ public class ApplicationManagerImpl implements ApplicationManager, TimerRemovedL
 
 	public ApplicationManagerImpl(Application app, ApplicationTracker tracker, AppID id) {
 		this.drainWorkQueueTask = new Callable<Void>() {
+			@Override
+			public String toString() {
+				return "work queue drain task";
+			}
 
 			@Override
 			public Void call() throws Exception {
@@ -114,6 +120,10 @@ public class ApplicationManagerImpl implements ApplicationManager, TimerRemovedL
 	// constructor used only for timer tests
 	protected ApplicationManagerImpl(Application app, TimerScheduler sched, FrameworkClock clock) {
 		this.drainWorkQueueTask = new Callable<Void>() {
+			@Override
+			public String toString() {
+				return "work queue drain task";
+			}
 
 			@Override
 			public Void call() throws Exception {
@@ -140,6 +150,10 @@ public class ApplicationManagerImpl implements ApplicationManager, TimerRemovedL
 
 	protected void startApplication() {
 		Callable<Boolean> callStart = new Callable<Boolean>() {
+			@Override
+			public String toString() {
+				return "start call for " + appID.toString();
+			}
 
 			@Override
 			public Boolean call() throws Exception {
@@ -170,6 +184,11 @@ public class ApplicationManagerImpl implements ApplicationManager, TimerRemovedL
 		}
 		else {
 			Callable<Boolean> callStop = new Callable<Boolean>() {
+				
+				@Override
+				public String toString() {
+					return "stop call for " + appID.toString();
+				}
 
 				@Override
 				public Boolean call() throws Exception {
@@ -327,7 +346,6 @@ public class ApplicationManagerImpl implements ApplicationManager, TimerRemovedL
 		for (Iterator<Timer> it = timersCopy.iterator(); it.hasNext();) {
 			it.next().destroy(); // will remove timer from timers list
 		}
-		workQueue.clear();
 		executor.shutdown();
 		try {
 			boolean shutdown = executor.awaitTermination(2, TimeUnit.SECONDS);
@@ -335,7 +353,10 @@ public class ApplicationManagerImpl implements ApplicationManager, TimerRemovedL
 				executor.shutdownNow();
 				executor.awaitTermination(2, TimeUnit.SECONDS);
 			}
-		} catch (InterruptedException e) { /* ignore */}
+		} catch (InterruptedException e) {
+			/* ignore */
+			logger.error("shutdown interrupted", e);
+		}
 		synchronized (this) {
 			if (advAcc != null)
 				advAcc.close();
@@ -343,10 +364,17 @@ public class ApplicationManagerImpl implements ApplicationManager, TimerRemovedL
 		}
 		resMan.close();
 		tracker.closeWebAccessManager(appID);
-		if (!executor.isTerminated()) 
-			logger.error("App {} did not shut down properly, there are still running tasks",appID.getIDString());
-		else
+		if (!executor.isTerminated()) {
+			logger.error("App {} did not shut down properly, there are still running tasks!",appID.getIDString());
+			workQueue.forEach(f -> {
+				if (!f.getKey().isDone()) {
+					logger.error("unfinished task: {} / {}", f.getValue().getClass().getCanonicalName(), f.getValue().toString());
+				}
+			});
+		} else {
 			logger.debug("shut down application manager for app '{}'", appID.getIDString());
+		}
+		workQueue.clear();
 		((AppIDImpl) appID).close();
 	}
 
@@ -356,11 +384,12 @@ public class ApplicationManagerImpl implements ApplicationManager, TimerRemovedL
 			return null;
 		}
 		Future<T> f = executor.submit(application);
-		workQueue.add(f);
+		workQueue.add(new AbstractMap.SimpleImmutableEntry<>(f, application));
 		if (workQueue.size() > WORKQUEUE_FORCE_DRAIN_SIZE) {
-			final Future<?> future = workQueue.peek();
-			if (future != null && future.isDone()) {
-				executor.submit(drainWorkQueueTask);
+			final Map.Entry<Future<?>, Callable<?>> future = workQueue.peek();
+			if (future != null && future.getKey().isDone()) {
+				Future<Void> df = executor.submit(drainWorkQueueTask);
+				workQueue.add(new AbstractMap.SimpleImmutableEntry<>(df, drainWorkQueueTask));
 			}
 		}
 		return f;
@@ -371,10 +400,10 @@ public class ApplicationManagerImpl implements ApplicationManager, TimerRemovedL
 	 * Synchronization note: must be called in app thread only.
 	 */
 	protected void drainWorkQueue() {
-		while (!workQueue.isEmpty() && workQueue.peek().isDone()) {
-			Future<?> f = workQueue.poll();
+		while (!workQueue.isEmpty() && workQueue.peek().getKey().isDone()) {
+			Map.Entry<Future<?>, Callable<?>> f = workQueue.poll();
 			try {
-				f.get();
+				f.getKey().get();
 			} catch (ExecutionException ee) {
 				reportException(ee.getCause());
 			} catch (InterruptedException ie) {

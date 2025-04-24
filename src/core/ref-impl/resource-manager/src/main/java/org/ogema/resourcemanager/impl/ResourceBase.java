@@ -1960,7 +1960,7 @@ if(RES_TO_TEST_CREATE != null && getPath().contains(RES_TO_TEST_CREATE)) {
 
     @Override
     public <T extends Resource> T getLocationResource() {
-    	return resMan.getApplicationManager().getResourceAccess().getResource(getLocation());
+    	return resMan.getResource(getLocation());
     }
 
     private ResourceBase getLocationResourcePrivileged() {

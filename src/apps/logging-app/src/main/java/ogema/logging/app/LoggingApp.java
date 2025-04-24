@@ -179,7 +179,7 @@ public class LoggingApp implements Application {
 	}
 	
 	RecordedDataConfiguration getLoggingConfiguration(final String path) {
-		return getLoggingConfiguration(am.getResourceAccess().getResource(path));
+		return getLoggingConfiguration(am.getResourceAccess().<Resource>getResource(path));
 	}
 	
 	static RecordedDataConfiguration getLoggingConfiguration(final Resource r) {
