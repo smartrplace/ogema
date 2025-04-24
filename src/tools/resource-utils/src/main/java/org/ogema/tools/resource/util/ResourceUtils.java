@@ -262,6 +262,8 @@ public class ResourceUtils {
 	 * @throws SecurityException
 	 * 		if the caller does not have the read permission for one of the resources necessary 
 	 * 		to access when checking for the room, typically one of the parent resources of res 
+	 * 
+	 *  TODO: Should be replaced by LogHelper#getDeviceRoom
 	 */
 	public static Room getDeviceRoom(Resource device) {
 		while (device != null) {
