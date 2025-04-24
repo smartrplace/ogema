@@ -59,6 +59,7 @@ public abstract class ThermostatUtils {
 	
 	static final int THREADS_PER_CONNECTION = 16;
 	static final Map<String, ScheduledExecutorService> PARAMETER_UPDATES_EXECUTORS = new ConcurrentHashMap<>();
+	static final Map<String, ScheduledFuture<?>> PARAMETER_UPDATE_TASKS = new ConcurrentSkipListMap<>();
 
 	private final static Map<String, Class<? extends SingleValueResource>> PARAMETERS;
 
@@ -269,28 +270,15 @@ public abstract class ThermostatUtils {
 		}
 	}
 	
-	static void sendParameters(String address, ParameterDescription.SET_TYPES set,
-			Map<String, ParameterDescription<?>> allParams, Collection<SingleValueResource> resources,
-			HomeMaticConnection conn, Logger logger) {
-		Map<String, Object> values = new HashMap<>();
-		resources.forEach(svr -> {
-			ParameterDescription<?> desc = allParams.get(svr.getName());
-			if (desc != null && desc.isWritable()) {
-				values.put(svr.getName(), ParameterListener.getResourceValue(svr, logger));
-			}
-		});
-		if (!values.isEmpty()) {
-			logger.debug("sending parameters for {}/{}: {}", address, set, values);
-			conn.performPutParamset(address, set.name(), values);
-		} else {
-			logger.debug("no parameters set on for {}/{}", address, set);
-		}
+	static void setupParameterResources(HmDevice parent, DeviceDescription desc,
+			Map<String, Map<String, ParameterDescription<?>>> paramSets,
+			HomeMaticConnection conn, Resource model, Logger logger) {
+		setupParameterResources(parent, desc, paramSets, PARAMETERS, conn, model, logger);
 	}
-	
-	static Map<String, ScheduledFuture<?>> parameterUpdateTasks = new ConcurrentSkipListMap<>();
 	
 	static void setupParameterResources(HmDevice parent, DeviceDescription desc,
 			Map<String, Map<String, ParameterDescription<?>>> paramSets,
+			Map<String, Class<? extends SingleValueResource>> parameters,
 			HomeMaticConnection conn, Resource model, Logger logger) {
 		final String address = desc.getAddress();
 		Map<String, SingleValueResource> params = new LinkedHashMap<>();
@@ -308,7 +296,7 @@ public abstract class ThermostatUtils {
 		}
 		ParameterListener l = new ParameterListener(conn, address, set.name(), logger);
 		Runnable updateValues = () -> {
-			Thread.currentThread().setName("HomeMatic Thermostats Parameter Update");
+			Thread.currentThread().setName("HomeMatic Parameter Update " + desc.getAddress());
 			try {
 				Map<String, Object> values = conn.getParamset(address, set.name());
 				int count = 0;
@@ -319,7 +307,7 @@ public abstract class ThermostatUtils {
 						continue;
 					}
 					String fbName = paramName + "_FEEDBACK";
-					SingleValueResource fb = paramList.getSubResource(fbName, PARAMETERS.get(paramName));
+					SingleValueResource fb = paramList.getSubResource(fbName, parameters.get(paramName));
 					fb.create();
 					ValueResourceUtils.setValue(fb, value);
 					fb.activate(false);
@@ -329,16 +317,16 @@ public abstract class ThermostatUtils {
 			} catch (IOException | RuntimeException ex) {
 				logger.debug("updating parameter values failed for {}: {}", address, ex.getMessage());
 			}
-			Thread.currentThread().setName("HomeMatic Thermostats Parameter Update (done)");
+			Thread.currentThread().setName(String.format("HomeMatic Parameter Update %s (done)", desc.getAddress()));
 		};
 		ResourceValueListener<BooleanResource> updateListener = (BooleanResource b) -> {
 			if (!b.getValue()) {
 				return;
 			}
 			queueParameterUpdate(address, conn, updateValues, 3000, logger);
-			logger.trace("number of pending parameter updates (all thermostat types): {}", parameterUpdateTasks.size());
+			logger.trace("number of pending parameter updates for {}: {}", conn.getConnectionUrl(), PARAMETER_UPDATE_TASKS.size());
 		};
-		PARAMETERS.forEach((p, t) -> {
+		parameters.forEach((p, t) -> {
 			if (allParams.containsKey(p)) {
 				SingleValueResource r = paramList.getSubResource(p, t);
 				if (!r.exists()) {
@@ -366,7 +354,7 @@ public abstract class ThermostatUtils {
 	}
 	
 	static void queueParameterUpdate(String address, HomeMaticConnection conn, Runnable updateValues, long delay, Logger logger) {
-		Iterator<Entry<String,ScheduledFuture<?>>> it = parameterUpdateTasks.entrySet().iterator();
+		Iterator<Entry<String,ScheduledFuture<?>>> it = PARAMETER_UPDATE_TASKS.entrySet().iterator();
 			while (it.hasNext()) {
 				Entry<String,ScheduledFuture<?>> e = it.next();
 				long delayMs = e.getValue().getDelay(TimeUnit.MILLISECONDS);
@@ -385,7 +373,7 @@ public abstract class ThermostatUtils {
 			ScheduledFuture<?> f = PARAMETER_UPDATES_EXECUTORS
 					.computeIfAbsent(conn.getConnectionUrl(), _c -> Executors.newScheduledThreadPool(THREADS_PER_CONNECTION))
 					.schedule(updateValues, delay, TimeUnit.MILLISECONDS);
-			parameterUpdateTasks.put(address, f);
+			PARAMETER_UPDATE_TASKS.put(address, f);
 	}
 
 	static void setupProgramListener(String address, HomeMaticConnection conn,
