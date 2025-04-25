@@ -404,6 +404,9 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 		} catch (XmlRpcException ex) {
 			logger.warn("failed to configure value resources for device {}, address {}: {}", dev.getPath(), address, ex.getMessage());
 			failedSetup.add(dev);
+		} catch (RuntimeException re) {
+			logger.warn("device setup for {} failed due to driver bug, will not retry", address, re);
+			failedSetup.remove(dev);
 		} finally {
 			setupInProgress = false;
 		}

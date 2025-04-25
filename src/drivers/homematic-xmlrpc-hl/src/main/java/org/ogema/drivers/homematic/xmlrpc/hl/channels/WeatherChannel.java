@@ -160,12 +160,10 @@ public class WeatherChannel extends AbstractDeviceHandler {
 
     @Override
     public boolean accept(DeviceDescription desc) {
-		/*
-		note: the HmIP-STE2-PCB is now handled by IpSte2Channel with extra support for its parameters
-		*/
         return "WEATHER".equalsIgnoreCase(desc.getType()) // WDS40, WDS100-C6-O-2
                 || "CLIMATE_TRANSCEIVER".equalsIgnoreCase(desc.getType()) // HmIP-SCTH230
-                || "WEATHER_TRANSMIT".equalsIgnoreCase(desc.getType()); // TC-IT-WM-W
+                || "WEATHER_TRANSMIT".equalsIgnoreCase(desc.getType()) // TC-IT-WM-W
+				|| "COND_SWITCH_TRANSMITTER_TEMPERATURE".equalsIgnoreCase(desc.getType());
     }
     
     private ResourceList<Sensor> getSensorList(HmDevice parent, String deviceName) {

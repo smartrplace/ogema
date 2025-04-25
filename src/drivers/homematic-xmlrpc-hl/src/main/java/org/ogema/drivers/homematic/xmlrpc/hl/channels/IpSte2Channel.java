@@ -35,7 +35,8 @@ import org.slf4j.LoggerFactory;
  *
  * @author jlapp
  */
-@Component(service = {DeviceHandlerFactory.class}, property = {Constants.SERVICE_RANKING + ":Integer=1"})
+// deactivated handler - HmIP-STE2 is handled by WeatherChannel
+//@Component(service = {DeviceHandlerFactory.class}, property = {Constants.SERVICE_RANKING + ":Integer=1"})
 public class IpSte2Channel extends AbstractDeviceHandler implements DeviceHandlerFactory {
 	
 	private final static Map<String, Class<? extends SingleValueResource>> STE2_PARAMETERS;
@@ -137,8 +138,6 @@ public class IpSte2Channel extends AbstractDeviceHandler implements DeviceHandle
 
 	@Override
 	public void setup(HmDevice device, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
-		try {
-		
 		String addr = desc.getAddress();
 		logger.debug("performing HmIP-STE2 channel setup for {}", addr);
 		String sensorName = ResourceUtils.getValidResourceName(addr);
@@ -178,12 +177,6 @@ public class IpSte2Channel extends AbstractDeviceHandler implements DeviceHandle
 			}
 		}
 		logger.debug("channel setup complete for {}: {}", addr, ts.getPath());
-		
-		} catch (Throwable t) {
-			System.out.println(t);
-			t.printStackTrace();
-			logger.error("fail!", t);
-		}
 	}
 	
 }
