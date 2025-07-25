@@ -240,6 +240,11 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
 		String parentType = parent.type().getValue();
 		return parentType != null && parentType.contains("CCU3");
 	}
+	
+	// return true for devices that actually have no battery despite listing battery parameters
+	private boolean hasNoBattery(DeviceDescription desc) {
+		return desc.getParentType().contains("BWTH24") || desc.getParentType().endsWith("WTH");
+	}
 
     @Override
     public void setup(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
@@ -295,13 +300,13 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
             mnt.rssiPeer().create();
         }
 		//boolean hasBattery = false;
-		if (values.containsKey(PARAMS.OPERATING_VOLTAGE.name())) {
+		if (values.containsKey(PARAMS.OPERATING_VOLTAGE.name()) && !hasNoBattery(desc)) {
 			mnt.battery().internalVoltage().reading().create();
 			mnt.battery().internalVoltage().activate(false);
 			mnt.battery().activate(false);
 			//hasBattery = true;
 		}
-		if (values.containsKey(PARAMS.LOWBAT.name()) || values.containsKey(PARAMS.LOW_BAT.name())) {
+		if ((values.containsKey(PARAMS.LOWBAT.name()) || values.containsKey(PARAMS.LOW_BAT.name())) && !hasNoBattery(desc)) {
 			mnt.battery().chargeSensor().reading().create();
 			mnt.battery().chargeSensor().activate(false);
 			mnt.battery().activate(false);
