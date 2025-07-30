@@ -280,6 +280,13 @@ public abstract class ThermostatUtils {
 			Map<String, Map<String, ParameterDescription<?>>> paramSets,
 			Map<String, Class<? extends SingleValueResource>> parameters,
 			HomeMaticConnection conn, Resource model, Logger logger) {
+		setupParameterResources(parent, desc, paramSets, parameters, conn, model, true, logger);
+	}
+	
+	static void setupParameterResources(HmDevice parent, DeviceDescription desc,
+			Map<String, Map<String, ParameterDescription<?>>> paramSets,
+			Map<String, Class<? extends SingleValueResource>> parameters,
+			HomeMaticConnection conn, Resource model, boolean updateOnSetup, Logger logger) {
 		final String address = desc.getAddress();
 		Map<String, SingleValueResource> params = new LinkedHashMap<>();
 		ParameterDescription.SET_TYPES set = ParameterDescription.SET_TYPES.MASTER;
@@ -350,7 +357,9 @@ public abstract class ThermostatUtils {
 		update.create();
 		update.addValueListener(updateListener, true);
 		update.activate(false);
-		queueParameterUpdate(address, conn, updateValues, 3000, logger);
+		if (updateOnSetup) {
+			queueParameterUpdate(address, conn, updateValues, 3000, logger);
+		}
 	}
 	
 	static void queueParameterUpdate(String address, HomeMaticConnection conn, Runnable updateValues, long delay, Logger logger) {
