@@ -133,7 +133,7 @@ public class IpWeatherRoomSensorChannel extends AbstractDeviceHandler implements
     	String parentType = desc.getParentType();
     	String type = desc.getType();
     	if("HmIP-STH".equalsIgnoreCase(desc.getParentType()) || "HmIP-STHO".equalsIgnoreCase(desc.getParentType())) {
-    		System.out.println("Type for "+parentType+" : "+type);
+    		//System.out.println("Type for "+parentType+" : "+type);
     		return "HEATING_CLIMATECONTROL_TRANSCEIVER".equalsIgnoreCase(desc.getType())
     				|| "CLIMATE_TRANSCEIVER".equalsIgnoreCase(desc.getType());
     	}

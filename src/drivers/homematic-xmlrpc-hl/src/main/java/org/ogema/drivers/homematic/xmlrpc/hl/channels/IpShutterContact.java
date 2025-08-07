@@ -39,7 +39,7 @@ import org.osgi.service.component.annotations.Component;
  *
  * @author jlapp
  */
-@Component(service = {DeviceHandlerFactory.class}, property = {Constants.SERVICE_RANKING + ":Integer=1"})
+@Component(service = {DeviceHandlerFactory.class}, property = {Constants.SERVICE_RANKING + ":Integer=10"})
 public class IpShutterContact extends AbstractDeviceHandler implements DeviceHandlerFactory {
 
     Logger logger = LoggerFactory.getLogger(getClass());
@@ -92,8 +92,8 @@ public class IpShutterContact extends AbstractDeviceHandler implements DeviceHan
 
     @Override
     public boolean accept(DeviceDescription desc) {
-        //return ("HMIP-SWDO".equalsIgnoreCase(desc.getParentType()) || "HMIP-SWDM".equalsIgnoreCase(desc.getParentType()))
-		return (desc.getParentType().toUpperCase().startsWith("HMIP-SWDO") || "HMIP-SWDM".equalsIgnoreCase(desc.getParentType()))
+		//return (desc.getParentType().toUpperCase().startsWith("HMIP-SWDO") || "HMIP-SWDM".equalsIgnoreCase(desc.getParentType()))
+		return desc.getParentType().toUpperCase().startsWith("HMIP")
                 && "SHUTTER_CONTACT".equalsIgnoreCase(desc.getType());
     }
 

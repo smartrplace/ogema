@@ -81,13 +81,9 @@ public class ShutterContactChannel extends AbstractDeviceHandler {
 
     @Override
     public boolean accept(DeviceDescription desc) {
-        return accept(desc.getType());
+		return "SHUTTER_CONTACT".equalsIgnoreCase(desc.getType()) && !desc.getParentType().toUpperCase().startsWith("HMIP");
     }
     
-    private boolean accept(String channelType) {
-        return "SHUTTER_CONTACT".equalsIgnoreCase(channelType);
-    }
-
     @Override
     public void setup(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
         logger.debug("setup SHUTTER_CONTACT handler for address {}", desc.getAddress());
