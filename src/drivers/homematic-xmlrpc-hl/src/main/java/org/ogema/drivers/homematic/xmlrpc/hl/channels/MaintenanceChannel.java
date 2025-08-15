@@ -32,6 +32,7 @@ import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.FloatResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
+import org.ogema.core.model.simple.StringResource;
 
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmMaintenance;
@@ -61,6 +62,11 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
 	
 	public static final float BATTERY_CHARGE_LOW = 0.1f;
 	public static final float BATTERY_CHARGE_OK = 1.0f;
+	
+	public static enum DisplayOrientation {
+		LEFT,
+		RIGHT
+	}
 
     public static enum PARAMS {
 
@@ -69,6 +75,7 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
         DUTY_CYCLE, // boolean (HAP)
         DUTY_CYCLE_LEVEL, // 0..100% (HAP)
         ERROR_CODE,
+		IP_ADDRESS, // (HAP)
         LOWBAT, //XXX typo, or is this actually used anywhere?
 		LOW_BAT,
         OPERATING_VOLTAGE,
@@ -193,6 +200,12 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
                         mnt.errorCode().create().activate(false);
                     }
                     mnt.errorCode().setValue(e.getValueInt());
+				} else if (PARAMS.IP_ADDRESS.name().equals(e.getValueKey())) {
+					StringResource ip = mnt.getSubResource("ipAddress", StringResource.class).create();
+					if (!e.getValueString().equals(ip.getValue())) {
+						ip.setValue(e.getValueString());
+						ip.activate(false);
+					}
                 } else if (PARAMS.LOWBAT.name().equals(e.getValueKey()) || PARAMS.LOW_BAT.name().equals(e.getValueKey())) {
                     if (!mnt.batteryLow().isActive()) {
                         mnt.batteryLow().create().activate(false);
@@ -312,6 +325,9 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
 			mnt.battery().activate(false);
 			//hasBattery = true;
 		}
+		if (values.containsKey(PARAMS.IP_ADDRESS.name())) {
+			mnt.getSubResource("ipAddress", StringResource.class).create();
+		}
 		/*
 		if (!hasBattery && mnt.battery().exists() && !mnt.battery().isReference(true)) {
 			mnt.battery().delete();
@@ -332,6 +348,22 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
                             Collections.singletonMap("GLOBAL_BUTTON_LOCK", val));
                 }, true);
             }
+			if (master.containsKey("MOUNTING_ORIENTATION")) {
+				IntegerResource displayOrientation = mnt.getSubResource("displayOrientation", IntegerResource.class).create();
+				displayOrientation.activate(false);
+				displayOrientation.addValueListener((IntegerResource r) -> {
+					int val = r.getValue();
+					if (val >= 0 && val < DisplayOrientation.values().length) {
+						DisplayOrientation o = DisplayOrientation.values()[val];
+						logger.debug("setting MOUNTING_ORIENTATION on {} to {} ({})",
+								desc.getAddress(), o, val);
+						conn.performPutParamset(desc.getAddress(), "MASTER", Collections.singletonMap("MOUNTING_ORIENTATION", o.name()));
+					} else {
+						logger.warn("value out of range: {} = {}", displayOrientation.getPath(), val);
+					}
+					
+				}, true);
+			}
         }
 		
 		ChannelUtils.setupParameterResources(parent, desc, paramSets,
