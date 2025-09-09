@@ -1,6 +1,7 @@
 package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +19,7 @@ import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmMaintenance;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
+import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription.SET_TYPES;
 import org.ogema.model.devices.storage.ElectricityStorage;
@@ -145,6 +147,56 @@ public class ChannelUtils {
 			battery.setAsReference(mntn.battery());
 		}
     }
+	
+	public static List<HmEvent> paramSetAsEvents(String deviceAddress, Map<String, Object> values) {
+		List<HmEvent> rval = new ArrayList<>();
+		for (Map.Entry<String, Object> e: values.entrySet()) {
+			Object value = e.getValue();
+			HmEvent ev = new HmEvent() {
+				@Override
+				public String getInterfaceId() {
+					throw new UnsupportedOperationException("Not supported yet.");
+				}
+
+				@Override
+				public String getAddress() {
+					return deviceAddress;
+				}
+
+				@Override
+				public String getValueKey() {
+					return e.getKey();
+				}
+
+				@Override
+				public Object getValue() {
+					return e.getValue();
+				}
+
+				@Override
+				public boolean getValueBoolean() {
+					return Boolean.parseBoolean(getValueString());
+				}
+
+				@Override
+				public float getValueFloat() {
+					return ((Number) value).floatValue();
+				}
+
+				@Override
+				public int getValueInt() {
+					return ((Number) value).intValue();
+				}
+
+				@Override
+				public String getValueString() {
+					return value.toString();
+				}
+			};
+			rval.add(ev);
+		}
+		return rval;
+	}
 
 	
 }

@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -104,6 +105,7 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
     Logger logger = LoggerFactory.getLogger(getClass());
     Collection<KnownDevice> knownDevices = Collections.newSetFromMap(new ConcurrentHashMap<>());
     ScheduledExecutorService exec;
+	Map<String, MaintenanceEventListener> listeners = new ConcurrentHashMap<>();
 
     private class KnownDevice {
 
@@ -166,6 +168,14 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
             this.address = address;
             this.parent = parent;
         }
+		
+		public boolean updateValues() throws IOException {
+			logger.trace("requesting all VALUES on {}", address);
+			Map<String, Object> values = conn.getParamset(address, "VALUES");
+			logger.trace("received VALUES from {}: {}", address, values);
+			event(ChannelUtils.paramSetAsEvents(address, values));
+			return true;
+		}
 		
         @Override
         public void event(List<HmEvent> events) {
@@ -369,7 +379,9 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
 		ChannelUtils.setupParameterResources(parent, desc, paramSets,
 				ParameterDescription.SET_TYPES.MASTER, PARAMETERS, conn, mnt, logger);
         
-        conn.addEventListener(new MaintenanceEventListener(parent, mnt, desc.getAddress()));
+		MaintenanceEventListener l = new MaintenanceEventListener(parent, mnt, desc.getAddress());
+        conn.addEventListener(l);
+		listeners.put(desc.getAddress(), l);
         knownDevices.add(new KnownDevice(mnt, desc, values));
         update(mnt, desc.getAddress());
     }
@@ -429,19 +441,18 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
     @Override
     public boolean update(HmDevice device) {
         HmDevice top = conn.getToplevelDevice(device);
-        return findChannels(top, "MAINTENANCE").findAny()
-                .map(d -> update(top, d.address().getValue())).orElse(Boolean.FALSE);
+		Optional<MaintenanceEventListener> mc = findChannels(top, "MAINTENANCE").findAny()
+				.map(d -> listeners.get(d.address().getValue()));
+		return mc.map(l -> {
+			try {
+				return l.updateValues();
+			} catch (IOException ioex) {
+				logger.debug("exception when updating values on {}", l.address, ioex);
+				return false;
+			}
+		}).orElse(false);
     }
 
-    private boolean update(HmDevice toplevel, String channelAddress) {
-        List<HmMaintenance> mnt = toplevel.getSubResources(HmMaintenance.class, false);
-        if (!mnt.isEmpty()) {
-            logger.debug("trying to update RSSI for {}", mnt.get(0));
-            return update(mnt.get(0), channelAddress);
-        }
-        return false;
-    }
-	
 	boolean isCyclicInfoDisabled(HmMaintenance resource) {
 		try {
 			Resource hmParametersMaster = resource.getSubResource("HmParametersMaster");
@@ -457,7 +468,7 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
 			return false;
 		}
 	}
-
+	
     private boolean update(HmMaintenance m, String channelAddress) {
 		if (isCyclicInfoDisabled(m)) {
 			logger.trace("not updating RSSI on {}: cyclic updates are disabled.", m.getPath());

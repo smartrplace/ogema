@@ -82,6 +82,7 @@ import org.slf4j.LoggerFactory;
 			"osgi.command.function=checkPrograms",
 			"osgi.command.function=listDevices",
 			"osgi.command.function=listCcuDevices",
+			"osgi.command.function=update",
 			"osgi.command.function=writeCounts"})
 public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 
