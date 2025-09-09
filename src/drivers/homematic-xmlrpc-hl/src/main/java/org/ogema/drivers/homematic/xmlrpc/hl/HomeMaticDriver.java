@@ -60,6 +60,7 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.ogema.model.devices.buildingtechnology.ThermostatProgram;
 import org.ogema.model.prototypes.PhysicalElement;
+import org.ogema.tools.driver.api.HomeMaticDeviceAccessI;
 import org.osgi.framework.Constants;
 import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.ComponentContext;
@@ -98,6 +99,7 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 
 	private ScheduledFuture<?> serviceRegistrationAction;
 	private volatile ServiceRegistration<HomeMaticDeviceAccess> serviceRegistration;
+	private volatile ServiceRegistration<HomeMaticDeviceAccessI> serviceRegistrationForI;
 
 	private final SortedSet<HandlerRegistration> handlerFactories = new TreeSet<>();
 
@@ -191,6 +193,7 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 		ScheduledExecutorService ses = Executors.newSingleThreadScheduledExecutor();
 		serviceRegistrationAction = ses.schedule(() -> {
 			serviceRegistration = ctx.getBundleContext().registerService(HomeMaticDeviceAccess.class, this, null);
+			serviceRegistrationForI = ctx.getBundleContext().registerService(HomeMaticDeviceAccessI.class, this, null);
 			logger.debug("registered HomeMaticDeviceAccess, available handlers: {}", handlerFactories);
 		}, 3, TimeUnit.SECONDS);
 		ses.shutdown();
@@ -201,6 +204,9 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 		serviceRegistrationAction.cancel(true);
 		if (serviceRegistration != null) {
 			serviceRegistration.unregister();
+		}
+		if (serviceRegistrationForI != null) {
+			serviceRegistrationForI.unregister();
 		}
 	}
 
