@@ -158,6 +158,8 @@ public class LoginServlet extends HttpServlet {
 			resource = getClass().getResource(ICON);
 			resp.setContentType("image/" + ICON_TYPE);
 		} else {
+			resp.setCharacterEncoding("UTF-8");
+			resp.setContentType("text/html");
 			resource = getClass().getResource("false".equalsIgnoreCase(req.getParameter("usecdn")) ? loginPathLocal : loginPath);
 		}
 		InputStream is;

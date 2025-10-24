@@ -381,6 +381,13 @@ public class OgemaHttpContext implements HttpContext {
 		String sessionid = httpses.getId();
 		response.addHeader("SET-COOKIE", cookie + "=" + sessionid + COOKIE_ATTRIBUTES);
 
+		if (sesAuth == null) {
+			logger.debug("handleSecurity: SessionAuth still null (how?), returning false");
+			return false;
+		} else if (sesAuth.getName() == null) {
+			logger.warn("handleSecurity: have SessionAuth but name is null (bug?), returning false");
+			return false;
+		}
 		// Look for access right of the user to the app sites according this http context.
 		String usrName = sesAuth.getName();
 		boolean permitted = false;
@@ -394,8 +401,9 @@ public class OgemaHttpContext implements HttpContext {
 		}
 		else {
 			accessMngr.setCurrentUser(usrName);
-			if (Configuration.DEBUG)
-				logger.debug("User authorization successful.");
+			if (Configuration.DEBUG) {
+				logger.debug("User authorization successful for: {}", usrName);
+			}
 			String id = httpses.getId();
 			// If a resource and not a servlet is requested
 			// the session infos are to be hashed to register an otp session tupel.
