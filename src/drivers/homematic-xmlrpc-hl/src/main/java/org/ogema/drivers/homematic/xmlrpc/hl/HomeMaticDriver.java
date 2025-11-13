@@ -28,9 +28,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -104,7 +104,7 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 	private final SortedSet<HandlerRegistration> handlerFactories = new TreeSet<>();
 
 	// store accepted devices (by address) so they are not offered again on a different connection
-	private final Map<String, ConnectedDevice> acceptedDevices = new TreeMap<>();
+	private final Map<String, ConnectedDevice> acceptedDevices = new ConcurrentSkipListMap<>();
 
 	private static class ConnectedDevice {
 
