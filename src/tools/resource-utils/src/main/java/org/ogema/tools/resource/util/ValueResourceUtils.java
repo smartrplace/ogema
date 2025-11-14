@@ -32,6 +32,7 @@ import org.ogema.core.channelmanager.measurements.Quality;
 import org.ogema.core.channelmanager.measurements.SampledValue;
 import org.ogema.core.channelmanager.measurements.StringValue;
 import org.ogema.core.channelmanager.measurements.Value;
+import org.ogema.core.model.RecordableResource;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.ValueResource;
@@ -51,6 +52,7 @@ import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.model.simple.TimeResource;
 import org.ogema.core.model.units.PhysicalUnitResource;
 import org.ogema.core.model.units.TemperatureResource;
+import org.ogema.core.recordeddata.RecordedDataConfiguration;
 import org.ogema.core.timeseries.InterpolationMode;
 import org.ogema.core.timeseries.ReadOnlyTimeSeries;
 import org.ogema.tools.timeseries.api.FloatTimeSeries;
@@ -82,6 +84,7 @@ public class ValueResourceUtils {
 	 * </ul>
 	 * @param resource
 	 * @param value
+	 * @param timestamp (optional)
 	 * @throws ClassCastException
 	 * 		If the value passed is not of the expected type, and the resource is not of SingleValueType
 	 * @throws NumberFormatException
@@ -89,47 +92,95 @@ public class ValueResourceUtils {
 	 * 		
 	 */
 	@SuppressWarnings("unchecked")
-	public static boolean setValue(ValueResource resource, Object value) throws ClassCastException, NumberFormatException {
+	public static boolean setValue(ValueResource resource, Object value, Long timestamp) throws ClassCastException, NumberFormatException {
+		if (timestamp != null) {
+			if (resource instanceof SingleValueResource) {
+				if (value instanceof Float) {
+					return setValue((SingleValueResource) resource, (float) (Float) value, timestamp);
+				} else if (value instanceof Double) {
+					return setValue((SingleValueResource) resource, (float) (double) (Double) value, timestamp);
+				} else if (value instanceof Integer) {
+					return setValue((SingleValueResource) resource, (float) (Integer) value, timestamp);
+				} else if (value instanceof Long) {
+					return setValue((SingleValueResource) resource, (float) (Long) value, timestamp);
+				} else if (value instanceof Boolean) {
+					return setValue((SingleValueResource) resource, (Boolean) value ? 1.0f : 0.0f, timestamp);
+				}
+
+				return setValue((SingleValueResource) resource, value.toString(), timestamp);
+			} else if (resource instanceof Schedule) {
+				Collection<SampledValue> values;
+				if (value instanceof ReadOnlyTimeSeries) {
+					values = ((ReadOnlyTimeSeries) value).getValues(Long.MIN_VALUE);
+				} else if (value instanceof List) {
+					values = (Collection<SampledValue>) value;
+				} else {
+					throw new IllegalArgumentException("Schedule value must be either a time series or a collection of SampledValue objects");
+				}
+				((Schedule) resource).replaceValues(Long.MIN_VALUE, Long.MAX_VALUE, values);
+				return true;
+			} else if (resource instanceof IntegerArrayResource) {
+				return ((IntegerArrayResource) resource).setValues((int[]) value, timestamp);
+			} else if (resource instanceof FloatArrayResource) {
+				return ((FloatArrayResource) resource).setValues((float[]) value, timestamp);
+			} else if (resource instanceof TimeArrayResource) {
+				return ((TimeArrayResource) resource).setValues((long[]) value, timestamp);
+			} else if (resource instanceof BooleanArrayResource) {
+				return ((BooleanArrayResource) resource).setValues((boolean[]) value, timestamp);
+			} else if (resource instanceof StringArrayResource) {
+				return ((StringArrayResource) resource).setValues((String[]) value, timestamp);
+			} else if (resource instanceof ByteArrayResource) {
+				return ((ByteArrayResource) resource).setValues((byte[]) value, timestamp);
+			} else if (resource instanceof org.ogema.core.model.simple.OpaqueResource) {
+				return ((org.ogema.core.model.simple.OpaqueResource) resource).setValue((byte[]) value, timestamp);
+			}
+			return false;
+		}
 		if (resource instanceof SingleValueResource) {
-			if(value instanceof Float)
-				return setValue((SingleValueResource) resource, (float)(Float)value);
-			else if(value instanceof Double)
-				return setValue((SingleValueResource) resource, (float)(double)(Double)value);
-			else if(value instanceof Integer)
-				return setValue((SingleValueResource) resource, (float)(Integer)value);
-			else if(value instanceof Long)
-				return setValue((SingleValueResource) resource, (float)(Long)value);
-			else if(value instanceof Boolean)
-				return setValue((SingleValueResource) resource, (Boolean)value?1.0f:0.0f);
+			if (value instanceof Float) {
+				return setValue((SingleValueResource) resource, (float) (Float) value);
+			} else if (value instanceof Double) {
+				return setValue((SingleValueResource) resource, (float) (double) (Double) value);
+			} else if (value instanceof Integer) {
+				return setValue((SingleValueResource) resource, (float) (Integer) value);
+			} else if (value instanceof Long) {
+				return setValue((SingleValueResource) resource, (float) (Long) value);
+			} else if (value instanceof Boolean) {
+				return setValue((SingleValueResource) resource, (Boolean) value ? 1.0f : 0.0f);
+			}
 
 			return setValue((SingleValueResource) resource, value.toString());
-		}
-		else if (resource instanceof Schedule) {
+		} else if (resource instanceof Schedule) {
 			Collection<SampledValue> values;
-			if (value instanceof ReadOnlyTimeSeries)
+			if (value instanceof ReadOnlyTimeSeries) {
 				values = ((ReadOnlyTimeSeries) value).getValues(Long.MIN_VALUE);
-			else if (value instanceof List) 
+			} else if (value instanceof List) {
 				values = (Collection<SampledValue>) value;
-			else 
+			} else {
 				throw new IllegalArgumentException("Schedule value must be either a time series or a collection of SampledValue objects");
+			}
 			((Schedule) resource).replaceValues(Long.MIN_VALUE, Long.MAX_VALUE, values);
 			return true;
-		}
-		else if (resource instanceof IntegerArrayResource) 
+		} else if (resource instanceof IntegerArrayResource) {
 			return ((IntegerArrayResource) resource).setValues((int[]) value);
-		else if (resource instanceof FloatArrayResource) 
+		} else if (resource instanceof FloatArrayResource) {
 			return ((FloatArrayResource) resource).setValues((float[]) value);
-		else if (resource instanceof TimeArrayResource)
+		} else if (resource instanceof TimeArrayResource) {
 			return ((TimeArrayResource) resource).setValues((long[]) value);
-		else if (resource instanceof BooleanArrayResource)
+		} else if (resource instanceof BooleanArrayResource) {
 			return ((BooleanArrayResource) resource).setValues((boolean[]) value);
-		else if (resource instanceof StringArrayResource)
+		} else if (resource instanceof StringArrayResource) {
 			return ((StringArrayResource) resource).setValues((String[]) value);
-		else if (resource instanceof ByteArrayResource)
+		} else if (resource instanceof ByteArrayResource) {
 			return ((ByteArrayResource) resource).setValues((byte[]) value);
-		else if (resource instanceof org.ogema.core.model.simple.OpaqueResource)
+		} else if (resource instanceof org.ogema.core.model.simple.OpaqueResource) {
 			return ((org.ogema.core.model.simple.OpaqueResource) resource).setValue((byte[]) value);
+		}
 		return false;
+	}
+	
+	public static boolean setValue(ValueResource resource, Object value) throws ClassCastException, NumberFormatException {
+		return setValue(resource, value, null);
 	}
 	
 	/**
@@ -166,6 +217,10 @@ public class ValueResourceUtils {
 			return ((org.ogema.core.model.simple.OpaqueResource) resource).getValue();
 		return null; // should not happen
 	}
+	
+	public static boolean setValue(SingleValueResource resource, String value) throws NumberFormatException {
+		return setValue(resource, value, null);
+	}
 
 	/**
 	 * Set the resource value. The <code>value</code> parameter must be parsable to the primitive (or String)
@@ -173,10 +228,25 @@ public class ValueResourceUtils {
 	 * then <code>value</code> must be parsable as float.
 	 * @param resource
 	 * @param value
+	 * @param timestamp value timestamp
 	 * @return 
 	 * @throws NumberFormatException
 	 */
-	public static boolean setValue(SingleValueResource resource, String value) throws NumberFormatException {
+	public static boolean setValue(SingleValueResource resource, String value, Long timestamp) throws NumberFormatException {
+		if (timestamp != null) {
+			if (resource instanceof StringResource) {
+				return ((StringResource) resource).setValue(value, timestamp);
+			} else if (resource instanceof FloatResource) {
+				return ((FloatResource) resource).setValue(Float.parseFloat(value), timestamp);
+			} else if (resource instanceof IntegerResource) {
+				return ((IntegerResource) resource).setValue(Integer.parseInt(value), timestamp);
+			} else if (resource instanceof BooleanResource) {
+				return ((BooleanResource) resource).setValue(Boolean.parseBoolean(value), timestamp);
+			} else if (resource instanceof TimeResource) {
+				return ((TimeResource) resource).setValue(Long.parseLong(value), timestamp);
+			}
+			return false;
+		}
 		if (resource instanceof StringResource) {
 			return ((StringResource) resource).setValue(value);
 		}
@@ -194,15 +264,37 @@ public class ValueResourceUtils {
 		}
 		return false;
 	}
+	
+	/**
+	 * @see #setValue(org.ogema.core.model.simple.SingleValueResource, float, java.lang.Long) 
+	 */
+	public static boolean setValue(SingleValueResource resource, float value) {
+		return setValue(resource, value, null);
+	}
 
 	/**
 	 * Set the resource value; the passed float value is converted by the respective 
 	 * canonical conversion method to the primitive (or String) value type of <code>resource</code>. 
 	 * @param resource
 	 * @param value
-	 * @return 
+	 * @param timestamp value timestamp (optional)
+	 * @return return value of the resource setValue call
 	 */
-	public static boolean setValue(SingleValueResource resource, float value) {
+	public static boolean setValue(SingleValueResource resource, float value, Long timestamp) {
+		if (timestamp != null) {
+			if (resource instanceof StringResource) {
+				return ((StringResource) resource).setValue(String.valueOf(value), timestamp);
+			} else if (resource instanceof FloatResource) {
+				return ((FloatResource) resource).setValue(value, timestamp);
+			} else if (resource instanceof IntegerResource) {
+				return ((IntegerResource) resource).setValue((int) value, timestamp);
+			} else if (resource instanceof BooleanResource) {
+				return ((BooleanResource) resource).setValue(value == 1, timestamp);
+			} else if (resource instanceof TimeResource) {
+				return ((TimeResource) resource).setValue((long) value, timestamp);
+			}
+			return false;
+		}
 		if (resource instanceof StringResource) {
 			return ((StringResource) resource).setValue(String.valueOf(value));
 		}
@@ -213,12 +305,16 @@ public class ValueResourceUtils {
 			return ((IntegerResource) resource).setValue((int) value);
 		}
 		else if (resource instanceof BooleanResource) {
-			return ((BooleanResource) resource).setValue(value == 1 ? true : false);
+			return ((BooleanResource) resource).setValue(value == 1);
 		}
 		else if (resource instanceof TimeResource) {
 			return ((TimeResource) resource).setValue((long) value);
 		}
 		return false;
+	}
+	
+	public static void setValue(SingleValueResource resource, int value) {
+		setValue(resource, value, null);
 	}
 
 	/**
@@ -226,8 +322,23 @@ public class ValueResourceUtils {
 	 * canonical conversion method to the primitive (or String) value type of <code>resource</code>. 
 	 * @param resource
 	 * @param value
+	 * @param timestamp value timestamp (optional)
 	 */
-	public static void setValue(SingleValueResource resource, int value) {
+	public static void setValue(SingleValueResource resource, int value, Long timestamp) {
+		if (timestamp != null) {
+			if (resource instanceof StringResource) {
+				((StringResource) resource).setValue(String.valueOf(value), timestamp);
+			} else if (resource instanceof FloatResource) {
+				((FloatResource) resource).setValue(value, timestamp);
+			} else if (resource instanceof IntegerResource) {
+				((IntegerResource) resource).setValue(value, timestamp);
+			} else if (resource instanceof BooleanResource) {
+				((BooleanResource) resource).setValue(value == 1, timestamp);
+			} else if (resource instanceof TimeResource) {
+				((TimeResource) resource).setValue(value, timestamp);
+			}
+			return;
+		}
 		if (resource instanceof StringResource) {
 			((StringResource) resource).setValue(String.valueOf(value));
 		}
@@ -238,7 +349,7 @@ public class ValueResourceUtils {
 			((IntegerResource) resource).setValue(value);
 		}
 		else if (resource instanceof BooleanResource) {
-			((BooleanResource) resource).setValue(value == 1 ? true : false);
+			((BooleanResource) resource).setValue(value == 1);
 		}
 		else if (resource instanceof TimeResource) {
 			((TimeResource) resource).setValue(value);
@@ -1402,6 +1513,51 @@ public class ValueResourceUtils {
 		if (res1 instanceof org.ogema.core.model.simple.OpaqueResource)
 			return ((org.ogema.core.model.simple.OpaqueResource) res1).getValue().equals(((org.ogema.core.model.simple.OpaqueResource) res2).getValue());
 		throw new IllegalStateException("unknown resource type in "+res1.getLocation()); // should not happen
+	}
+	
+	/**
+	 * Creates and activates a resource, sets a values and optionally performs
+	 * activation of parent resources (up to an upper bound) and activates resource
+	 * logging.
+	 * 
+	 * @param res Resource to activate
+	 * @param upper activate resources up to this ancestor resource (optional, null means no additional resources are activated)
+	 * @param value value to set on the resource.
+	 * @param timestamp set this value timestamp along with the value (optional).
+	 * @param rdc activate recording with this configuration (optional).
+	 * @param recheck always perform additional activation and recorded data activation, otherwise only perform these steps if res was not yet active.
+	 */
+	public static void initResource(RecordableResource res, Resource upper, Object value, Long timestamp, RecordedDataConfiguration rdc, boolean recheck) {
+		res.create();
+		if (rdc != null && (recheck || !res.isActive())) {
+			if (res.getHistoricalData().getConfiguration() == null) {
+				res.getHistoricalData().setConfiguration(rdc);
+			}
+		}
+		if (upper != null && (recheck || !res.isActive())) {
+			activateUpTo(res, upper);
+		} else {
+			res.activate(false);
+		}
+		setValue(res, value, timestamp);
+	}
+	
+	public static void initResource(ValueResource res, Resource upper, Object value, Long timestamp, boolean recheck) {
+		res.create();
+		if (upper != null && (recheck || !res.isActive())) {
+			activateUpTo(res, upper);
+		} else {
+			res.activate(false);
+		}
+		setValue(res, value, timestamp);
+	}
+	
+	public static void activateUpTo(Resource start, Resource upper) {
+		Objects.requireNonNull(start);
+		while (start != null && !start.equals(upper)) {
+			start.activate(false);
+			start = start.getParent();
+		}
 	}
 	
 }

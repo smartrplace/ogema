@@ -60,7 +60,32 @@ public class DefaultRecordedData implements RecordedData {
 	public static final String SET_LAST_RECORDED_VALUE_PROP = "org.ogema.resources.setLastRecordedValueOnStart";
 
 	final static boolean SECURITY_ENABLED = System.getSecurityManager() != null;
-	final static boolean SET_LAST_RECORDED_VALUE = Boolean.getBoolean(SET_LAST_RECORDED_VALUE_PROP);
+	//final static boolean SET_LAST_RECORDED_VALUE = Boolean.getBoolean(SET_LAST_RECORDED_VALUE_PROP);
+	static RecordedValuesRestoreMode SET_LAST_RECORDED_VALUE;
+	
+	enum RecordedValuesRestoreMode {
+		All,
+		NonPersistent,
+		Persistent,
+		None
+	}
+	
+	static {
+		String mode = System.getProperty(SET_LAST_RECORDED_VALUE_PROP, "false").trim().toUpperCase();
+		if (mode.equals("ALL") || mode.equals("TRUE")) {
+			SET_LAST_RECORDED_VALUE = RecordedValuesRestoreMode.All;
+		} else if (mode.equals("NONPERSISTENT")) {
+			SET_LAST_RECORDED_VALUE = RecordedValuesRestoreMode.NonPersistent;
+		} else if (mode.equals("PERSISTENT")) {
+			SET_LAST_RECORDED_VALUE = RecordedValuesRestoreMode.Persistent;
+		} else if (mode.equals("NONE") || mode.equals("FALSE")) {
+			SET_LAST_RECORDED_VALUE = RecordedValuesRestoreMode.None;
+		} else {
+			LoggerFactory.getLogger(DefaultRecordedData.class).error("");
+			System.err.println("unkown value ");
+		}
+	}
+	
 
 	protected final String id;
 	protected final DataRecorder dataAccess;
@@ -94,8 +119,21 @@ public class DefaultRecordedData implements RecordedData {
 			config = tsData.getConfiguration();
 			createUpdater();
 			setConfiguration(config);
-			if (SET_LAST_RECORDED_VALUE) {
-				setLastRecordedValue();
+			switch (SET_LAST_RECORDED_VALUE) {
+				case None : break;
+				case All : setLastRecordedValue(); break;
+				case NonPersistent : {
+					if (el.isNonpersistent()) {
+						setLastRecordedValue();
+					}
+					break;
+				}
+				case Persistent : {
+					if (!el.isNonpersistent()) {
+						setLastRecordedValue();
+					}
+					break;
+				}
 			}
 		}
 	}

@@ -1,6 +1,7 @@
 package org.ogema.tools.driver.api;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.util.List;
 
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmLogicInterface;
@@ -64,7 +65,18 @@ public interface CCUAccessI {
 	 * @param iface CCU interface
 	 * @return return value of the reboot command, 0 indicates success.
 	 * @throws IOException
+	 * @throws InterruptedIOException if the command execution was interrupted
 	 */
 	public int reboot(HmLogicInterface iface) throws IOException;
+	
+	/**
+	 * Trigger a reboot of the router connecting the CCU.
+	 * 
+	 * @param iface CCU interface
+	 * @return -1 if no router paramaters are configured on iface, otherwise return value of the reboot command (0=success).
+	 * @throws IOException
+	 * @throws InterruptedIOException if the command execution was interrupted
+	 */
+	int rebootRouter(HmLogicInterface iface) throws IOException;
 
 }

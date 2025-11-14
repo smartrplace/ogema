@@ -601,7 +601,13 @@ public class ResourcePathCommands implements Application {
 
 			public IterationState(Resource res, List<Resource> children, int childIndex) {
 				if (!(res instanceof ResourceList)) {
-					Collections.sort(children, (r1,r2) -> r1.getName().compareTo(r2.getName()));
+					Collections.sort(children, (r1,r2) -> {
+						if (r1 == null || r2 == null) {
+							System.err.printf("resource %s returned null as child%n", res.getPath());
+							return 0;
+						}
+						return r1.getName().compareTo(r2.getName());
+					});
 				}
 				this.res = res;
 				this.children = children;
@@ -664,6 +670,10 @@ public class ResourcePathCommands implements Application {
 					return true;
 				}
 				Resource next = it.children.get(it.childIndex++);
+				if (next == null) {
+					System.err.printf("resource %s has null child at index %d%n", it.res.getPath(), it.childIndex-1);
+					return false;
+				}
 				if (stack.size() - 1 < maxDepth && !visitedOnPath.contains(next.getLocationResource())) {
 					//System.out.println("push: " + next.getPath());
 					List<Resource> nextChildren = getNextChildren(next);

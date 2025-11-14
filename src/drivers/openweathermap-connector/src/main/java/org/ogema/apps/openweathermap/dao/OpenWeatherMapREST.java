@@ -139,6 +139,7 @@ public class OpenWeatherMapREST {
 	}
     
     private CurrentData getWeatherCurrent(String url) {
+		LOGGER.debug("requesting weather data from: {}", url);
         String json = util.call(url);
 		if (json == null)
 			return null;

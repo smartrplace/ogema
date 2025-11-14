@@ -109,6 +109,7 @@ public class WeatherUtil {
                 }
             }
 		} catch (NoSuchAlgorithmException | IOException e) {
+			LOGGER.error("HTTPS connection failed", e);
 			return "ERROR: " + Arrays.toString(e.getStackTrace());
 		}
 		return result;
