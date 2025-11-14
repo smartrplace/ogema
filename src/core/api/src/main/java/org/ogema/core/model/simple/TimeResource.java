@@ -16,8 +16,8 @@
 package org.ogema.core.model.simple;
 
 import org.ogema.core.channelmanager.measurements.SampledValue;
+import org.ogema.core.model.RecordableResource;
 import org.ogema.core.model.schedule.AbsoluteSchedule;
-import org.ogema.core.recordeddata.RecordedData;
 import org.ogema.core.resourcemanager.ResourceAccessException;
 import org.ogema.core.resourcemanager.VirtualResourceException;
 import org.ogema.core.timeseries.TimeSeries;
@@ -27,7 +27,7 @@ import org.ogema.core.timeseries.TimeSeries;
  * represented as "milliseconds since begin of 1970". Time differences always refer to physical time, not calendar time.
  * Dates are usually read from some system, so for dates the exact behavior with respect to leap seconds is not defined.
  */
-public interface TimeResource extends SingleValueResource {
+public interface TimeResource extends SingleValueResource, RecordableResource {
 
 	/**
 	 * Gets the time difference (in ms).
@@ -87,13 +87,6 @@ public interface TimeResource extends SingleValueResource {
 	 */
 	long getAndAdd(long value) throws VirtualResourceException, SecurityException, ResourceAccessException;
 	
-	/**
-	 * Gets recorded past values.
-	 * 
-	 * @return returns the handler for the recorded data.
-	 */
-	RecordedData getHistoricalData();
-
 	/**
 	 * Future prognosis for this value. The data type, unit and interpretation of
 	 * the values in the schedule are the same as the value in this. If multiple

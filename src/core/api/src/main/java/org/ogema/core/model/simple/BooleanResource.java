@@ -16,6 +16,7 @@
 package org.ogema.core.model.simple;
 
 import org.ogema.core.channelmanager.measurements.SampledValue;
+import org.ogema.core.model.RecordableResource;
 import org.ogema.core.model.schedule.AbsoluteSchedule;
 import org.ogema.core.recordeddata.RecordedData;
 import org.ogema.core.resourcemanager.ResourceAccessException;
@@ -25,7 +26,7 @@ import org.ogema.core.timeseries.TimeSeries;
 /**
  * Simple resource holding a boolean value.
  */
-public interface BooleanResource extends SingleValueResource {
+public interface BooleanResource extends SingleValueResource, RecordableResource {
 	/**
 	 * Gets the value stored in the resource.
 	 */
@@ -66,11 +67,6 @@ public interface BooleanResource extends SingleValueResource {
 	 * 		if access mode is read-only
 	 */
 	boolean getAndSet(boolean value) throws VirtualResourceException, SecurityException, ResourceAccessException;
-
-	/**
-	 * Gets an access to the value's logged data.
-	 */
-	RecordedData getHistoricalData();
 
 	/**
 	 * Future prognosis for this value. The data type, unit and interpretation of
