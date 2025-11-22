@@ -53,4 +53,8 @@ public interface RecordedDataStorage extends RecordedData {
 	 */
 	void update(RecordedDataConfiguration configuration) throws DataRecorderException;
 
+
+	default boolean isReadOnly() {
+		return true;
+	}
 }
