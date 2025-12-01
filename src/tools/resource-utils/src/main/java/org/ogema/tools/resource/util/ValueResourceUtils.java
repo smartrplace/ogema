@@ -411,8 +411,11 @@ public class ValueResourceUtils {
 		else if (resource instanceof TimeResource) {
 			return String.valueOf(((TimeResource) resource).getValue());
 		}
+		else if(!resource.exists())
+			return "--";
 		else
-			throw new RuntimeException("Unknown SingleValueResource: "+resource==null?"null":(resource.getLocation()+" :: "+resource.getResourceType().getName()));
+			return "---";
+			//throw new RuntimeException("Unknown SingleValueResource: "+resource==null?"null":(resource.getLocation()+" :: "+resource.getResourceType().getName()));
 	}
 	
 	/**
