@@ -57,6 +57,9 @@ public class SessionAuth implements HttpSessionBindingListener {
 
 	public SessionAuth(Authorization auth, AccessManager accessManager, HttpSession ses) {
 		this.auth = auth;
+		if (auth.getName() == null) {
+			logger.error("SessionAuth with null name created.", new NullPointerException("Authorization#getName is null"));
+		}
 		this.ses = ses;
 		// this.usr = user;
 		this.otpList = new ConcurrentHashMap<>();
