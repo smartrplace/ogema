@@ -307,6 +307,7 @@ public class OgemaHttpContext implements HttpContext {
 		
 		final HttpConfigManagement httpConfigs = httpConfigRef.get();
 		final HttpConfig httpConfig = httpConfigs == null ? null : httpConfigs.getConfig(owner.getBundle());
+		logger.trace("get HttpConfig (from {}) {}: {}", httpConfigs, owner.getBundle(), httpConfig);
 		if (httpConfig != null) {
 			final String allowedOrigin = httpConfig.getAllowedOrigin(request);
 			if (allowedOrigin != null) {
@@ -385,10 +386,10 @@ public class OgemaHttpContext implements HttpContext {
 			logger.debug("handleSecurity: SessionAuth still null (how?), returning false");
 			return false;
 		} else if (sesAuth.getName() == null) {
-			logger.warn("handleSecurity: have SessionAuth but name is null (bug?), returning false");
-			if(Boolean.getBoolean("org.ogema.impl.security.test.nameNull.accept"))
-				return true;
-			return false;
+			logger.warn("handleSecurity: have SessionAuth but name is null (bug?, Authenticator={}), returning value of org.ogema.impl.security.test.nameNull.accept",
+					httpses.getAttribute("Authenticator"));
+			httpses.invalidate();
+			return Boolean.getBoolean("org.ogema.impl.security.test.nameNull.accept");
 		}
 		// Look for access right of the user to the app sites according this http context.
 		String usrName = sesAuth.getName();
