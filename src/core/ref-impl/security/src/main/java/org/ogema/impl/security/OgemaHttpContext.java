@@ -67,6 +67,9 @@ import org.ogema.core.application.Application;
 import org.ogema.core.security.WebAccessManager;
 import org.ogema.util.Util;
 import org.ogema.webadmin.AdminWebAccessManager;
+import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleException;
+import org.osgi.framework.FrameworkUtil;
 import org.osgi.framework.ServiceReference;
 import org.osgi.service.http.HttpContext;
 import org.osgi.service.useradmin.Authorization;
@@ -388,6 +391,21 @@ public class OgemaHttpContext implements HttpContext {
 		} else if (sesAuth.getName() == null) {
 			logger.warn("handleSecurity: have SessionAuth but name is null (bug?, Authenticator={}), returning value of org.ogema.impl.security.test.nameNull.accept",
 					httpses.getAttribute("Authenticator"));
+			if (Boolean.getBoolean("org.ogema.impl.security.test.nameNull.restart")) {
+				logger.error("trying framework shutdown because of OgemaHttpContext SessionAuth");
+				try {
+					Bundle b = FrameworkUtil.getBundle(getClass());
+					Bundle fw = b.getBundleContext().getBundle(0);
+					if (fw != null) {
+						logger.error("shutting down framework because of OgemaHttpContext SessionAuth bug");
+						fw.stop();
+					} else {
+						logger.error("framework shutdown because of OgemaHttpContext SessionAuth bug failed, could not get framework bunlde");
+					}
+				} catch (RuntimeException | BundleException e) {
+					logger.error("framework shutdown because of OgemaHttpContext SessionAuth bug failed", e);
+				}
+			}
 			httpses.invalidate();
 			return Boolean.getBoolean("org.ogema.impl.security.test.nameNull.accept");
 		}
