@@ -18,10 +18,15 @@ package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.stream.Stream;
+import org.ogema.core.model.Resource;
 import org.ogema.core.model.simple.BooleanResource;
+import org.ogema.core.model.simple.IntegerResource;
+import org.ogema.core.resourcemanager.ResourceStructureEvent;
+import org.ogema.core.resourcemanager.ResourceStructureListener;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.AbstractDeviceHandler;
 import org.osgi.service.component.annotations.Component;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandler;
@@ -33,6 +38,7 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEvent;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HmEventListener;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.ogema.model.actors.OnOffSwitch;
+import org.ogema.model.sensors.DoorWindowSensor;
 import org.ogema.model.sensors.GenericBinarySensor;
 import org.ogema.tools.resource.util.ResourceUtils;
 import org.osgi.framework.Constants;
@@ -40,7 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Sets up resources for HmIP-FSM devices. The ChannelHandler accepts both
+ * Sets up resources for HmIP-FSM and similar devices (BSL, PS(M), DRSI). The ChannelHandler accepts both
  * SWITCH_TRANSMITTER and SWITCH_VIRTUAL_RECEIVER channels and creates a single
  * {@link OnOffSwitch} that will control the relais. The state of the
  * SWITCH_VIRTUAL_RECEIVERs is made available in {@link GenericBinarySensor}s.
@@ -49,6 +55,9 @@ import org.slf4j.LoggerFactory;
  */
 @Component(service = {DeviceHandlerFactory.class}, property = {Constants.SERVICE_RANKING + ":Integer=1"})
 public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
+	
+	public static final String LINK_CHANNEL_NUMBER = "linkChannelNumber";
+	public final static String SHUTTER_CONTACT_DECORATOR = "linkedShutterContact";
 
     static class FsmChannels extends AbstractDeviceHandler {
 
@@ -57,7 +66,7 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
 
         private static final String SWITCH_VIRTUAL_RECEIVER_TYPE = "SWITCH_VIRTUAL_RECEIVER";
         private static final String SWITCH_TRANSMITTER_TYPE = "SWITCH_TRANSMITTER";
-
+		
         public FsmChannels(HomeMaticConnection conn) {
             super(conn);
         }
@@ -91,7 +100,8 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
 		boolean parentTypeMatches(DeviceDescription desc) {
 			return Stream.of("HmIP-BSL", "HmIP-BS2", "HmIP-BSM", "HmIP-FSM", "HmIP-FSM16",
 					"HmIP-SCTH230", "HMIP-PS", "HmIP-PS-2", "HmIP-PS-2 9YM", "HMIP-PSM-2").anyMatch(t -> t.equalsIgnoreCase(desc.getParentType()))
-					|| desc.getParentType().toLowerCase().startsWith("hmip-ps-2");
+					|| desc.getParentType().toLowerCase().startsWith("hmip-ps-2")
+					|| desc.getParentType().toLowerCase().startsWith("hmip-drsi");
 		}
 
         @Override
@@ -127,6 +137,14 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
             sw.stateControl().create();
             sw.stateFeedback().create();
             sw.stateControl().create();
+			if (desc.getParentType().toLowerCase().startsWith("hmip-drsi")) {
+				IntegerResource i = sw.getSubResource(LINK_CHANNEL_NUMBER, IntegerResource.class);
+				if (!i.isActive()) {
+					i.create();
+					i.setValue(3);
+					i.activate(false);
+				}
+			}
             logger.debug("adding STATE listener to {}", sw.stateControl().getPath());
             sw.stateControl().addValueListener((BooleanResource br) -> {
                 boolean isOn = br.getValue();
@@ -164,6 +182,8 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
             sw.stateControl().activate(false);
             sw.stateFeedback().activate(false);
             sw.activate(false);
+			conn.registerControlledResource(conn.getChannel(parent, desc.getAddress()), sw);
+			setupShutterContactLinking(sw, conn, logger);
         }
 
         private void setupSwitchVirtualReceiver(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
@@ -177,6 +197,7 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
             conn.addEventListener(new StateEventListener(sens.reading(), desc.getAddress()));
             fsmVirtualReceivers.computeIfAbsent(base, _s -> new ConcurrentSkipListMap<>())
                     .put(desc.getAddress(), sens);
+			conn.registerControlledResource(conn.getChannel(parent, desc.getAddress()), sens);
             logger.trace("FSM virtual receivers: {}", fsmVirtualReceivers);
         }
 
@@ -186,5 +207,62 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
     public DeviceHandler createHandler(HomeMaticConnection connection) {
         return new FsmChannels(connection);
     }
+	
+	static void setupShutterContactLinking(final OnOffSwitch onOff, HomeMaticConnection conn, Logger logger) {
+		final String senderChannelType = "SHUTTER_CONTACT";
+		final String receiverChannelType = "SWITCH_VIRTUAL_RECEIVER";
+        DoorWindowSensor shutterContact = onOff.getSubResource(SHUTTER_CONTACT_DECORATOR, DoorWindowSensor.class);
+        
+        ResourceStructureListener l = new ResourceStructureListener() {
+
+            @Override
+            public void resourceStructureChanged(ResourceStructureEvent event) {
+				logger.info(event.toString());
+                Resource added = event.getChangedResource();
+                if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_ADDED) {
+					int channelNum = onOff.getSubResource(LINK_CHANNEL_NUMBER, IntegerResource.class).isActive()
+						? onOff.getSubResource(LINK_CHANNEL_NUMBER, IntegerResource.class).getValue()
+						: -1;
+                    if (added instanceof DoorWindowSensor) {
+                        DeviceHandlers.linkChannels(conn, added, senderChannelType,
+                                onOff, receiverChannelType, channelNum, logger,
+                                "Shutter Contact", "Window open sensor / AC on/off link", false);
+                    }
+                } else if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_REMOVED
+                		&& (added instanceof DoorWindowSensor)) {
+                	// since we do not know which resource the link referenced before it got deleted
+                	// we need to use the low level API to find out all links for the weather receiver channel
+					int channelNum = onOff.getSubResource(LINK_CHANNEL_NUMBER, IntegerResource.class).isActive()
+						? onOff.getSubResource(LINK_CHANNEL_NUMBER, IntegerResource.class).getValue()
+						: -1;
+					Optional<HmDevice> recChan = DeviceHandlers.findDeviceChannel(conn, added, receiverChannelType, channelNum, logger);
+					if (!recChan.isPresent()) {
+						logger.debug("channel not found on {}: type {}, number {}", onOff.getPath(), receiverChannelType, channelNum);
+						return;
+					}
+					String receiverChannelAddress = recChan.get().address().getValue();
+                	for (Map<String, Object> link : conn.performGetLinks(receiverChannelAddress, 0)) {
+                		if (!receiverChannelAddress.equals(link.get("RECEIVER"))) {
+                			continue;
+						}
+                		final Object sender = link.get("SENDER");
+                		if (!(sender instanceof String)) {
+                			continue;
+						}
+                		conn.performRemoveLink((String) sender, receiverChannelAddress);
+                		logger.info("AC switch / shutter contact connection removed. Switch channel {}, shutter contact sensor {}",
+                				receiverChannelAddress, sender);
+                	}
+                }
+            }
+        };
+        onOff.addStructureListener(l);
+        if (shutterContact.isActive()) {
+            DeviceHandlers.linkChannels(conn, shutterContact, senderChannelType,
+                    onOff, receiverChannelType, logger,
+                    "Shutter Contact", "Window open sensor / AC on/off link", false);
+        }
+
+	}
 
 }
