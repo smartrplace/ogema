@@ -2,6 +2,7 @@ package org.ogema.drivers.homematic.xmlrpc.hl.channels;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.ogema.core.model.Resource;
@@ -90,9 +91,13 @@ abstract class DeviceHandlers {
                     logger.debug("removing link {} => {}", senderAddress, receiverAddress);
                     conn.performRemoveLink(senderAddress, receiverAddress);
                 } else {
-                    logger.debug("adding link {} => {}", senderAddress, receiverAddress);
-                    conn.performAddLink(senderAddress, receiverAddress,
-                        linkName, linkDescription);
+					if (linkExists(senderAddress, receiverAddress, conn, logger)) {
+						logger.debug("link {} => {} already exists", senderAddress, receiverAddress);
+					} else {
+						logger.debug("adding link {} => {}", senderAddress, receiverAddress);
+						conn.performAddLink(senderAddress, receiverAddress,
+							linkName, linkDescription);
+					}
                 }
                 return true;
             } else {
@@ -103,6 +108,11 @@ abstract class DeviceHandlers {
         }
         return false;
     }
+	
+	static boolean linkExists(String senderAddress, String receiverAddress, HomeMaticConnection conn, Logger logger) {
+		List<Map<String, Object>> links = conn.performGetLinks(receiverAddress, 0);
+		return links.stream().anyMatch(m -> senderAddress.equals(m.get("SENDER")) && receiverAddress.equals(m.get("RECEIVER")));
+	}
 	
 	/**
      * Link (or delink) 2 channels. The given devices must have been registered
@@ -130,9 +140,13 @@ abstract class DeviceHandlers {
                     logger.debug("removing link {} => {}", senderAddress, receiverAddress);
                     conn.performRemoveLink(senderAddress, receiverAddress);
                 } else {
-                    logger.debug("adding link {} => {}", senderAddress, receiverAddress);
-                    conn.performAddLink(senderAddress, receiverAddress,
-                        linkName, linkDescription);
+					if (linkExists(senderAddress, receiverAddress, conn, logger)) {
+						logger.debug("link {} => {} already exists", senderAddress, receiverAddress);
+					} else {
+						logger.debug("adding link {} => {}", senderAddress, receiverAddress);
+						conn.performAddLink(senderAddress, receiverAddress,
+							linkName, linkDescription);
+					}
                 }
                 return true;
             } else {
