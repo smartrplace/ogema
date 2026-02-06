@@ -24,6 +24,7 @@ import org.ogema.model.devices.generators.HeatGenerator;
 import org.ogema.model.devices.storage.ThermalStorage;
 import org.ogema.model.prototypes.PhysicalElement;
 import org.ogema.model.sensors.EnergyAccumulatedSensor;
+import org.ogema.model.sensors.TemperatureSensor;
 
 /**
  * Central heating model.
@@ -68,10 +69,21 @@ public interface CentralHeating extends PhysicalElement {
 	EnergyAccumulatedSensor primaryEnergy();
 	
 	/**
+	 * Main heating circuit pump. Note that for complex installations, every
+	 * {@link ThermalMixingConnection} in {@link #mixingCircuits() } also has a
+	 * pump field.
+	 * 
+	 * @return the pump for the main heating circuit.
+	 */
+	Pump heatingPump();
+	
+	/**
 	 * Additional mixing circuits for heating.
 	 * 
 	 * @return connected mixing circuits.
 	 */
 	ResourceList<ThermalMixingConnection> mixingCircuits();
+	
+	TemperatureSensor outdoorTemperature();
 
 }
