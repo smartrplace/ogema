@@ -266,7 +266,9 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
 	
 	// return true for devices that actually have no battery despite listing battery parameters
 	private boolean hasNoBattery(DeviceDescription desc) {
-		return desc.getParentType().contains("BWTH24") || desc.getParentType().endsWith("WTH");
+		return desc.getParentType().contains("BWTH24")
+				|| desc.getParentType().endsWith("WTH")
+				|| desc.getParentType().contains("DRSI");
 	}
 
     @Override
