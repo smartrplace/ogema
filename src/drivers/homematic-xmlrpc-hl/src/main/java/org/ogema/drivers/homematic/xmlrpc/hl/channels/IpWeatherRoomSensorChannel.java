@@ -139,9 +139,13 @@ public class IpWeatherRoomSensorChannel extends AbstractDeviceHandler implements
     	}
     	return false;
     }
+	
+	private SensorDevice getDevice(HmDevice parent, String deviceName) {
+		return parent.addDecorator(deviceName, SensorDevice.class);
+	}
     
     private ResourceList<Sensor> getSensorList(HmDevice parent, String deviceName) {
-        SensorDevice sd = parent.addDecorator(deviceName, SensorDevice.class);
+        SensorDevice sd = getDevice(parent, deviceName);
         ResourceList<Sensor> sensors = sd.sensors();
         sensors.create();
         sd.activate(false);
@@ -192,7 +196,8 @@ public class IpWeatherRoomSensorChannel extends AbstractDeviceHandler implements
                 }
             }
         }
-        
+		// setup CONTROL_MODE decorator and set mode to manual (1) for new devices.
+		ThermostatUtils.setupControlModeResource(getDevice(parent, swName), null, conn, desc.getAddress(), 1, logger);
         conn.addEventListener(new WeatherEventListener(resources, desc.getAddress()));
     }
     

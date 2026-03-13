@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -19,7 +18,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -44,7 +42,9 @@ import org.ogema.drivers.homematic.xmlrpc.ll.api.ParameterDescription;
 import org.ogema.model.actors.MultiSwitch;
 import org.ogema.model.devices.buildingtechnology.Thermostat;
 import org.ogema.model.devices.buildingtechnology.ThermostatProgram;
+import org.ogema.model.prototypes.PhysicalElement;
 import org.ogema.model.sensors.DoorWindowSensor;
+import org.ogema.model.sensors.TemperatureSensor;
 import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.slf4j.Logger;
 
@@ -493,21 +493,57 @@ public abstract class ThermostatUtils {
 			conn.performPutParamset(address, "MASTER", programParams);
 		}
 	}
-
+	
 	static void setupControlModeResource(Thermostat thermos, HomeMaticConnection conn, final String deviceAddress) {
-		IntegerResource controlMode = thermos.addDecorator(CONTROL_MODE_DECORATOR, IntegerResource.class);
+		setupControlModeResource(thermos, thermos.temperatureSensor(), conn, deviceAddress, null, null);
+	}
+
+	/**
+	 * generic CONTROL_MODE setup, optionally sets a mode directly on creation.
+	 * Temperature sensor is also optional, to support the SensorDevice created
+	 * by IpWeatherRoomSensorChannel for HmIP-STH devices which is not
+	 * actually set up as a thermostat by that ChannelHandler.
+	 * 
+	 * @param device base resource for decorator
+	 * @param tempSens (optional) the temperature sensor to use for settings
+	 * @param conn
+	 * @param deviceAddress 
+	 * @param newDeviceMode (optional) set this mode for newly created devices
+	 * @param logger
+	 */
+	static void setupControlModeResource(PhysicalElement device, TemperatureSensor tempSens, HomeMaticConnection conn, final String deviceAddress, Integer newDeviceMode, Logger logger) {
+		IntegerResource controlMode = device.addDecorator(CONTROL_MODE_DECORATOR, IntegerResource.class);
+		boolean isNew = !controlMode.exists();
 		controlMode.create().activate(false);
+		if (isNew && newDeviceMode != null) {
+			controlMode.setValue(newDeviceMode);
+		}
 		controlMode.addValueListener(new ResourceValueListener<IntegerResource>() {
 			@Override
 			public void resourceChanged(IntegerResource resource) {
 				Map<String, Object> params = new HashMap<>();
+				int mode = resource.getValue();
 				// 0: automatic, 1: manual
 				// cannot be read, but will be available as VALUES/SET_POINT_MODE
-				params.put("CONTROL_MODE", resource.getValue());
-				params.put("SET_POINT_TEMPERATURE", thermos.temperatureSensor().settings().setpoint().getCelsius());
+				params.put("CONTROL_MODE", mode);
+				if (tempSens != null) {
+					params.put("SET_POINT_TEMPERATURE", tempSens.settings().setpoint().getCelsius());
+				}
 				conn.performPutParamset(deviceAddress, "VALUES", params);
+				if (logger != null) {
+					logger.debug("setting CONTROL_MODE for {} to {}", device.getPath(), mode);
+				}
 			}
 		}, true);
+		if (isNew && newDeviceMode != null) {
+			if (logger != null) {
+				logger.debug("setting CONTROL_MODE for new device {} to {}", device.getPath(), newDeviceMode);
+			}
+			Map<String, Object> params = new HashMap<>();
+			params.put("CONTROL_MODE", newDeviceMode);
+			// do not transmit a temperature value for new device
+			conn.performPutParamset(deviceAddress, "VALUES", params);
+		}
 	}
 
 	/* DoorWindowSensors that are linked on the thermostat as sub resource SHUTTER_CONTACT_DECORATOR
