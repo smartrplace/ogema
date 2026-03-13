@@ -16,6 +16,38 @@ import org.slf4j.Logger;
  * @author jlapp
  */
 abstract class DeviceHandlers {
+
+	/**
+	 * Setup a link from sender to receiver and remove all other links to the receiver.
+	 *
+	 * @param senderChannelAddress sender
+	 * @param receiverChannelAddress receiver
+	 * @param conn connection
+	 * @param logger logger
+	 */
+	public static void setSingleChannelLink(String senderChannelAddress, String receiverChannelAddress, String linkName, String linkDescription, HomeMaticConnection conn, Logger logger) {
+		boolean linkExists = false;
+		for (Map<String, Object> link : conn.performGetLinks(receiverChannelAddress, 0)) {
+			if (!receiverChannelAddress.equals(link.get("RECEIVER"))) {
+				continue;
+			}
+			final Object sender = link.get("SENDER");
+			if (!(sender instanceof String)) {
+				continue;
+			}
+			if (senderChannelAddress.equals(sender)) {
+				logger.debug("{} link {} => {} already exists", linkName, senderChannelAddress, receiverChannelAddress);
+				linkExists = true;
+			} else {
+				logger.info("removing unknown / stale {} link {} => {}", linkName, senderChannelAddress, receiverChannelAddress);
+				conn.performRemoveLink((String) sender, receiverChannelAddress);
+			}
+		}
+		if (!linkExists) {
+			logger.info("adding new link {} => {}", senderChannelAddress, receiverChannelAddress);
+			conn.performAddLink(senderChannelAddress, receiverChannelAddress, linkName, linkDescription);
+		}
+	}
     
     private DeviceHandlers() {}
 	
@@ -81,32 +113,7 @@ abstract class DeviceHandlers {
     static boolean linkChannels(HomeMaticConnection conn,
             Resource senderDevice, String senderChannelType, Resource receiverDevice, String receiverChannelType,
             Logger logger, String linkName, String linkDescription, boolean removeLink) {
-        Optional<HmDevice> senderChannel = findDeviceChannel(conn, senderDevice, senderChannelType, logger);
-        if (senderChannel.isPresent()) {
-            Optional<HmDevice> receiverChannel = findDeviceChannel(conn, receiverDevice, receiverChannelType, logger);
-            if (receiverChannel.isPresent()) {
-                String senderAddress = senderChannel.get().address().getValue();
-                String receiverAddress = receiverChannel.get().address().getValue();
-                if (removeLink) {
-                    logger.debug("removing link {} => {}", senderAddress, receiverAddress);
-                    conn.performRemoveLink(senderAddress, receiverAddress);
-                } else {
-					if (linkExists(senderAddress, receiverAddress, conn, logger)) {
-						logger.debug("link {} => {} already exists", senderAddress, receiverAddress);
-					} else {
-						logger.debug("adding link {} => {}", senderAddress, receiverAddress);
-						conn.performAddLink(senderAddress, receiverAddress,
-							linkName, linkDescription);
-					}
-                }
-                return true;
-            } else {
-                logger.debug("could not find channel (receiver) {} / {}", receiverDevice.getPath(), receiverChannelType);
-            }
-        } else {
-            logger.debug("could not find channel (sender) {} / {}", senderDevice.getPath(), senderChannelType);
-        }
-        return false;
+		return linkChannels(conn, senderDevice, senderChannelType, receiverDevice, receiverChannelType, -1, logger, linkName, linkDescription, removeLink, false);
     }
 	
 	static boolean linkExists(String senderAddress, String receiverAddress, HomeMaticConnection conn, Logger logger) {
@@ -121,15 +128,16 @@ abstract class DeviceHandlers {
      * @param senderChannelType 
      * @param receiverDevice 
      * @param receiverChannelType 
-	 * @param num channel number of receiver channel in case of multiple channels with same type
+	 * @param num channel number of receiver channel in case of multiple channels with same type, or -1 to ignore number
      * @param logger 
      * @param linkName (optional)
      * @param linkDescription (optional)
      * @param removeLink remove link if true, otherwise add link
+	 * @param singleLink when adding a link, remove all other incoming links on the receiver
      */
 	static boolean linkChannels(HomeMaticConnection conn,
             Resource senderDevice, String senderChannelType, Resource receiverDevice, String receiverChannelType, int num,
-            Logger logger, String linkName, String linkDescription, boolean removeLink) {
+            Logger logger, String linkName, String linkDescription, boolean removeLink, boolean singleLink) {
         Optional<HmDevice> senderChannel = findDeviceChannel(conn, senderDevice, senderChannelType, logger);
         if (senderChannel.isPresent()) {
             Optional<HmDevice> receiverChannel = findDeviceChannel(conn, receiverDevice, receiverChannelType, num, logger);
@@ -140,12 +148,16 @@ abstract class DeviceHandlers {
                     logger.debug("removing link {} => {}", senderAddress, receiverAddress);
                     conn.performRemoveLink(senderAddress, receiverAddress);
                 } else {
-					if (linkExists(senderAddress, receiverAddress, conn, logger)) {
-						logger.debug("link {} => {} already exists", senderAddress, receiverAddress);
+					if (singleLink) {
+						setSingleChannelLink(senderAddress, receiverAddress, linkName, linkDescription, conn, logger);
 					} else {
-						logger.debug("adding link {} => {}", senderAddress, receiverAddress);
-						conn.performAddLink(senderAddress, receiverAddress,
-							linkName, linkDescription);
+						if (linkExists(senderAddress, receiverAddress, conn, logger)) {
+							logger.debug("link {} => {} already exists", senderAddress, receiverAddress);
+						} else {
+							logger.debug("adding link {} => {}", senderAddress, receiverAddress);
+							conn.performAddLink(senderAddress, receiverAddress,
+								linkName, linkDescription);
+						}
 					}
                 }
                 return true;

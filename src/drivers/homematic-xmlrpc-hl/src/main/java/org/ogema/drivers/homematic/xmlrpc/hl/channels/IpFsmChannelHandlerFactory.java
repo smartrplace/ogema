@@ -226,7 +226,7 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
                     if (added instanceof DoorWindowSensor) {
                         DeviceHandlers.linkChannels(conn, added, senderChannelType,
                                 onOff, receiverChannelType, channelNum, logger,
-                                "Shutter Contact", "Window open sensor / AC on/off link", false);
+                                "Shutter Contact", "Window open sensor / AC on/off link", false, false);
                     }
                 } else if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_REMOVED
                 		&& (added instanceof DoorWindowSensor)) {
@@ -258,9 +258,12 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
         };
         onOff.addStructureListener(l);
         if (shutterContact.isActive()) {
+			int channelNum = onOff.getSubResource(LINK_CHANNEL_NUMBER, IntegerResource.class).isActive()
+						? onOff.getSubResource(LINK_CHANNEL_NUMBER, IntegerResource.class).getValue()
+						: -1;
             DeviceHandlers.linkChannels(conn, shutterContact, senderChannelType,
-                    onOff, receiverChannelType, logger,
-                    "Shutter Contact", "Window open sensor / AC on/off link", false);
+                    onOff, receiverChannelType, channelNum, logger,
+                    "Shutter Contact", "Window open sensor / AC on/off link", false, false);
         }
 
 	}

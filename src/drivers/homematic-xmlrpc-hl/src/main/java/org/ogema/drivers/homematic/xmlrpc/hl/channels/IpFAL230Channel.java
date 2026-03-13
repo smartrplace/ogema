@@ -198,17 +198,18 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
 
             @Override
             public void resourceStructureChanged(ResourceStructureEvent event) {
-                Resource added = event.getChangedResource();
                 if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_ADDED) {
+					Resource added = event.getChangedResource();
                     if (added.getName().equals(LINKED_THERMOSTAT_DECORATOR) && added instanceof Thermostat) {
 						Optional<HmDevice> senderChannel = findDeviceChannel(conn, added, TEMPERATURE_SENDER_CHANNEL, logger);
 						senderChannel.ifPresent(sender -> {
 							String senderAddress = sender.address().getValue();
-							conn.performAddLink(senderAddress, falmotChannel, "Valve-Thermostat-Link", "Link wall thermostat - floor heating");
+							//conn.performAddLink(senderAddress, falmotChannel, "Valve-Thermostat-Link", "Link wall thermostat - floor heating");
+							DeviceHandlers.setSingleChannelLink(senderAddress, falmotChannel, "Valve-Thermostat-Link", "Link wall thermostat - floor heating", conn, logger);
 						});
                     }
                 } else if (event.getType() == ResourceStructureEvent.EventType.SUBRESOURCE_REMOVED
-                		&& added.getName().equals(LINKED_THERMOSTAT_DECORATOR)) {
+                		&& event.getChangedResource().getName().equals(LINKED_THERMOSTAT_DECORATOR)) {
                 	// since we do not know which resource the link referenced before it got deleted
                 	// we need to use the low level API to find out all links for the weather receiver channel
                     String receiverChannelAddress = falmotChannel;
@@ -230,10 +231,12 @@ public class IpFAL230Channel extends AbstractDeviceHandler implements DeviceHand
 			Optional<HmDevice> senderChannel = findDeviceChannel(conn, tempSens, TEMPERATURE_SENDER_CHANNEL, logger);
 			senderChannel.ifPresent(sender -> {
 				String senderAddress = sender.address().getValue();
-				logger.debug("adding temperature sensor link {} => {}", senderAddress, falmotChannel);
-				conn.performAddLink(senderAddress, falmotChannel, "Valve-Thermostat-Link", "Link wall thermostat - floor heating");
+				//logger.debug("adding temperature sensor link {} => {}", senderAddress, falmotChannel);
+				//conn.performAddLink(senderAddress, falmotChannel, "Valve-Thermostat-Link", "Link wall thermostat - floor heating");
+				DeviceHandlers.setSingleChannelLink(senderAddress, falmotChannel, "Valve-Thermostat-Link", "Link wall thermostat - floor heating", conn, logger);
 			});
 		}
     }
+	
 	
 }
