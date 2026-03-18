@@ -268,7 +268,9 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
 	private boolean hasNoBattery(DeviceDescription desc) {
 		return desc.getParentType().contains("BWTH24")
 				|| desc.getParentType().endsWith("WTH")
-				|| desc.getParentType().contains("DRSI");
+				|| desc.getParentType().contains("DRSI")
+				|| desc.getParentType().contains("FAL2")
+				|| desc.getParentType().contains("FALMOT");
 	}
 
     @Override
