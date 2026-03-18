@@ -34,6 +34,7 @@ import org.ogema.model.devices.buildingtechnology.Thermostat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
+import org.ogema.drivers.homematic.xmlrpc.hl.channels.IpThermostatChannelHandlerFactory.Config;
 import org.ogema.model.sensors.HumiditySensor;
 import org.ogema.tools.resource.util.ResourceUtils;
 import org.ogema.tools.resource.util.ValueResourceUtils;
@@ -53,9 +54,11 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
     public static final String CONTROL_MODE_DECORATOR = "controlMode";
 
     Logger logger = LoggerFactory.getLogger(getClass());
+	Config cfg;
 
-    public IpThermostatChannel(HomeMaticConnection conn) {
+    public IpThermostatChannel(HomeMaticConnection conn, Config cfg) {
         super(conn);
+		this.cfg = cfg;
     }
 
     enum PARAMS {
@@ -165,6 +168,7 @@ public class IpThermostatChannel extends AbstractDeviceHandler {
 				/*"HMIP-eTRV".equalsIgnoreCase(pType) //XXX also matched by IpThermostatBChannel
 				||*/ pType.toLowerCase().startsWith("hmip-wth-")
 				|| pType.toLowerCase().startsWith("hmip-bwth")
+				|| (cfg.handleSTH() && pType.toLowerCase().startsWith("hmip-sth"))
 		);
 		return parentTypeMatches && "HEATING_CLIMATECONTROL_TRANSCEIVER".equalsIgnoreCase(desc.getType());
     }

@@ -19,18 +19,36 @@ import org.osgi.service.component.annotations.Component;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandler;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandlerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
+import org.ogema.drivers.homematic.xmlrpc.hl.channels.IpThermostatChannelHandlerFactory.Config;
 import org.osgi.framework.Constants;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.metatype.annotations.Designate;
+import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
 /**
  *
  * @author jlapp
  */
-@Component(service = {DeviceHandlerFactory.class}, property = {Constants.SERVICE_RANKING + ":Integer=1"})
+@Designate(ocd = Config.class)
+// ranking: above IpWeatherRoomSensorChannel which would create STH as SensorDevice
+@Component(service = {DeviceHandlerFactory.class}, property = {Constants.SERVICE_RANKING + ":Integer=5"})
 public class IpThermostatChannelHandlerFactory implements DeviceHandlerFactory {
+	
+	@ObjectClassDefinition
+	public static @interface Config {
+		boolean handleSTH() default true;
+	}
+	
+	Config cfg;
+	
+	@Activate
+	protected void activate(Config config) {
+		this.cfg = config;
+	}
 
     @Override
     public DeviceHandler createHandler(HomeMaticConnection connection) {
-        return new IpThermostatChannel(connection);
+        return new IpThermostatChannel(connection, cfg);
     }    
     
 }

@@ -48,6 +48,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author jlapp
  */
+// ranking: below IpThermostatChannelHandlerFactory which should create STH as thermostat
 @Component(service = {DeviceHandlerFactory.class}, property = {Constants.SERVICE_RANKING + ":Integer=1"})
 public class IpWeatherRoomSensorChannel extends AbstractDeviceHandler implements DeviceHandlerFactory {
     
