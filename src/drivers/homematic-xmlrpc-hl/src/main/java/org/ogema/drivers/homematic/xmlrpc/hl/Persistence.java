@@ -111,14 +111,12 @@ class Persistence implements HmBackend, DeviceListener {
 				if (!res.exists()) {
 					logger.debug("new device: {}", res.getPath());
 					long now = System.currentTimeMillis();
-					/*
 					hm.lastDeviceChangeTime().create();
 					hm.lastDeviceChangeTime().setValue(now);
 					hm.lastDeviceChangeTime().activate(false);
 					hm.lastDeviceChange().create();
 					hm.lastDeviceChange().setValue(String.format("added %s %s", dd.getType(), dd.getAddress()), now);
 					hm.lastDeviceChange().activate(false);
-					*/
 				} else {
 					logger.debug("added known device: {}", res.getPath());
 				}
