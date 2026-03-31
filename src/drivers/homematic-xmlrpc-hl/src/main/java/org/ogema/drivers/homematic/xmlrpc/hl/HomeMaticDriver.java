@@ -400,6 +400,7 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 										toplevelDevice.deactivate(true);
 									}
 									long now = System.currentTimeMillis();
+									/*
 									HmLogicInterface hm = conn.baseResource;
 									hm.lastDeviceChangeTime().create();
 									hm.lastDeviceChangeTime().setValue(now);
@@ -407,6 +408,7 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 									hm.lastDeviceChange().create();
 									hm.lastDeviceChange().setValue(String.format("deleted %s %s", type, address), now);
 									hm.lastDeviceChange().activate(false);
+									*/
 								} catch (IOException ex) {
 									logger.error("cloud not delete device {}: {}", toplevelDevice.getPath(), ex.getMessage());
 									logger.trace("cloud not delete device {}", toplevelDevice.getPath(), ex);
