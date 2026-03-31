@@ -22,10 +22,6 @@ import java.util.Map;
 import java.util.Objects;
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.core.model.ValueResource;
-import org.ogema.core.model.array.StringArrayResource;
-import org.ogema.core.model.simple.IntegerResource;
-import org.ogema.core.model.simple.StringResource;
-import org.ogema.core.resourcemanager.ResourceValueListener;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmLogicInterface;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
@@ -111,8 +107,19 @@ class Persistence implements HmBackend, DeviceListener {
             this.descriptions.put(dd.getAddress(), dd);
             String deviceResName = createResourceName(dd.getType(), dd.getAddress());
             if (dd.isDevice()) {
-                HmDevice res = hm.devices().addDecorator(deviceResName, HmDevice.class);
-                logger.debug("new device: {}", res.getPath());
+                HmDevice res = hm.devices().getSubResource(deviceResName, HmDevice.class);
+				if (!res.exists()) {
+					logger.debug("new device: {}", res.getPath());
+					long now = System.currentTimeMillis();
+					hm.lastDeviceChangeTime().create();
+					hm.lastDeviceChangeTime().setValue(now);
+					hm.lastDeviceChangeTime().activate(false);
+					hm.lastDeviceChange().create();
+					hm.lastDeviceChange().setValue(String.format("added %s %s", dd.getType(), dd.getAddress()), now);
+					hm.lastDeviceChange().activate(false);
+				} else {
+					logger.debug("added known device: {}", res.getPath());
+				}
                 storeDeviceData(res, dd);
                 res.activate(true);
             } else {

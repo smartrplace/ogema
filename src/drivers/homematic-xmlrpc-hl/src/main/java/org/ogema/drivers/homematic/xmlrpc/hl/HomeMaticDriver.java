@@ -387,6 +387,7 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 							case 4: {
 								logger.info("deleting device with disableStatus {} from CCU: {}", disableStatus, toplevelDevice.getPath());
 								try {
+									String type = toplevelDevice.type().getValue();
 									// 0x01 = reset before delete
 									// 0x02 = delete even if not reachable
 									// 0x04 = delete as soon as reachable
@@ -398,6 +399,14 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 										logger.info("deactivating device with disableStatus {}: {}", disableStatus, toplevelDevice.getPath());
 										toplevelDevice.deactivate(true);
 									}
+									long now = System.currentTimeMillis();
+									HmLogicInterface hm = conn.baseResource;
+									hm.lastDeviceChangeTime().create();
+									hm.lastDeviceChangeTime().setValue(now);
+									hm.lastDeviceChangeTime().activate(false);
+									hm.lastDeviceChange().create();
+									hm.lastDeviceChange().setValue(String.format("deleted %s %s", type, address), now);
+									hm.lastDeviceChange().activate(false);
 								} catch (IOException ex) {
 									logger.error("cloud not delete device {}: {}", toplevelDevice.getPath(), ex.getMessage());
 									logger.trace("cloud not delete device {}", toplevelDevice.getPath(), ex);

@@ -20,6 +20,7 @@ import org.ogema.core.model.ResourceList;
 import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.StringResource;
+import org.ogema.core.model.simple.TimeResource;
 import org.ogema.model.actors.OnOffSwitch;
 
 /**
@@ -122,5 +123,15 @@ public interface HmLogicInterface extends Resource {
      * @return Bidcos interface information.
      */
     HmInterfaceInfo interfaceInfo();
+	
+	/**
+	 * @return timestamp of last device added or deleted event.
+	 */
+	TimeResource lastDeviceChangeTime();
+	
+	/**
+	 * @return informational text describing the last device change (add/delete, address etc.)
+	 */
+	StringResource lastDeviceChange();
     
 }
