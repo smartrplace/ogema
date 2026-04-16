@@ -18,6 +18,7 @@ package org.ogema.drivers.homematic.xmlrpc.hl.api;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionStage;
 import org.ogema.core.model.Resource;
 import org.ogema.drivers.homematic.xmlrpc.hl.types.HmDevice;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.DeviceDescription;
@@ -85,7 +86,7 @@ public interface HomeMaticConnection extends HomeMaticConnectionI {
     
     List<Map<String, Object>> performGetLinks(String address, int flags);
 
-    void performPutParamset(String address, String set, Map<String, Object> values);
+    CompletionStage<Void> performPutParamset(String address, String set, Map<String, Object> values);
 
     void performSetValue(String address, String valueKey, Object value);
 

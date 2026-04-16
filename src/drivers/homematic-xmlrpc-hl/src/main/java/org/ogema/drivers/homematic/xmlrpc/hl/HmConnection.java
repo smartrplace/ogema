@@ -37,6 +37,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -435,9 +436,11 @@ public class HmConnection implements HomeMaticConnection {
 	}
 
 	@Override
-	public void performPutParamset(String address, String set, Map<String, Object> values) {
+	public CompletionStage<Void> performPutParamset(String address, String set, Map<String, Object> values) {
         logger.debug("adding putParamset action: {} {} {}", address, set, values);
-		writer.addWriteAction(WriteAction.createPutParamset(client, address, set, values));
+		WriteAction w = WriteAction.createPutParamset(client, address, set, values);
+		writer.addWriteAction(w);
+		return w.f;
 	}
 
     @Override

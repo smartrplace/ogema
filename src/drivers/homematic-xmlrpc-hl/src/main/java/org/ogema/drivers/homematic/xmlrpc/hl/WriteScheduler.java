@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.drivers.homematic.xmlrpc.hl.events.HomeMaticEventMessages;
@@ -137,6 +138,14 @@ public class WriteScheduler implements Closeable {
                         WriteAction wa = it.next();
                         if (wa.target().equals(next.target())) {
                             wa.coalesce(next); //next is the older action here
+							WriteAction replaced = next;
+							wa.f.whenComplete((v, e) -> {
+								if (e != null) {
+									replaced.f.completeExceptionally(e);
+								} else {
+									replaced.f.complete(v);
+								}
+							});
                             next = wa;
                             it.remove();
                             coalesce_count++;
@@ -162,6 +171,7 @@ public class WriteScheduler implements Closeable {
                     if (next.tries() >= MAX_RETRIES) {
                         logger.error("discarding write to {} after {} failed tries.",
                                 next.target(), next.tries());
+						next.f.completeExceptionally(new TimeoutException("failed after " + MAX_RETRIES + " tries"));
                         eventAdmin.postEvent(HomeMaticEventMessages.createWriteFailedEvent(appman, next.target()));
                     } else {
                         // the scheduler does not actually use system time,
@@ -176,14 +186,18 @@ public class WriteScheduler implements Closeable {
                     Thread.sleep(SLEEP_AFTER_ERROR);
                 } else {
                     if (next.tries() > 1) {
-                        logger.info("failed write for {} succeeded on try {}", next.target(), next.tries());
+                        logger.debug("failed write for {} succeeded on try {}", next.target(), next.tries());
                     }
+					logger.debug("write completed: {}", next.target());
+					next.f.complete(null);
                 }
             }
         } catch (InterruptedException ie) {
             //ok, shutting down
             logger.debug("write thread shutting down");
-        }
+        } catch (RuntimeException re) {
+			logger.error("bug in writescheduler thread", re);
+		}
 
     }
 

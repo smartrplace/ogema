@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import org.apache.xmlrpc.XmlRpcException;
 import org.ogema.drivers.homematic.xmlrpc.ll.api.HomeMatic;
 import org.ogema.drivers.homematic.xmlrpc.ll.xmlrpc.MapXmlRpcStruct;
@@ -36,6 +37,7 @@ public abstract class WriteAction {
     private boolean success = false;
     
     private static final Logger LOGGER = LoggerFactory.getLogger(WriteScheduler.class);
+	CompletableFuture<Void> f = new CompletableFuture<>();
     
     // for the scheduler
     long nextRun = firstTry;

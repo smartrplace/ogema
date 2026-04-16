@@ -13,8 +13,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.Executors;
@@ -60,6 +62,9 @@ public abstract class ThermostatUtils {
 	static final int THREADS_PER_CONNECTION = 16;
 	static final Map<String, ScheduledExecutorService> PARAMETER_UPDATES_EXECUTORS = new ConcurrentHashMap<>();
 	static final Map<String, ScheduledFuture<?>> PARAMETER_UPDATE_TASKS = new ConcurrentSkipListMap<>();
+	static final long PARAMETER_UPDATE_DELAY_MS = 3000;
+	static final long PARAMETER_UPDATE_RETRY_MS = 15000;
+	static final long PARAMETER_REWRITE_MS = 60000;
 
 	private final static Map<String, Class<? extends SingleValueResource>> PARAMETERS;
 
@@ -105,21 +110,21 @@ public abstract class ThermostatUtils {
 			logger.info("Parameter set '{}' updated for {}: {}", set, address, parameterSet);
 		}
 		
-		static Object getResourceValue(SingleValueResource resource, Logger logger) {
-			Object resourceValue = null;
-			if (resource instanceof IntegerResource) {
-				resourceValue = ((IntegerResource) resource).getValue();
-			} else if (resource instanceof BooleanResource) {
-				resourceValue = ((BooleanResource) resource).getValue();
-			} else if (resource instanceof FloatResource) {
-				resourceValue = ((FloatResource) resource).getValue();
-			} else {
-				logger.warn("unsupported parameter type: " + resource);
-			}
-			return resourceValue;
-		}
-
 	};
+	
+	static Object getResourceValue(SingleValueResource resource, Logger logger) {
+		Object resourceValue = null;
+		if (resource instanceof IntegerResource) {
+			resourceValue = ((IntegerResource) resource).getValue();
+		} else if (resource instanceof BooleanResource) {
+			resourceValue = ((BooleanResource) resource).getValue();
+		} else if (resource instanceof FloatResource) {
+			resourceValue = ((FloatResource) resource).getValue();
+		} else {
+			logger.warn("unsupported parameter type: " + resource);
+		}
+		return resourceValue;
+	}
 
 	private static void setupDecalcDecorators(HmDevice parent, DeviceDescription desc,
 			Map<String, Map<String, ParameterDescription<?>>> paramSets,
@@ -302,35 +307,72 @@ public abstract class ThermostatUtils {
 			paramList.create();
 		}
 		ParameterListener l = new ParameterListener(conn, address, set.name(), logger);
-		Runnable updateValues = () -> {
-			Thread.currentThread().setName("HomeMatic Parameter Update " + desc.getAddress());
-			try {
-				Map<String, Object> values = conn.getParamset(address, set.name());
-				int count = 0;
-				for (String paramName : params.keySet()) {
-					Object value = values.get(paramName);
-					if (value == null) {
-						logger.debug("missing value for {} in getParamset response on {}", paramName, address);
-						continue;
+		Runnable updateValues = new Runnable() {
+			@Override
+			public void run() {
+				Thread.currentThread().setName("HomeMatic Parameter Update " + desc.getAddress());
+				try {
+					Map<String, Object> values = conn.getParamset(address, set.name());
+					//FIXME: warn
+					logger.warn("read {} parameter values for {}", set.name(), address);
+					int count = 0;
+					for (String paramName : params.keySet()) {
+						if (Thread.currentThread().isInterrupted()) {
+							return;
+						}
+						Object value = values.get(paramName);
+						if (value == null) {
+							logger.debug("missing value for {} in getParamset response on {}", paramName, address);
+							continue;
+						}
+						String fbName = paramName + "_FEEDBACK";
+						SingleValueResource fb = paramList.getSubResource(fbName, parameters.get(paramName));
+						fb.create();
+						ValueResourceUtils.setValue(fb, value);
+						fb.activate(false);
+						count++;
+
+						SingleValueResource ctrl = paramList.getSubResource(paramName, parameters.get(paramName));
+						if (ctrl.isActive() && ctrl.getLastUpdateTime() > 0) {
+							String vCtrl = ValueResourceUtils.getValue(ctrl);
+							String vFb = ValueResourceUtils.getValue(fb);
+							logger.trace("compare parameter value/feedback for {}, {} ({}): {} / {}", address, paramName, set.name(), vCtrl, vFb);
+							if (!Objects.equals(vCtrl, vFb)) {
+								long now = System.currentTimeMillis();
+								if (now - ctrl.getLastUpdateTime() < PARAMETER_REWRITE_MS) {
+									logger.warn("parameter mismatch for {}, {} ({}): {} / {}, queue another update", address, paramName, set.name(), vCtrl, vFb);
+									queueParameterUpdate(address, conn, this, PARAMETER_UPDATE_RETRY_MS, logger);
+								} else {
+									logger.warn("parameter mismatch for {}, {} ({}): {} / {}, rewrite and queue another update", address, paramName, set.name(), vCtrl, vFb);
+									Object resourceValue = getResourceValue(ctrl, logger);
+									Map<String, Object> parameterSet = new HashMap<>();
+									parameterSet.put(paramName, resourceValue);
+									CompletionStage<Void> putFuture = conn.performPutParamset(address, set.name(), parameterSet);
+									putFuture.whenComplete((v,e) -> {
+										if (e != null) {
+											logger.warn("PutParamset failed for {} ({})", address, e.getMessage());
+										} else {
+											//FIXME: warn
+											logger.warn("PutParamset complete for {}, queueing update request", address);
+											queueParameterUpdate(address, conn, this, PARAMETER_UPDATE_DELAY_MS, logger);
+										}
+									});
+								}
+							}
+						}
 					}
-					String fbName = paramName + "_FEEDBACK";
-					SingleValueResource fb = paramList.getSubResource(fbName, parameters.get(paramName));
-					fb.create();
-					ValueResourceUtils.setValue(fb, value);
-					fb.activate(false);
-					count++;
+					logger.debug("{} parameters updated on {}", count, paramList);
+				} catch (IOException | RuntimeException ex) {
+					logger.debug("updating parameter values failed for {}: {}", address, ex.getMessage());
 				}
-				logger.debug("{} parameters updated on {}", count, paramList);
-			} catch (IOException | RuntimeException ex) {
-				logger.debug("updating parameter values failed for {}: {}", address, ex.getMessage());
+				Thread.currentThread().setName(String.format("HomeMatic Parameter Update %s (done)", desc.getAddress()));
 			}
-			Thread.currentThread().setName(String.format("HomeMatic Parameter Update %s (done)", desc.getAddress()));
 		};
 		ResourceValueListener<BooleanResource> updateListener = (BooleanResource b) -> {
 			if (!b.getValue()) {
 				return;
 			}
-			queueParameterUpdate(address, conn, updateValues, 3000, logger);
+			queueParameterUpdate(address, conn, updateValues, PARAMETER_UPDATE_DELAY_MS, logger);
 			logger.trace("number of pending parameter updates for {}: {}", conn.getConnectionUrl(), PARAMETER_UPDATE_TASKS.size());
 		};
 		parameters.forEach((p, t) -> {
@@ -382,7 +424,7 @@ public abstract class ThermostatUtils {
 			ScheduledFuture<?> f = PARAMETER_UPDATES_EXECUTORS
 					.computeIfAbsent(conn.getConnectionUrl(), _c -> Executors.newScheduledThreadPool(THREADS_PER_CONNECTION))
 					.schedule(updateValues, delay, TimeUnit.MILLISECONDS);
-			PARAMETER_UPDATE_TASKS.put(address, f);
+			ScheduledFuture<?> fOld = PARAMETER_UPDATE_TASKS.put(address, f);
 	}
 
 	static void setupProgramListener(String address, HomeMaticConnection conn,
