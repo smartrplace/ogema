@@ -41,6 +41,10 @@ public class MapXmlRpcStruct implements XmlRpcStruct {
     
     @Override
     public boolean getBoolean(String key) {
+		Object v = struct.get(key);
+		if (v instanceof Boolean) {
+			return (Boolean) v;
+		}
         return ((Number) struct.get(key)).intValue() != 0;
     }
     

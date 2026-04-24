@@ -138,5 +138,9 @@ public interface HomeMaticConnection extends HomeMaticConnectionI {
      */
 	@Override
     void deleteDevice(String address, int flags) throws IOException;
+	
+	void refreshDeployedDeviceFirmwareList() throws IOException;
+	
+	boolean updateFirmware(String device) throws IOException;
     
 }

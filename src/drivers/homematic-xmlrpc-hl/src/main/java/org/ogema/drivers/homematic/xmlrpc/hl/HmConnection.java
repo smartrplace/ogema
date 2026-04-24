@@ -270,7 +270,7 @@ public class HmConnection implements HomeMaticConnection {
                 return;
             }
             Optional<Map<String, Object>> defaultIf = ifs.stream()
-                    .filter(m -> Boolean.valueOf(m.getOrDefault("DEFAULT", "false").toString()))
+                    .filter(m -> Boolean.parseBoolean(m.getOrDefault("DEFAULT", "false").toString()))
                     .findAny();
             Map<String, Object> interfaceInfo = defaultIf.orElse(ifs.get(0));
             logger.debug("read Bidcos interface information: {}", interfaceInfo);
@@ -1035,6 +1035,24 @@ public class HmConnection implements HomeMaticConnection {
 	public void setInstallMode(boolean on, int time, int mode) throws IOException {
 		try {
 			client.setInstallMode(on, time, mode);
+		} catch (XmlRpcException xe) {
+			throw new IOException(xe.getMessage(), xe);
+		}
+	}
+	
+	@Override
+	public void refreshDeployedDeviceFirmwareList() throws IOException {
+		try {
+			client.refreshDeployedDeviceFirmwareList();
+		} catch (XmlRpcException xe) {
+			throw new IOException(xe.getMessage(), xe);
+		}
+	}
+	
+	@Override
+	public boolean updateFirmware(String device) throws IOException {
+		try {
+			return client.installFirmware(device);
 		} catch (XmlRpcException xe) {
 			throw new IOException(xe.getMessage(), xe);
 		}

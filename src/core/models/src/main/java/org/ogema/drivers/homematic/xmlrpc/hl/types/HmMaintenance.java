@@ -18,6 +18,7 @@ package org.ogema.drivers.homematic.xmlrpc.hl.types;
 import org.ogema.core.model.Resource;
 import org.ogema.core.model.simple.BooleanResource;
 import org.ogema.core.model.simple.IntegerResource;
+import org.ogema.core.model.simple.StringResource;
 import org.ogema.model.communication.CommunicationStatus;
 import org.ogema.model.devices.storage.ElectricityStorage;
 import org.ogema.model.sensors.GenericBinarySensor;
@@ -69,5 +70,9 @@ public interface HmMaintenance extends Resource {
     GenericBinarySensor dutyCycle();
     
     BooleanResource configPending();
+	
+	BooleanResource updatePending();
+	
+	StringResource firmwareVersion();
     
 }

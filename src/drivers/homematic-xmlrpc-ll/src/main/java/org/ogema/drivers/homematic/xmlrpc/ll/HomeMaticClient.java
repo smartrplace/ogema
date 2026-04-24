@@ -206,6 +206,18 @@ public class HomeMaticClient implements HomeMatic {
         return ((Number) client.execute("getInstallMode", new Object[]{})).intValue();
     }
 
+	@Override
+	public void refreshDeployedDeviceFirmwareList() throws XmlRpcException {
+		logger.trace("refreshDeployedDeviceFirmwareList");
+		client.execute("refreshDeployedDeviceFirmwareList", new Object[]{});
+	}
+
+	@Override
+	public boolean installFirmware(String device) throws XmlRpcException {
+		logger.trace("installFirmware {}", device);
+        return (boolean) client.execute("installFirmware", new Object[]{device});
+	}
+	
     @Override
     public void setInstallMode(boolean on, int time, int mode) throws XmlRpcException {
     	if (type == HomematicType.Ip) {

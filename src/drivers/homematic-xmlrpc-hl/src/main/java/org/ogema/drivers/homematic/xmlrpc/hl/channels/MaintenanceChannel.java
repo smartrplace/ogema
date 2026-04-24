@@ -50,6 +50,7 @@ import org.ogema.model.sensors.GenericBinarySensor;
 import org.ogema.model.sensors.GenericFloatSensor;
 import org.ogema.model.sensors.Sensor;
 import org.ogema.tools.resource.util.ResourceUtils;
+import org.ogema.tools.resource.util.ValueResourceUtils;
 
 /**
  * Handler for {@code MAINTENANCE} channels on BidCos and HmIP devices. See
@@ -82,7 +83,8 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
         OPERATING_VOLTAGE,
         RSSI_DEVICE,
         RSSI_PEER,
-        UNREACH
+        UNREACH,
+		UPDATE_PENDING
 
     }
 	
@@ -249,6 +251,11 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
 					mnt.battery().internalVoltage().reading().activate(false);
                 } else if (PARAMS.UNREACH.name().equals(e.getValueKey())) {
                     mnt.communicationStatus().communicationDisturbed().setValue(e.getValueBoolean());
+                } else if (PARAMS.UPDATE_PENDING.name().equals(e.getValueKey())) {
+                    BooleanResource b = mnt.getSubResource("updatePending", BooleanResource.class);
+					b.create();
+					b.setValue(e.getValueBoolean());
+					b.activate(false);
                 }
             }
         }
@@ -306,6 +313,8 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
         }
         HmMaintenance mnt = parent.addDecorator(swName, HmMaintenance.class).create();
 		mnt.activate(true);
+		String version = desc.getString(DeviceDescription.KEYS.FIRMWARE.name());
+		ValueResourceUtils.initResource(mnt.firmwareVersion(), mnt, version, null, true);
 		if (values.containsKey(PARAMS.LOWBAT.name()) || values.containsKey(PARAMS.LOW_BAT.name())) {
 			// create the battery field as it will be probably be linked into higher level models
 		    mnt.batteryLow().create();

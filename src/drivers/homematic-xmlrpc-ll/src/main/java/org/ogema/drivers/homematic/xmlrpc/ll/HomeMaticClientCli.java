@@ -50,9 +50,10 @@ public class HomeMaticClientCli {
         Dictionary<String, Object> props = new Hashtable<>();
         props.put("osgi.command.scope", commandScope);
         props.put("osgi.command.function", new String[]{
-            "list", "listBidcosInterfaces", "params", "tim", "read", "readValue", "readParams", "putParams", "valueUsage", "set",
-        "addLink", "removeLink", "getLinkInfo", "getLinks",
-        "deleteDevice", "abortDeleteDevice", "getServiceMessages", "client", "ping"});
+			"list", "listBidcosInterfaces", "params", "tim", "read", "readValue", "readParams", "putParams", "valueUsage", "set",
+			"addLink", "removeLink", "getLinkInfo", "getLinks",
+			"deleteDevice", "abortDeleteDevice", "getServiceMessages", "client", "ping", "refreshDeployedDeviceFirmwareList",
+			"updateFirmware", "installFirmware", "installFirmwareA"});
         return ctx.registerService(HomeMaticClientCli.class, this, props);
     }
     
@@ -64,8 +65,19 @@ public class HomeMaticClientCli {
     public void list() throws Exception {
         List<DeviceDescription> l = client.listDevices();
         for (DeviceDescription dd : l) {
-            System.out.printf("%s%s (v%s) @ %s%n", dd.isDevice() ? "" : "  ", dd.getType(), dd.getVersion(), dd.getAddress());
-        }
+			System.out.printf("%s%s (v%s) @ %s%n", dd.isDevice() ? "" : "  ", dd.getType(), dd.getVersion(), dd.getAddress());
+			if (dd.isDevice()) {
+				String fw = dd.getString(DeviceDescription.KEYS.FIRMWARE.name());
+				String fwa = dd.getString(DeviceDescription.KEYS.AVAILABLE_FIRMWARE.name());
+				System.out.printf("    Firmware: %s", fw);
+				if (fwa != null && !fwa.equals("0.0.0")) {
+					System.out.printf(", available update: %s, updateable=%b%n",
+							fwa, dd.getBoolean(DeviceDescription.KEYS.UPDATABLE.name()));
+				} else {
+					System.out.println();
+				}
+			}
+		}
     }
 
     /**
@@ -103,8 +115,7 @@ public class HomeMaticClientCli {
             Object val = e.getValue();
             if (val.getClass().isArray()) {
                 try {
-                
-                        out.append(Arrays.toString((Object[])val));
+                    out.append(Arrays.toString((Object[])val));
                 } catch (StackOverflowError wtf) {
                     out.append("XXXXXXXXXXXXXXXX");
                 }
@@ -245,5 +256,13 @@ public class HomeMaticClientCli {
     public void setClient(HomeMatic client) {
         this.client = client;
     }
-    
+	
+	public void refreshDeployedDeviceFirmwareList() throws Exception {
+		client.refreshDeployedDeviceFirmwareList();
+	}
+	
+	public boolean installFirmware(String device) throws Exception {
+		return client.installFirmware(device);
+	}
+	
 }

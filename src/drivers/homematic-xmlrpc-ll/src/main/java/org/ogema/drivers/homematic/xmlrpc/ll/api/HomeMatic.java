@@ -103,5 +103,14 @@ public interface HomeMatic {
     List<Map<String, Object>> listBidcosInterfaces() throws XmlRpcException;
     
     XmlRpcStruct rssiInfo() throws XmlRpcException;
+	
+	void refreshDeployedDeviceFirmwareList() throws XmlRpcException;
+	
+	/*
+	  documentation shows only updateFirmware;
+	  compare function cmd_firmware_update in ccu cgi script /www/config/ic_ifacecmd.cgi;
+	  apparently updateFirmware is only for BidCos
+	*/
+	boolean installFirmware(String device) throws XmlRpcException;
     
 }
