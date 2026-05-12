@@ -313,8 +313,12 @@ public final class MaintenanceChannel extends AbstractDeviceHandler {
         }
         HmMaintenance mnt = parent.addDecorator(swName, HmMaintenance.class).create();
 		mnt.activate(true);
-		String version = desc.getString(DeviceDescription.KEYS.FIRMWARE.name());
-		ValueResourceUtils.initResource(mnt.firmwareVersion(), mnt, version, null, true);
+		//FIXME(?) firmware version not available here!
+		//String version = desc.getString(DeviceDescription.KEYS.FIRMWARE.name());
+		//ValueResourceUtils.initResource(mnt.firmwareVersion(), mnt, version, null, true);
+		if (mnt.firmwareVersion().isActive() && (mnt.firmwareVersion().getValue() == null || mnt.firmwareVersion().getValue().isEmpty())) {
+			mnt.firmwareVersion().delete();
+		}
 		if (values.containsKey(PARAMS.LOWBAT.name()) || values.containsKey(PARAMS.LOW_BAT.name())) {
 			// create the battery field as it will be probably be linked into higher level models
 		    mnt.batteryLow().create();
