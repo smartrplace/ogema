@@ -198,5 +198,17 @@ public class ChannelUtils {
 		return rval;
 	}
 
+	/**
+	 * @return the channel number of the device
+	 * @throws IllegalArgumentException if desc is not a channel description (is main device)
+	 * @throws NullPointerException if argument is null
+	 */
+	public static int getChannelNumber(DeviceDescription desc) {
+		int addrStart = desc.getAddress().lastIndexOf(":");
+		if (addrStart == -1) {
+			throw new IllegalArgumentException("not a channel description, address=" + desc.getAddress());
+		}
+		return Integer.parseInt(desc.getAddress().substring(addrStart+1));
+	}
 	
 }

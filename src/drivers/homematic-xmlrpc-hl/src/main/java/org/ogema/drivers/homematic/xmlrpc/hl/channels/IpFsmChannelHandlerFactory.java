@@ -123,25 +123,47 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
             }
         }
 
-        private String baseAddress(String address) {
-            String base = address.split(":")[0];
-            logger.trace("base for {}: {}", address, base);
-            return base;
+		/*
+		 * for devices with multiple switches (DRSI4), the SWITCH_VIRTUAL_RECEIVER
+		 * channels must be mapped to the correct SWITCH_TRANSMITTER,
+		 * currently only supported for the DRSI4
+		 */
+        private String controllingSwitchId(DeviceDescription dd) {
+			String parentType = dd.getParentType();
+			String id;
+			String pre = dd.getAddress().split(":")[0];
+			if (parentType.contains("DRSI4")) {
+				int chan = ChannelUtils.getChannelNumber(dd);
+				if (chan < 9) {
+					id = pre + ":5";
+				} else if (chan < 13) {
+					id = pre + ":9";
+				} else if (chan < 17) {
+					id = pre + ":13";
+				} else {
+					id = pre + ":17";
+				}
+			} else {
+				id = dd.getAddress().split(":")[0];
+			}
+            logger.trace("id for {}: {}", dd.getAddress(), id);
+            return id;
         }
 
         private void setupSwitchTransmitter(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
             logger.debug("setup SWITCH handler for address {}", desc.getAddress());
             String swName = ResourceUtils.getValidResourceName("SWITCH_" + desc.getAddress());
-            String base = baseAddress(desc.getAddress());
+            String switchId = controllingSwitchId(desc);
             OnOffSwitch sw = parent.addDecorator(swName, OnOffSwitch.class);
             sw.stateControl().create();
             sw.stateFeedback().create();
             sw.stateControl().create();
 			if (desc.getParentType().toLowerCase().startsWith("hmip-drsi")) {
+				int switchChannelNumber = ChannelUtils.getChannelNumber(desc);
 				IntegerResource i = sw.getSubResource(LINK_CHANNEL_NUMBER, IntegerResource.class);
 				if (!i.isActive()) {
 					i.create();
-					i.setValue(3);
+					i.setValue(switchChannelNumber + 1);
 					i.activate(false);
 				}
 			}
@@ -149,17 +171,17 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
             sw.stateControl().addValueListener((BooleanResource br) -> {
                 boolean isOn = br.getValue();
                 logger.trace("FSM virtual receivers: {}", fsmVirtualReceivers);
-                logger.trace("FSM virtual receivers for {}: {}", base, fsmVirtualReceivers.get(base));
+                logger.trace("FSM virtual receivers for {}: {}", switchId, fsmVirtualReceivers.get(switchId));
                 if (isOn) {
                     //turn on the first virtual receiver channel
-                    fsmVirtualReceivers.getOrDefault(base, Collections.emptyMap()).entrySet().stream().findFirst()
+                    fsmVirtualReceivers.getOrDefault(switchId, Collections.emptyMap()).entrySet().stream().findFirst()
                             .ifPresent(e -> {
                                 logger.debug("{} STATE:={}", e.getKey(), true);
                                 conn.performSetValue(e.getKey(), "STATE", true);
                             });
                 } else {
                     //turn off all virtual receiver channels with state=true
-                    fsmVirtualReceivers.getOrDefault(base, Collections.emptyMap())
+                    fsmVirtualReceivers.getOrDefault(switchId, Collections.emptyMap())
                             .forEach((addr, sens) -> {
                                 if (sens.reading().getValue() || !sens.reading().isActive()) {
                                     logger.debug("{} STATE:={}", addr, false);
@@ -189,13 +211,13 @@ public class IpFsmChannelHandlerFactory implements DeviceHandlerFactory {
         private void setupSwitchVirtualReceiver(HmDevice parent, DeviceDescription desc, Map<String, Map<String, ParameterDescription<?>>> paramSets) {
             logger.debug("setup SWITCH_VIRTUAL_RECEIVER handler for address {}", desc.getAddress());
             String sensName = ResourceUtils.getValidResourceName("VIRTUAL_SWITCH_FEEDBACK_" + desc.getAddress());
-            String base = baseAddress(desc.getAddress());
+            String switchId = controllingSwitchId(desc);
             GenericBinarySensor sens = parent.addDecorator(sensName, GenericBinarySensor.class);
             sens.reading().create();
             sens.reading().activate(false);
             sens.activate(false);
             conn.addEventListener(new StateEventListener(sens.reading(), desc.getAddress()));
-            fsmVirtualReceivers.computeIfAbsent(base, _s -> new ConcurrentSkipListMap<>())
+            fsmVirtualReceivers.computeIfAbsent(switchId, _s -> new ConcurrentSkipListMap<>())
                     .put(desc.getAddress(), sens);
 			conn.registerControlledResource(conn.getChannel(parent, desc.getAddress()), sens);
             logger.trace("FSM virtual receivers: {}", fsmVirtualReceivers);
