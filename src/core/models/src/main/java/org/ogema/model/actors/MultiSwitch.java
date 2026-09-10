@@ -68,6 +68,8 @@ public interface MultiSwitch extends Actor {
 
 	@Override
 	GenericFloatTargetRange settings();
+	
+	GenericFloatTargetRange deviceFeedback();
 
 	/**
 	 * Net electrical power of the device as a function of the {@link #stateControl()}. The
