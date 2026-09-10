@@ -35,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import org.apache.xmlrpc.XmlRpcException;
 import org.ogema.core.application.Application;
@@ -48,6 +49,7 @@ import org.ogema.core.model.simple.IntegerResource;
 import org.ogema.core.model.simple.SingleValueResource;
 import org.ogema.core.model.simple.StringResource;
 import org.ogema.core.resourcemanager.ResourceDemandListener;
+import org.ogema.drivers.homematic.xmlrpc.hl.HomeMaticDriver.Config;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandler;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.DeviceHandlerFactory;
 import org.ogema.drivers.homematic.xmlrpc.hl.api.HomeMaticConnection;
@@ -71,6 +73,8 @@ import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.event.EventAdmin;
+import org.osgi.service.metatype.annotations.Designate;
+import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,6 +82,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author jlapp
  */
+@Designate(ocd = Config.class)
 @Component(service = {Application.class},
 		property = {"osgi.command.scope=hmhl",
 			"osgi.command.function=checkPrograms",
@@ -89,6 +94,7 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 
 	private ApplicationManager appman;
 	private EventAdmin eventAdmin;
+	private Config cfg;
 	private ComponentContext ctx;
 	private Logger logger = LoggerFactory.getLogger(getClass());
 	private final Map<HmLogicInterface, HmConnection> connections = new HashMap<>();
@@ -105,6 +111,13 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 
 	// store accepted devices (by address) so they are not offered again on a different connection
 	private final Map<String, ConnectedDevice> acceptedDevices = new ConcurrentSkipListMap<>();
+	
+	@ObjectClassDefinition
+	protected @interface Config {
+		
+		String[] blockedHmLogicPaths() default {};
+		
+	}
 
 	private static class ConnectedDevice {
 
@@ -183,7 +196,8 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 	}
 
 	@Activate
-	protected void activate(ComponentContext ctx) {
+	protected void activate(Config cfg, ComponentContext ctx) {
+		this.cfg = cfg;
 		this.ctx = ctx;
 		/*
         delay registration until set of DeviceHandlerFactories is stable,
@@ -214,6 +228,10 @@ public class HomeMaticDriver implements Application, HomeMaticDeviceAccess {
 
 		@Override
 		public void resourceAvailable(HmLogicInterface t) {
+			if (Stream.of(cfg.blockedHmLogicPaths()).anyMatch(s -> s.endsWith(t.getPath()))) {
+				logger.info("ignoring blocked resource: {}", t.getPath());
+				return;
+			}
 			List<DeviceHandlerFactory> l = new ArrayList<>(handlerFactories.size());
 			synchronized (handlerFactories) {
 				for (HandlerRegistration reg : handlerFactories) {

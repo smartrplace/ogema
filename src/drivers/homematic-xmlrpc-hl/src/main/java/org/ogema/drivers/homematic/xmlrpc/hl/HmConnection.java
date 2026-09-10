@@ -131,22 +131,15 @@ public class HmConnection implements HomeMaticConnection {
 	 */
 	final List<DeviceHandler> handlers;
 
-	public static Resource getToplevelResource(Resource r) {
-		Resource res = r.getLocationResource();
-		while (!res.isTopLevel()) {
-			res = res.getParent();
-			if (res == null) {
-				throw new IllegalStateException("This should never occur!");
-			}
-		}
-		return res;
-	}
-
 	private final ResourceDemandListener<HmDevice> devResourceListener = new ResourceDemandListener<HmDevice>() {
 
 		@Override
 		public void resourceAvailable(HmDevice t) {
-			if (!getToplevelResource(t).equalsLocation(baseResource)) {
+			Resource hmLogicIf = t.getParent();
+			while (hmLogicIf != null && !hmLogicIf.equalsLocation(baseResource)) {
+				hmLogicIf = hmLogicIf.getParent();
+			}
+			if (hmLogicIf == null) {
 				return;
 			}
 			hmDriver.setupDevice(t);
