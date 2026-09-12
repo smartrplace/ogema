@@ -59,6 +59,45 @@ public interface CCUAccessI {
 	
 	public List<HomematicConnectionData> getConnectionsData(HmLogicInterface iface);
 	
+	/** Data of a direct link ("Direktverknüpfung") between two device channels as it is configured
+	 * on a CCU. See the HomeMatic XML-RPC method {@code getLinks}.
+	 */
+	public static class HomematicLinkData {
+		/** Address of the sending channel, e.g. "LEQ0568335:1"*/
+		public String sender;
+		/** Address of the receiving channel, e.g. "OEQ2083227:1"*/
+		public String receiver;
+		/** Link name configured on the CCU, e.g. "TempSens". May be null.*/
+		public String name;
+		/** Link description configured on the CCU. May be null.*/
+		public String description;
+		public int flags;
+		/** CCU on which the link is configured*/
+		public HmLogicInterface iface;
+	}
+
+	/** Get the direct links configured on a CCU. This is a pure reading operation on the CCU.
+	 * 
+	 * @param iface CCU
+	 * @param address device or channel address the links shall be reported for, e.g. "OEQ2083227:1".
+	 * 		If null or empty all links known to the CCU are returned.
+	 * @return all links in which the address given is involved (as sender or as receiver), respectively
+	 * 		all links of the CCU if no address is given. An empty list is returned if the CCU is not
+	 * 		connected.
+	 * @throws IOException if the CCU could not be queried
+	 */
+	public List<HomematicLinkData> getLinks(HmLogicInterface iface, String address) throws IOException;
+
+	/** Get all direct links configured on a CCU,
+	 * see {@link #getLinks(HmLogicInterface, String)}
+	 */
+	public List<HomematicLinkData> getLinks(HmLogicInterface iface) throws IOException;
+
+	/** Get all direct links configured on all CCUs connected. CCUs that cannot be queried are just
+	 * skipped, so use {@link #getLinks(HmLogicInterface)} if you need to detect such failures.
+	 */
+	public List<HomematicLinkData> getAllLinks();
+	
 	/**
 	 * Trigger a reboot of the connected CCU.
 	 * 
