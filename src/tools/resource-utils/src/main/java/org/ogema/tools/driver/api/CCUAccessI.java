@@ -93,6 +93,14 @@ public interface CCUAccessI {
 	 */
 	public List<HomematicLinkData> getLinks(HmLogicInterface iface) throws IOException;
 
+	/** Check whether the connection to a CCU is established. Note that direct links can only be
+	 * read from a connected CCU, see {@link #getLinks(HmLogicInterface, String)}.
+	 *
+	 * @param iface CCU
+	 * @return true if the CCU is known and connected
+	 */
+	public boolean isConnected(HmLogicInterface iface);
+
 	/** Get all direct links configured on all CCUs connected. CCUs that cannot be queried are just
 	 * skipped, so use {@link #getLinks(HmLogicInterface)} if you need to detect such failures.
 	 */
