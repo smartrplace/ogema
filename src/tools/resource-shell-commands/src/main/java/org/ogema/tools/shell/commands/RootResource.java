@@ -12,7 +12,6 @@ import org.ogema.core.resourcemanager.NoSuchResourceException;
 import org.ogema.core.resourcemanager.ResourceAccess;
 import org.ogema.core.resourcemanager.ResourceAlreadyExistsException;
 import org.ogema.core.resourcemanager.ResourceGraphException;
-import org.ogema.core.resourcemanager.ResourceListener;
 import org.ogema.core.resourcemanager.ResourceStructureListener;
 import org.ogema.core.resourcemanager.ResourceValueListener;
 import org.ogema.core.resourcemanager.VirtualResourceException;
@@ -23,11 +22,11 @@ import org.ogema.core.resourcemanager.VirtualResourceException;
  */
 public class RootResource implements Resource {
 	
-	final ApplicationManager appman;
+	//final ApplicationManager appman;
 	final ResourceAccess resacc;
 
 	public RootResource(ApplicationManager appman) {
-		this.appman = appman;
+		//this.appman = appman;
 		this.resacc = appman.getResourceAccess();
 	}
 
@@ -78,13 +77,13 @@ public class RootResource implements Resource {
 
 	@Override
 	@SuppressWarnings("deprecation")
-	public void addResourceListener(ResourceListener rl, boolean bln) {
+	public void addResourceListener(org.ogema.core.resourcemanager.ResourceListener rl, boolean bln) {
 		throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
 	}
 
 	@Override
 	@SuppressWarnings("deprecation")
-	public boolean removeResourceListener(ResourceListener rl) {
+	public boolean removeResourceListener(org.ogema.core.resourcemanager.ResourceListener rl) {
 		throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
 	}
 

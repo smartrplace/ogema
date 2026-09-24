@@ -37,6 +37,8 @@ import org.jline.reader.Candidate;
 import org.jline.reader.ParsedLine;
 import org.jline.terminal.Terminal;
 import org.jline.utils.InfoCmp;
+import org.ogema.core.administration.AdminApplication;
+import org.ogema.core.administration.AdministrationManager;
 import org.ogema.core.application.Application;
 import org.ogema.core.application.ApplicationManager;
 import org.ogema.core.model.Resource;
@@ -52,6 +54,7 @@ import org.ogema.tools.resource.util.ValueResourceUtils;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 
 /**
  *
@@ -86,6 +89,10 @@ complete -c resource:find -a '__resources'
 public class ResourcePathCommands implements Application {
 
 	ApplicationManager appman;
+	/*
+	@Reference
+	AdministrationManager admin;
+	*/
 	BundleContext ctx;
 
 	final static String CURRENT_RESOURCE = "currentResource";
@@ -552,7 +559,7 @@ public class ResourcePathCommands implements Application {
 		}
 		res.activate(rec);
 	}
-
+	
 	@Descriptor("deactivate resource")
 	public void deactivate(CommandSession sess,
 			@Descriptor("recursive")
@@ -740,9 +747,17 @@ public class ResourcePathCommands implements Application {
 			@Descriptor("Stop traversal at 'maxdepth' levels below starting point.") int maxdepth,
 			@Parameter(names = {"-H"}, absentValue = "false", presentValue = "true")
 			@Descriptor("Do not follow references.") boolean noFollowReferences,
+			@Parameter(names = {"-active", "-a"}, absentValue = "false", presentValue = "true")
+			@Descriptor("Match only active resources.") boolean active,
+			@Parameter(names = {"-inactive", "-i"}, absentValue = "false", presentValue = "true")
+			@Descriptor("Match only inactive resources.") boolean inactive,
 			Resource res) throws ClassNotFoundException {
 		if (!exec.isEmpty() && !print.isEmpty()) {
 			sess.getConsole().println("find: -exec and -print are mutually exclusive.");
+			return null;
+		}
+		if (active && inactive) {
+			sess.getConsole().println("find: -active and -inactive are mutually exclusive.");
 			return null;
 		}
 		Stream<Resource> s;
@@ -763,6 +778,12 @@ public class ResourcePathCommands implements Application {
 
 		Resource cwr = (Resource) sess.get(CURRENT_RESOURCE);
 		String pathrel = cwr != null && !cwr.getPath().isEmpty() ? "/" + cwr.getPath() : "";
+		
+		if (active) {
+			s = s.filter(r -> r.isActive());
+		} else if (inactive) {
+			s = s.filter(r -> !r.isActive());
+		}
 
 		if (!namerx.isEmpty()) {
 			if (namerx.startsWith("!")) {
@@ -820,16 +841,18 @@ public class ResourcePathCommands implements Application {
 		}
 		if (!exec.isEmpty()) {
 			Object outerIt = sess.get("it");
-			s.forEach(r -> {
-				try {
-					sess.put("it", r);
-					sess.execute(exec);
-				} catch (Exception ex) {
-					sess.put("it", outerIt);
-					throw new RuntimeException(ex);
-				}
-			});
-			sess.put("it", outerIt);
+			try {
+				s.forEach(r -> {
+					try {
+						sess.put("it", r);
+						sess.execute(exec);
+					} catch (Exception ex) {
+						throw new RuntimeException(ex);
+					}
+				});
+			} finally {
+				sess.put("it", outerIt);
+			}
 			return Collections.emptyList();
 		}
 		return s.collect(Collectors.toList());
@@ -863,6 +886,10 @@ public class ResourcePathCommands implements Application {
 			@Descriptor("Stop traversal at 'maxdepth' levels below starting point.") int maxdepth,
 			@Parameter(names = {"-H"}, absentValue = "false", presentValue = "true")
 			@Descriptor("Do not follow references.") boolean noFollowReferences,
+			@Parameter(names = {"-active", "-a"}, absentValue = "false", presentValue = "true")
+			@Descriptor("Match only active resources.") boolean active,
+			@Parameter(names = {"-inactive", "-i"}, absentValue = "false", presentValue = "true")
+			@Descriptor("Match only inactive resources.") boolean inactive,
 			String... path) throws Exception {
 		/*
 		Resource r = (Resource) sess.get(CURRENT_RESOURCE);
@@ -878,7 +905,7 @@ public class ResourcePathCommands implements Application {
 		res.forEach((p, r) -> {
 			sess.put(REQUEST_PATH, p);
 			try {
-				rval.addAll(find(sess, namerx, pathrx, locrx, type, time, value, print, exec, maxdepth, noFollowReferences, r));
+				rval.addAll(find(sess, namerx, pathrx, locrx, type, time, value, print, exec, maxdepth, noFollowReferences, active, inactive, r));
 			} catch (ClassNotFoundException cnfe) {
 				sess.getConsole().printf("find: unloadable resource: %s%n", cnfe.getMessage());
 			}
