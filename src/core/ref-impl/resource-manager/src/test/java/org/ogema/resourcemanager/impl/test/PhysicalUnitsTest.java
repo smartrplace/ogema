@@ -39,11 +39,13 @@ import org.ogema.core.model.units.MassResource;
 import org.ogema.core.model.units.PhysicalUnit;
 import org.ogema.core.model.units.PhysicalUnitResource;
 import org.ogema.core.model.units.PowerResource;
+import org.ogema.core.model.units.PressureResource;
 import org.ogema.core.model.units.TemperatureResource;
 import org.ogema.core.model.units.ThermalEnergyCapacityResource;
 import org.ogema.core.model.units.VelocityResource;
 import org.ogema.core.model.units.VoltageResource;
 import org.ogema.core.model.units.VolumeResource;
+import org.ogema.model.sensors.PressureSensor;
 import org.ogema.model.sensors.TemperatureSensor;
 import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
 import org.ops4j.pax.exam.spi.reactors.PerClass;
@@ -117,5 +119,19 @@ public class PhysicalUnitsTest extends OsgiTestBase {
 
 		FloatResource setpoint = tempSens.settings().setpoint();
 		assertTrue(setpoint instanceof TemperatureResource);
+	}
+	
+	@Test
+	public void pressureSensorTest() {
+		PressureSensor psens = resMan.createResource(newResourceName(), PressureSensor.class);
+		FloatResource mmxFloat = psens.reading();
+		mmxFloat.create();
+		PhysicalUnit unit = psens.reading().getUnit();
+		Assert.assertEquals(PhysicalUnit.PASCAL, unit);
+		assertTrue(mmxFloat instanceof PressureResource);
+		assertTrue(psens.reading() instanceof PressureResource);
+
+		FloatResource setpoint = psens.settings().setpoint();
+		assertTrue("actual class: " + setpoint.getResourceType(), setpoint instanceof PressureResource);
 	}
 }

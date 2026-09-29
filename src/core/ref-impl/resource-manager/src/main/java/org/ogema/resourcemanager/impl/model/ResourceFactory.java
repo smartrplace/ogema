@@ -54,6 +54,7 @@ import org.ogema.core.model.units.MassResource;
 import org.ogema.core.model.units.PercentageResource;
 import org.ogema.core.model.units.PhysicalUnitResource;
 import org.ogema.core.model.units.PowerResource;
+import org.ogema.core.model.units.PressureResource;
 import org.ogema.core.model.units.TemperatureResource;
 import org.ogema.core.model.units.ThermalEnergyCapacityResource;
 import org.ogema.core.model.units.VelocityResource;
@@ -103,6 +104,7 @@ import org.ogema.resourcemanager.impl.model.units.DefaultVelocityResource;
 import org.ogema.resourcemanager.impl.model.units.DefaultVoltageResource;
 import org.ogema.resourcemanager.impl.model.units.DefaultVolumeResource;
 import org.ogema.resourcemanager.impl.model.units.DefaultPercentageResource;
+import org.ogema.resourcemanager.impl.model.units.DefaultPressureResource;
 import org.ogema.resourcemanager.virtual.VirtualTreeElement;
 import org.ogema.resourcetree.TreeElement;
 import org.osgi.framework.Bundle;
@@ -217,6 +219,9 @@ public class ResourceFactory {
 				}
 				else if (resType.equals(PowerResource.class)) {
 					result = new DefaultPowerResource(el, resType, path, m_resMan);
+				}
+				else if (resType.equals(PressureResource.class)) {
+					result = new DefaultPressureResource(el, resType, path, m_resMan);
 				}
 				else if (resType.equals(TemperatureResource.class)) {
 					result = new DefaultTemperatureResource(el, resType, path, m_resMan);

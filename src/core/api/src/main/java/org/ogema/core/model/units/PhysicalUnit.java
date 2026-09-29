@@ -46,7 +46,8 @@ public enum PhysicalUnit {
     CUBIC_METERS("m³"),
     UNKNOWN("???"),
     PERCENT("%"),
-    AMPERE_HOURS("Ah");
+    AMPERE_HOURS("Ah"),
+	PASCAL("Pa");
     
 	static final Map<String, PhysicalUnit> stringToEnum;
 
